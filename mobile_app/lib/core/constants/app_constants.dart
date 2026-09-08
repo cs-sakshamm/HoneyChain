@@ -1,0 +1,92 @@
+import 'package:flutter/material.dart';
+
+/// Production Design System & App Constants for HoneyChain Mobile
+class AppConstants {
+  AppConstants._();
+
+  // App Identity
+  static const String appName = 'HoneyChain';
+  static const String appTagline = 'Supply chain management simplified for business owners.';
+  static const String legalDisclaimer =
+      'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
+
+  // Design Tokens: Color Palette (Senior SaaS Product Palette)
+  static const Color primary = Color(0xFFD97706); // Warm Honey Amber
+  static const Color honeyAccent = primary; // Alias for compatibility
+  static const Color primaryDark = Color(0xFFB45309); // Deep Amber
+  static const Color primarySoft = Color(0xFFFFFBEB); // Soft Amber Tint
+
+  static const Color background = Color(0xFFF9FAFB); // Neutral Light Background (Gray-50)
+  static const Color surface = Color(0xFFFFFFFF); // Pure White Surface
+  static const Color border = Color(0xFFE5E7EB); // Subtle Border (Gray-200)
+  static const Color borderFocus = Color(0xFFD97706); // Active Input Focus
+
+  static const Color textPrimary = Color(0xFF111827); // Dark Neutral (Gray-900)
+  static const Color textSecondary = Color(0xFF4B5563); // Muted Body Text (Gray-600)
+  static const Color textMuted = Color(0xFF9CA3AF); // Placeholder / Caption (Gray-400)
+
+  static const Color success = Color(0xFF059669); // Emerald Success
+  static const Color successBackground = Color(0xFFECFDF5);
+  static const Color error = Color(0xFFDC2626); // Production Error Red
+  static const Color errorBackground = Color(0xFFFEF2F2);
+  static const Color warning = Color(0xFFD97706); // Warning Amber
+
+  // Spacing Tokens (4px Grid System)
+  static const double space4 = 4.0;
+  static const double space8 = 8.0;
+  static const double space12 = 12.0;
+  static const double space16 = 16.0;
+  static const double space24 = 24.0;
+  static const double space32 = 32.0;
+  static const double space48 = 48.0;
+
+  // Component Dimensions
+  static const double buttonHeight = 48.0;
+  static const double inputHeight = 48.0;
+  static const double borderRadiusSmall = 8.0;
+  static const double borderRadiusMedium = 12.0;
+  static const double borderRadiusLarge = 16.0;
+
+  // Auth Text & Strings
+  static const String emailOrPhoneHint = 'Business Email or Phone';
+  static const String passwordHint = 'Password';
+  static const String businessNameHint = 'Legal Business Name';
+  static const String loginButtonText = 'Sign In to Account';
+  static const String createAccountButtonText = 'Create Business Account';
+  static const String forgotPasswordText = 'Forgot Password?';
+  static const String orDividerText = 'OR CONTINUE WITH';
+
+  // Provider Tooltips
+  static const String googleSignInText = 'Sign in with Google';
+  static const String appleSignInText = 'Sign in with Apple';
+  static const String phoneSignInText = 'Sign in with Phone';
+
+  // Navigation Links
+  static const String dontHaveAccountText = "New to HoneyChain? ";
+  static const String createAccountLinkText = 'Create Business Account';
+  static const String alreadyHaveAccountText = 'Already have an account? Sign In';
+
+  // OTP Verification
+  static const String phoneOtpTitle = 'Security Verification';
+  static const String phoneOtpSubtitle = 'Enter the 6-digit code sent to your registered phone number.';
+  static const String enterPhoneNumberHint = 'Mobile phone number (+1 234 567 8900)';
+  static const String sendOtpButtonText = 'Send Verification Code';
+  static const String verifyOtpButtonText = 'Verify & Access Dashboard';
+  static const String resendOtpText = 'Resend Code';
+
+  // Password Reset
+  static const String resetPasswordTitle = 'Reset Password';
+  static const String resetPasswordSubtitle = 'Enter your business email or phone to receive reset instructions.';
+  static const String sendResetLinkText = 'Send Reset Instructions';
+
+  // Status & Feedback
+  static const String signingInText = 'Authenticating...';
+  static const String authErrorText = 'Invalid credentials. Please verify your details and try again.';
+  static const String tryAgainText = 'Try Again';
+
+  // Logout Dialog
+  static const String logoutTitle = 'Confirm Log Out';
+  static const String logoutSubtitle = 'Are you sure you want to end your current session?';
+  static const String logoutCancel = 'Cancel';
+  static const String logoutConfirm = 'Log Out';
+}
