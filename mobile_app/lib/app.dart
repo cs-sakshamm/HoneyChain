@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'features/authentication/auth_controller.dart';
 import 'features/authentication/login_screen.dart';
-import 'home/home_screen.dart';
+import 'features/navigation/main_navigation_screen.dart';
 
 /// Root HoneyChain Mobile Application
 class HoneyChainApp extends StatelessWidget {
@@ -13,10 +14,14 @@ class HoneyChainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = context.watch<ThemeController>();
+
     return MaterialApp(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeController.themeMode,
       home: const AuthRouter(),
     );
   }
@@ -31,7 +36,7 @@ class AuthRouter extends StatelessWidget {
     final authController = context.watch<AuthController>();
 
     if (authController.isAuthenticated) {
-      return const HomeScreen();
+      return const MainNavigationScreen();
     }
 
     return const LoginScreen();
