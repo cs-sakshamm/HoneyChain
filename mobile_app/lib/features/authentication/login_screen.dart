@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/localization/localization_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/app_text_field.dart';
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phoneInputController = TextEditingController();
   final _otpCodeController = TextEditingController();
   final _resetIdentifierController = TextEditingController();
+  final _languageSearchController = TextEditingController();
 
   @override
   void dispose() {
@@ -40,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _phoneInputController.dispose();
     _otpCodeController.dispose();
     _resetIdentifierController.dispose();
+    _languageSearchController.dispose();
     super.dispose();
   }
 
@@ -50,12 +53,51 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppConstants.background,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.space24,
-              vertical: AppConstants.space32,
+        child: Stack(
+          children: [
+            // Top Right Small Language Selector [ 🌐 EN ] (Rule #1 Compliant)
+            Positioned(
+              top: 8,
+              right: 16,
+              child: Consumer<LanguageController>(
+                builder: (context, langCtrl, _) {
+                  return InkWell(
+                    onTap: () => _showLanguagePickerModal(context),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppConstants.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppConstants.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.language_rounded, size: 16, color: AppConstants.textSecondary),
+                          const SizedBox(width: 4),
+                          Text(
+                            langCtrl.currentLanguageCode.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppConstants.textPrimary,
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppConstants.textSecondary),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.space24,
+                  vertical: AppConstants.space32,
+                ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 380),
               child: Column(
@@ -113,8 +155,10 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+);
   }
 
   // ---------------------------------------------------------------------------
@@ -263,8 +307,9 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppConstants.space32),
 
         // Switch to Create Business Account
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             const Text(
               AppConstants.dontHaveAccountText,
@@ -585,6 +630,124 @@ class _LoginScreenState extends State<LoginScreen> {
               },
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _showLanguagePickerModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppConstants.borderRadiusLarge)),
+      ),
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final langController = ctx.watch<LanguageController>();
+            final searchQuery = _languageSearchController.text.trim().toLowerCase();
+
+            final filteredLanguages = LanguageController.supportedLanguages.where((l) {
+              if (searchQuery.isEmpty) return true;
+              return l.name.toLowerCase().contains(searchQuery) ||
+                  l.nativeName.toLowerCase().contains(searchQuery) ||
+                  l.code.toLowerCase().contains(searchQuery);
+            }).toList();
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(modalContext).size.height * 0.75,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: AppConstants.space16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppConstants.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.space16),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: AppConstants.space24),
+                    child: Row(
+                      children: [
+                        Icon(Icons.language_rounded, size: 20, color: AppConstants.primaryDark),
+                        SizedBox(width: 8),
+                        Text(
+                          'Choose Language',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppConstants.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.space12),
+
+                  // Search Field
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
+                    child: TextField(
+                      controller: _languageSearchController,
+                      onChanged: (_) => setModalState(() {}),
+                      style: const TextStyle(fontSize: 14),
+                      decoration: const InputDecoration(
+                        hintText: 'Search language...',
+                        prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppConstants.textMuted),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        fillColor: AppConstants.background,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.space12),
+                  const Divider(height: 1),
+
+                  // Flag-free Language List
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filteredLanguages.length,
+                      itemBuilder: (context, index) {
+                        final lang = filteredLanguages[index];
+                        final isSelected = lang.code == langController.currentLanguageCode;
+
+                        return ListTile(
+                          title: Text(
+                            lang.name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              color: isSelected ? AppConstants.primaryDark : AppConstants.textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            lang.nativeName,
+                            style: const TextStyle(fontSize: 12, color: AppConstants.textSecondary),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_rounded, color: AppConstants.primaryDark, size: 20)
+                              : null,
+                          onTap: () {
+                            langController.setLanguage(lang.code);
+                            Navigator.pop(modalContext);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );

@@ -121,4 +121,19 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get darkTheme {
+    return ThemeData.dark(useMaterial3: true).copyWith(
+      scaffoldBackgroundColor: const Color(0xFF121212),
+      colorScheme: const ColorScheme.dark(
+        surface: Color(0xFF1E1E1E),
+        primary: AppConstants.primary,
+        onPrimary: Colors.white,
+        secondary: Color(0xFF9CA3AF),
+        onSurface: Colors.white,
+        error: AppConstants.error,
+        outline: Color(0xFF374151),
+      ),
+    );
+  }
 }
