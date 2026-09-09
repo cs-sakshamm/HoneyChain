@@ -111,13 +111,13 @@ class Hive {
   Color get statusColor {
     switch (overallHealth.trim().toLowerCase()) {
       case 'healthy':
-        return const Color(0xFF059669); // Emerald Success
+        return const Color(0xFF000000); // Black
       case 'needs attention':
-        return const Color(0xFFD97706); // Amber Warning
+        return const Color(0xFF4B5563); // Gray 600
       case 'critical':
-        return const Color(0xFFDC2626); // Red Error
+        return const Color(0xFF111827); // Gray 900
       default:
-        return const Color(0xFF4B5563);
+        return const Color(0xFF9CA3AF); // Gray 400
     }
   }
 

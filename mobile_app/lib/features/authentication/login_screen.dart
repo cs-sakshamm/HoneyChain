@@ -106,6 +106,40 @@ class _LoginScreenState extends State<LoginScreen> {
                 else
                   _buildMobileLayout(context, controller),
 
+                
+                // Top Left Back Button
+                Positioned(
+                  top: 16,
+                  left: 20,
+                  child: InkWell(
+                    onTap: () => controller.clearRole(),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: context.surfaceColor,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.arrow_back_rounded, size: 16, color: context.textSecondaryColor),
+                          const SizedBox(width: 6),
+                          Text(
+                            context.tr('back_to_roles'),
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
                 // Top Right Compact Language Switcher
                 Positioned(
                   top: 16,
@@ -160,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
     BoxConstraints constraints,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final leftBg = isDark ? const Color(0xFF0F172A) : AppConstants.primarySoft.withValues(alpha: 0.35);
+    final leftBg = isDark ? const Color(0xFF000000) : AppConstants.primarySoft.withValues(alpha: 0.35);
 
     return Row(
       children: [
@@ -411,6 +445,27 @@ class _LoginScreenState extends State<LoginScreen> {
   // ---------------------------------------------------------------------------
   // 1. Refined Login Form
   // ---------------------------------------------------------------------------
+  
+  String _getRoleTitle(BuildContext context, UserRole? role) {
+    switch (role) {
+      case UserRole.harvester:
+        return context.tr('harvester_login');
+      case UserRole.collectionProcessing:
+        return context.tr('collection_login');
+      case UserRole.labTesting:
+        return context.tr('lab_login');
+      case UserRole.packaging:
+        return context.tr('packaging_login');
+      default:
+        return AppConstants.loginTitle;
+    }
+  }
+
+  String _getRoleSubtitle(BuildContext context, UserRole? role) {
+    if (role != null) return AppConstants.loginSubtitle;
+    return AppConstants.loginSubtitle;
+  }
+
   Widget _buildLoginForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
 
@@ -420,7 +475,7 @@ class _LoginScreenState extends State<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            AppConstants.loginTitle,
+            _getRoleTitle(context, controller.selectedRole),
             style: GoogleFonts.manrope(
               fontSize: 26,
               fontWeight: FontWeight.w800,
@@ -430,7 +485,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: AppConstants.space6),
           Text(
-            AppConstants.loginSubtitle,
+            _getRoleSubtitle(context, controller.selectedRole),
             style: GoogleFonts.inter(
               fontSize: 14,
               color: context.textSecondaryColor,

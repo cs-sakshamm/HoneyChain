@@ -6,7 +6,11 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/authentication/auth_controller.dart';
 import 'features/authentication/login_screen.dart';
+import 'features/authentication/role_selection_screen.dart';
+import 'features/collection/collection_navigation_screen.dart';
+import 'features/lab/lab_navigation_screen.dart';
 import 'features/navigation/main_navigation_screen.dart';
+import 'features/packaging/packaging_navigation_screen.dart';
 
 /// Root HoneyChain Mobile Application
 class HoneyChainApp extends StatelessWidget {
@@ -35,10 +39,25 @@ class AuthRouter extends StatelessWidget {
   Widget build(BuildContext context) {
     final authController = context.watch<AuthController>();
 
-    if (authController.isAuthenticated) {
-      return const MainNavigationScreen();
+    if (authController.selectedRole == null) {
+      return const RoleSelectionScreen();
     }
 
-    return const LoginScreen();
+    if (!authController.isAuthenticated) {
+      return const LoginScreen();
+    }
+
+    switch (authController.selectedRole) {
+      case UserRole.harvester:
+        return const MainNavigationScreen();
+      case UserRole.collectionProcessing:
+        return const CollectionNavigationScreen();
+      case UserRole.labTesting:
+        return const LabNavigationScreen();
+      case UserRole.packaging:
+        return const PackagingNavigationScreen();
+      default:
+        return const RoleSelectionScreen();
+    }
   }
 }

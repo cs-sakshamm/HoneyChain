@@ -18,28 +18,35 @@ class GoogleSignInButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final isDark = theme.brightness == Brightness.dark;
+
+    final bgColor = isDark ? theme.colorScheme.surface : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF3C4043);
+    final borderColor = isDark ? theme.colorScheme.outline : const Color(0xFFDADCE0);
+
     return Container(
       constraints: const BoxConstraints(maxWidth: 320, minHeight: 48),
       child: OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF3C4043),
+          backgroundColor: bgColor,
+          foregroundColor: textColor,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          side: const BorderSide(color: Color(0xFFDADCE0), width: 1),
+          side: BorderSide(color: borderColor, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24), // Google rounded pill shape
           ),
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(AppConstants.honeyAccent),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isDark ? Colors.white : AppConstants.primary,
+                  ),
                 ),
               )
             : Row(
@@ -51,7 +58,7 @@ class GoogleSignInButton extends StatelessWidget {
                   Text(
                     AppConstants.googleSignInText,
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: const Color(0xFF3C4043),
+                      color: textColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

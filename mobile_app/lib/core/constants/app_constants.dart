@@ -10,27 +10,27 @@ class AppConstants {
   static const String legalDisclaimer =
       'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
 
-  // Design Tokens: Color Palette (Senior SaaS Product Palette)
-  static const Color primary = Color(0xFFD97706); // Warm Honey Amber
+  // Design Tokens: Color Palette (Premium Monochrome)
+  static const Color primary = Color(0xFF000000); // Pure Black
   static const Color honeyAccent = primary; // Alias for compatibility
-  static const Color primaryDark = Color(0xFFB45309); // Deep Amber
-  static const Color primarySoft = Color(0xFFFFFBEB); // Soft Amber Tint
+  static const Color primaryDark = Color(0xFF000000); // Pure Black
+  static const Color primarySoft = Color(0xFFF3F4F6); // Light Grey (Gray-100)
   static const Color secondary = Color(0xFF4B5563); // Muted Secondary Color
 
-  static const Color background = Color(0xFFF9FAFB); // Neutral Light Background (Gray-50)
+  static const Color background = Color(0xFFFFFFFF); // Pure White Background
   static const Color surface = Color(0xFFFFFFFF); // Pure White Surface
   static const Color border = Color(0xFFE5E7EB); // Subtle Border (Gray-200)
-  static const Color borderFocus = Color(0xFFD97706); // Active Input Focus
+  static const Color borderFocus = Color(0xFF000000); // Active Input Focus
 
-  static const Color textPrimary = Color(0xFF111827); // Dark Neutral (Gray-900)
+  static const Color textPrimary = Color(0xFF000000); // Pure Black
   static const Color textSecondary = Color(0xFF4B5563); // Muted Body Text (Gray-600)
   static const Color textMuted = Color(0xFF9CA3AF); // Placeholder / Caption (Gray-400)
 
-  static const Color success = Color(0xFF059669); // Emerald Success
-  static const Color successBackground = Color(0xFFECFDF5);
-  static const Color error = Color(0xFFDC2626); // Production Error Red
-  static const Color errorBackground = Color(0xFFFEF2F2);
-  static const Color warning = Color(0xFFD97706); // Warning Amber
+  static const Color success = Color(0xFF000000); // Pure Black
+  static const Color successBackground = Color(0xFFF3F4F6); // Gray 100
+  static const Color error = Color(0xFF000000); // Pure Black
+  static const Color errorBackground = Color(0xFFF3F4F6); // Gray 100
+  static const Color warning = Color(0xFF000000); // Changed to black to remove orange
 
   // Spacing Tokens (4px Grid System)
   static const double space4 = 4.0;
@@ -68,6 +68,9 @@ class AppConstants {
   // Provider Tooltips & Text
   static const String continueWithGoogleText = 'Continue with Google';
   static const String continueWithPhoneText = 'Continue with phone';
+  static const String googleSignInText = 'Sign in with Google';
+  static const String appleSignInText = 'Sign in with Apple';
+  static const String phoneSignInText = 'Sign in with Phone';
 
   // Navigation Links
   static const String dontHaveAccountText = "New to HoneyChain? ";

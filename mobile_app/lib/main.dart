@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'core/controllers/workflow_controller.dart';
 import 'core/localization/localization_service.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/authentication/auth_controller.dart';
@@ -28,6 +29,9 @@ void main() {
         ),
         ChangeNotifierProvider<UserController>(
           create: (_) => UserController(),
+        ),
+        ChangeNotifierProvider<WorkflowController>(
+          create: (_) => WorkflowController(),
         ),
       ],
       child: const HoneyChainApp(),

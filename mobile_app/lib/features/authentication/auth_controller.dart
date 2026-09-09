@@ -20,6 +20,14 @@ enum AuthMode {
   forgotPassword,
 }
 
+/// Roles in the HoneyChain supply chain
+enum UserRole {
+  harvester,
+  collectionProcessing,
+  labTesting,
+  packaging,
+}
+
 /// Production Controller managing business authentication & session state
 class AuthController extends ChangeNotifier {
   final AuthService _authService;
@@ -31,6 +39,9 @@ class AuthController extends ChangeNotifier {
   String? _infoMessage;
   User? _currentUser;
   bool _isDemoMode = false;
+
+  // Role State
+  UserRole? _selectedRole;
 
   // Form & Security State
   bool _isPasswordVisible = false;
@@ -65,6 +76,17 @@ class AuthController extends ChangeNotifier {
   bool get isPasswordVisible => _isPasswordVisible;
   String get phoneNumberForOtp => _phoneNumberForOtp;
   int get otpCountdown => _otpCountdown;
+  UserRole? get selectedRole => _selectedRole;
+
+  void setRole(UserRole role) {
+    _selectedRole = role;
+    notifyListeners();
+  }
+
+  void clearRole() {
+    _selectedRole = null;
+    notifyListeners();
+  }
 
   void togglePasswordVisibility() {
     _isPasswordVisible = !_isPasswordVisible;
@@ -269,6 +291,7 @@ class AuthController extends ChangeNotifier {
     await _authService.signOut();
     _currentUser = null;
     _isDemoMode = false;
+    _selectedRole = null;
     _status = AuthStateStatus.idle;
     _mode = AuthMode.login;
     _errorMessage = null;

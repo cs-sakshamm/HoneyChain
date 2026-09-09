@@ -141,14 +141,14 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme {
-    const darkBackground = Color(0xFF111827); // Gray-900
-    const darkSurface = Color(0xFF1F2937); // Gray-800
-    const darkTextPrimary = Color(0xFFF9FAFB); // Gray-50
-    const darkTextSecondary = Color(0xFFD1D5DB); // Gray-300
-    const darkTextMuted = Color(0xFF9CA3AF); // Gray-400
-    const darkBorder = Color(0xFF374151); // Gray-700
-    const darkPrimaryContainer = Color(0xFF38230D); // Amber dark tint
-    const darkOnPrimaryContainer = Color(0xFFFBBF24); // Amber light highlight
+    const darkBackground = Color(0xFF000000); // Pure Black
+    const darkSurface = Color(0xFF111111); // Very Dark Grey
+    const darkTextPrimary = Color(0xFFFFFFFF); // Pure White
+    const darkTextSecondary = Color(0xFFA1A1AA); // Zinc-400
+    const darkTextMuted = Color(0xFF71717A); // Zinc-500
+    const darkBorder = Color(0xFF27272A); // Zinc-800
+    const darkPrimaryContainer = Color(0xFF18181B); // Zinc-900
+    const darkOnPrimaryContainer = Color(0xFFFFFFFF); // White
 
     final baseTextTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme);
 
@@ -250,11 +250,11 @@ class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-          borderSide: const BorderSide(color: AppConstants.error, width: 1.0),
+          borderSide: const BorderSide(color: darkTextPrimary, width: 1.0),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-          borderSide: const BorderSide(color: AppConstants.error, width: 1.5),
+          borderSide: const BorderSide(color: darkTextPrimary, width: 1.5),
         ),
       ),
       cardTheme: CardThemeData(

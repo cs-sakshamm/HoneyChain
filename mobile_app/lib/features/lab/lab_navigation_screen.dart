@@ -3,29 +3,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../../../core/constants/app_constants.dart';
-import '../../../core/localization/localization_service.dart';
-import '../../../core/theme/app_theme.dart';
-import '../hives/screens/all_hives_screen.dart';
-import '../hives/screens/harvester_dashboard_screen.dart';
-import '../profile/screens/profile_screen.dart';
 
-/// Compact, Minimal 3-Tab Harvester Navigation (Home | Hive | Profile)
-class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+import '../../core/constants/app_constants.dart';
+import '../../core/localization/localization_service.dart';
+import '../../core/theme/app_theme.dart';
+import '../profile/screens/profile_screen.dart';
+import 'screens/lab_dashboard_screen.dart';
+import 'screens/lab_history_screen.dart';
+
+class LabNavigationScreen extends StatefulWidget {
+  const LabNavigationScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  State<LabNavigationScreen> createState() => _LabNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> with WidgetsBindingObserver {
-  int _currentIndex = 0; // 0: Home, 1: Hive, 2: Profile
+class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsBindingObserver {
+  int _currentIndex = 0;
   bool _isNavVisible = true;
   Timer? _idleTimer;
 
   final List<Widget> _pages = const [
-    HarvesterDashboardScreen(),
-    AllHivesScreen(),
+    LabDashboardScreen(),
+    LabHistoryScreen(),
     ProfileScreen(),
   ];
 
@@ -143,23 +143,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                   children: [
                     _buildNavItem(
                       index: 0,
-                      icon: Icons.grid_view_rounded,
-                      activeIcon: Icons.grid_view_rounded,
-                      label: context.tr('home'),
+                      icon: Icons.science_outlined,
+                      activeIcon: Icons.science_rounded,
+                      label: context.tr('samples') ?? 'Samples',
                       isSelected: _currentIndex == 0,
                     ),
                     _buildNavItem(
                       index: 1,
-                      icon: Icons.hive_outlined,
-                      activeIcon: Icons.hive_rounded,
-                      label: context.tr('hives'),
+                      icon: Icons.history_outlined,
+                      activeIcon: Icons.history_rounded,
+                      label: context.tr('history') ?? 'History',
                       isSelected: _currentIndex == 1,
                     ),
                     _buildNavItem(
                       index: 2,
                       icon: Icons.person_outline_rounded,
                       activeIcon: Icons.person_rounded,
-                      label: context.tr('profile'),
+                      label: context.tr('profile') ?? 'Profile',
                       isSelected: _currentIndex == 2,
                     ),
                   ],

@@ -3,29 +3,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../../../core/constants/app_constants.dart';
-import '../../../core/localization/localization_service.dart';
-import '../../../core/theme/app_theme.dart';
-import '../hives/screens/all_hives_screen.dart';
-import '../hives/screens/harvester_dashboard_screen.dart';
-import '../profile/screens/profile_screen.dart';
 
-/// Compact, Minimal 3-Tab Harvester Navigation (Home | Hive | Profile)
-class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+import '../../core/constants/app_constants.dart';
+import '../../core/localization/localization_service.dart';
+import '../../core/theme/app_theme.dart';
+import '../profile/screens/profile_screen.dart';
+import 'screens/packaging_dashboard_screen.dart';
+import 'screens/packaging_history_screen.dart';
+
+/// Navigation Screen for the Packaging Role
+class PackagingNavigationScreen extends StatefulWidget {
+  const PackagingNavigationScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  State<PackagingNavigationScreen> createState() => _PackagingNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> with WidgetsBindingObserver {
-  int _currentIndex = 0; // 0: Home, 1: Hive, 2: Profile
+class _PackagingNavigationScreenState extends State<PackagingNavigationScreen> with WidgetsBindingObserver {
+  int _currentIndex = 0;
   bool _isNavVisible = true;
   Timer? _idleTimer;
 
   final List<Widget> _pages = const [
-    HarvesterDashboardScreen(),
-    AllHivesScreen(),
+    PackagingDashboardScreen(),
+    PackagingHistoryScreen(),
     ProfileScreen(),
   ];
 
@@ -123,7 +124,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
             child: Center(
               heightFactor: 1.0,
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 260),
+                constraints: const BoxConstraints(maxWidth: 300),
                 height: 52,
                 decoration: BoxDecoration(
                   color: surfaceColor,
@@ -143,16 +144,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                   children: [
                     _buildNavItem(
                       index: 0,
-                      icon: Icons.grid_view_rounded,
-                      activeIcon: Icons.grid_view_rounded,
-                      label: context.tr('home'),
+                      icon: Icons.inventory_2_outlined,
+                      activeIcon: Icons.inventory_2_rounded,
+                      label: context.tr('batches'),
                       isSelected: _currentIndex == 0,
                     ),
                     _buildNavItem(
                       index: 1,
-                      icon: Icons.hive_outlined,
-                      activeIcon: Icons.hive_rounded,
-                      label: context.tr('hives'),
+                      icon: Icons.history_outlined,
+                      activeIcon: Icons.history_rounded,
+                      label: context.tr('history'),
                       isSelected: _currentIndex == 1,
                     ),
                     _buildNavItem(

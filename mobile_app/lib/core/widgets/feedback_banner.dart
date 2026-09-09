@@ -31,19 +31,19 @@ class FeedbackBanner extends StatelessWidget {
     switch (type) {
       case FeedbackBannerType.error:
         bg = AppConstants.errorBackground;
-        border = const Color(0xFFFCA5A5);
+        border = const Color(0xFF374151); // Gray-700
         iconColor = AppConstants.error;
         icon = Icons.error_outline_rounded;
         break;
       case FeedbackBannerType.info:
         bg = AppConstants.primarySoft;
-        border = const Color(0xFFFDE68A);
+        border = const Color(0xFFD1D5DB); // Gray-300
         iconColor = AppConstants.primaryDark;
         icon = Icons.info_outline_rounded;
         break;
       case FeedbackBannerType.success:
         bg = AppConstants.successBackground;
-        border = const Color(0xFFA7F3D0);
+        border = const Color(0xFFD1D5DB); // Gray-300
         iconColor = AppConstants.success;
         icon = Icons.check_circle_outline_rounded;
         break;
