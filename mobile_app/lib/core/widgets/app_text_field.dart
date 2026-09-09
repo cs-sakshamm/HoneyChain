@@ -18,6 +18,12 @@ class AppTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final FormFieldValidator<String>? validator;
 
+  final FocusNode? focusNode;
+  final bool enabled;
+  final bool autofocus;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+
   const AppTextField({
     super.key,
     this.controller,
@@ -31,6 +37,11 @@ class AppTextField extends StatelessWidget {
     this.suffixIcon,
     this.onChanged,
     this.validator,
+    this.focusNode,
+    this.enabled = true,
+    this.autofocus = false,
+    this.textInputAction,
+    this.onFieldSubmitted,
   });
 
   @override
@@ -52,8 +63,13 @@ class AppTextField extends StatelessWidget {
         ],
         TextFormField(
           controller: controller,
+          focusNode: focusNode,
+          enabled: enabled,
+          autofocus: autofocus,
           obscureText: obscureText,
           keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          onFieldSubmitted: onFieldSubmitted,
           onChanged: onChanged,
           validator: validator,
           style: GoogleFonts.inter(

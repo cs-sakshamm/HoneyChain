@@ -9,6 +9,7 @@ import '../../authentication/auth_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'all_hives_screen.dart';
+import 'hive_details_screen.dart';
 import 'start_harvesting_screen.dart';
 
 /// Distinctive, Minimal Harvester Home Screen
@@ -286,7 +287,7 @@ class HomeDashboardScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => HiveDetailsScreen(hive: hive),
+                  builder: (context) => HiveDetailsScreen(hiveId: hive.id),
                 ),
               );
             } else {

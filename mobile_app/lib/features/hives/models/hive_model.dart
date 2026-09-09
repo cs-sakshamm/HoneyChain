@@ -35,6 +35,8 @@ class Hive {
   final String notes;
   final DateTime updatedAt;
 
+  String get location => apiaryLocation;
+
   const Hive({
     required this.id,
     required this.name,

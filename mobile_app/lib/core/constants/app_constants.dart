@@ -52,18 +52,22 @@ class AppConstants {
   static const double borderRadiusLarge = 16.0;
 
   // Auth Text & Strings
-  static const String emailOrPhoneHint = 'Business Email or Phone';
-  static const String passwordHint = 'Password';
-  static const String businessNameHint = 'Legal Business Name';
-  static const String loginButtonText = 'Sign In to Account';
-  static const String createAccountButtonText = 'Create Business Account';
-  static const String forgotPasswordText = 'Forgot Password?';
-  static const String orDividerText = 'OR CONTINUE WITH';
+  static const String loginTitle = 'Welcome back';
+  static const String loginSubtitle = 'Sign in to continue to HoneyChain.';
+  static const String brandHeadline = 'Everything you need, connected in one place.';
+  static const String brandSubtitle = 'Sign in to continue your HoneyChain experience.';
+  static const String emailLabel = 'Email address';
+  static const String emailHint = 'Enter your email address';
+  static const String passwordLabel = 'Password';
+  static const String passwordHint = 'Enter your password';
+  static const String loginButtonText = 'Sign in';
+  static const String createAccountButtonText = 'Create account';
+  static const String forgotPasswordText = 'Forgot password?';
+  static const String orDividerText = 'OR';
 
-  // Provider Tooltips
-  static const String googleSignInText = 'Sign in with Google';
-  static const String appleSignInText = 'Sign in with Apple';
-  static const String phoneSignInText = 'Sign in with Phone';
+  // Provider Tooltips & Text
+  static const String continueWithGoogleText = 'Continue with Google';
+  static const String continueWithPhoneText = 'Continue with phone';
 
   // Navigation Links
   static const String dontHaveAccountText = "New to HoneyChain? ";
