@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/user_controller.dart';
@@ -49,7 +50,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Password updated successfully'),
+          content: Text(context.tr('password_updated')),
           backgroundColor: AppConstants.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -65,9 +66,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppConstants.background,
-      appBar: const GlobalAppBar(
+      appBar: GlobalAppBar(
         showBackButton: true,
-        titleText: 'Change Password',
+        titleText: context.tr('change_password'),
       ),
       body: Form(
         key: _formKey,
@@ -85,37 +86,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 child: Column(
                   children: [
                     _buildPasswordField(
-                      label: 'Current Password *',
+                      label: '${context.tr('current_password')} *',
                       controller: _currentPasswordController,
                       obscureText: _obscureCurrent,
                       onToggleVisibility: () =>
                           setState(() => _obscureCurrent = !_obscureCurrent),
                       validator: (val) =>
-                          (val == null || val.isEmpty) ? 'Enter current password' : null,
+                          (val == null || val.isEmpty) ? context.tr('current_password') : null,
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildPasswordField(
-                      label: 'New Password *',
+                      label: '${context.tr('new_password')} *',
                       controller: _newPasswordController,
                       obscureText: _obscureNew,
                       onToggleVisibility: () =>
                           setState(() => _obscureNew = !_obscureNew),
                       validator: (val) {
-                        if (val == null || val.isEmpty) return 'Enter new password';
-                        if (val.length < 6) return 'Password must be at least 6 characters';
+                        if (val == null || val.isEmpty) return context.tr('new_password');
+                        if (val.length < 6) return context.tr('new_password');
                         return null;
                       },
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildPasswordField(
-                      label: 'Confirm New Password *',
+                      label: '${context.tr('confirm_password')} *',
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirm,
                       onToggleVisibility: () =>
                           setState(() => _obscureConfirm = !_obscureConfirm),
                       validator: (val) {
-                        if (val == null || val.isEmpty) return 'Confirm password';
-                        if (val != _newPasswordController.text) return 'Passwords do not match';
+                        if (val == null || val.isEmpty) return context.tr('confirm_password');
+                        if (val != _newPasswordController.text) return context.tr('confirm_password');
                         return null;
                       },
                     ),
@@ -124,7 +125,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
               const SizedBox(height: AppConstants.space32),
               AppButton(
-                text: 'Update Password',
+                text: context.tr('update_password'),
                 isLoading: _isLoading,
                 variant: AppButtonVariant.primary,
                 onPressed: _updatePassword,
@@ -177,3 +178,4 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 }
+

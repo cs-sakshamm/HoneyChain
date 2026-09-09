@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
 import '../../../core/widgets/app_button.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
@@ -280,7 +281,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       backgroundColor: AppConstants.background,
       appBar: GlobalAppBar(
         showBackButton: true,
-        titleText: isEditing ? 'Edit Hive' : 'Add New Hive',
+        titleText: isEditing ? context.tr('edit_hive') : context.tr('add_new_hive'),
       ),
       body: Form(
         key: _formKey,
@@ -290,32 +291,32 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. Basic Information Section
-              _buildSectionHeader('Basic Information', Icons.info_outline_rounded),
+              _buildSectionHeader(context.tr('basic_info'), Icons.info_outline_rounded),
               _buildCardContainer([
                 _buildTextField(
-                  label: 'Hive Name *',
+                  label: '${context.tr('hive_name')} *',
                   hint: 'e.g. Hive Alpha',
                   controller: _nameController,
                   validator: (val) =>
-                      (val == null || val.trim().isEmpty) ? 'Enter hive name' : null,
+                      (val == null || val.trim().isEmpty) ? context.tr('hive_name') : null,
                 ),
                 const SizedBox(height: AppConstants.space16),
                 Row(
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: 'Hive ID / Code *',
+                        label: '${context.tr('hive_code')} *',
                         hint: 'e.g. H-001',
                         controller: _hiveCodeController,
                         validator: (val) => (val == null || val.trim().isEmpty)
-                            ? 'Enter hive code'
+                            ? context.tr('hive_code')
                             : null,
                       ),
                     ),
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildDropdown(
-                        label: 'Hive Type',
+                        label: context.tr('hive_type'),
                         value: _hiveType,
                         items: _hiveTypeOptions,
                         onChanged: (val) => setState(() => _hiveType = val!),
@@ -325,18 +326,18 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                 ),
                 const SizedBox(height: AppConstants.space16),
                 _buildTextField(
-                  label: 'Apiary / Location *',
+                  label: '${context.tr('apiary_location')} *',
                   hint: 'e.g. Main Apiary, Meadow Field',
                   controller: _apiaryLocationController,
                   validator: (val) =>
-                      (val == null || val.trim().isEmpty) ? 'Enter location' : null,
+                      (val == null || val.trim().isEmpty) ? context.tr('apiary_location') : null,
                 ),
                 const SizedBox(height: AppConstants.space16),
                 Row(
                   children: [
                     Expanded(
                       child: _buildDatePickerTile(
-                        label: 'Date Added',
+                        label: context.tr('date_added'),
                         value: dateFormat.format(_dateAdded),
                         onTap: () => _selectDate(context, true),
                       ),
@@ -344,7 +345,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildDropdown(
-                        label: 'Queen Status',
+                        label: context.tr('queen_status'),
                         value: _queenStatus,
                         items: _queenStatusOptions,
                         onChanged: (val) => setState(() => _queenStatus = val!),
@@ -357,19 +358,19 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
               const SizedBox(height: AppConstants.space24),
 
               // 2. Hive Details Section
-              _buildSectionHeader('Hive Details', Icons.widgets_outlined),
+              _buildSectionHeader(context.tr('hive_details'), Icons.widgets_outlined),
               _buildCardContainer([
                 Row(
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: 'Total Frames *',
+                        label: '${context.tr('total_frames')} *',
                         hint: '10',
                         controller: _totalFramesController,
                         keyboardType: TextInputType.number,
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'Required';
-                          if (int.tryParse(val.trim()) == null) return 'Invalid number';
+                          if (val == null || val.trim().isEmpty) return context.tr('total_frames');
+                          if (int.tryParse(val.trim()) == null) return context.tr('total_frames');
                           return null;
                         },
                       ),
@@ -377,13 +378,13 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildTextField(
-                        label: 'Brood Frames *',
+                        label: '${context.tr('brood_frames')} *',
                         hint: '6',
                         controller: _broodFramesController,
                         keyboardType: TextInputType.number,
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'Required';
-                          if (int.tryParse(val.trim()) == null) return 'Invalid number';
+                          if (val == null || val.trim().isEmpty) return context.tr('brood_frames');
+                          if (int.tryParse(val.trim()) == null) return context.tr('brood_frames');
                           return null;
                         },
                       ),
@@ -395,7 +396,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildDropdown(
-                        label: 'Colony Strength',
+                        label: context.tr('colony_strength'),
                         value: _colonyStrength,
                         items: _colonyStrengthOptions,
                         onChanged: (val) => setState(() => _colonyStrength = val!),
@@ -404,7 +405,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildTextField(
-                        label: 'Queen Age (months)',
+                        label: context.tr('queen_age'),
                         hint: '12',
                         controller: _queenAgeMonthsController,
                         keyboardType: TextInputType.number,
@@ -414,7 +415,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                 ),
                 const SizedBox(height: AppConstants.space16),
                 _buildDropdown(
-                  label: 'Bee Breed',
+                  label: context.tr('bee_breed'),
                   value: _beeBreed,
                   items: _beeBreedOptions,
                   onChanged: (val) => setState(() => _beeBreed = val!),
@@ -424,13 +425,13 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
               const SizedBox(height: AppConstants.space24),
 
               // 3. Production Information Section
-              _buildSectionHeader('Production Information', Icons.scale_outlined),
+              _buildSectionHeader(context.tr('production_info'), Icons.scale_outlined),
               _buildCardContainer([
                 Row(
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: 'Expected Honey (kg)',
+                        label: context.tr('expected_honey'),
                         hint: '35.0',
                         controller: _expectedProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -439,7 +440,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildTextField(
-                        label: 'Previous Year (kg)',
+                        label: context.tr('previous_year'),
                         hint: '25.0',
                         controller: _previousYearProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -452,7 +453,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: 'Current Year (kg)',
+                        label: context.tr('current_year'),
                         hint: '28.0',
                         controller: _currentYearProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -461,7 +462,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildDropdown(
-                        label: 'Honey Type',
+                        label: context.tr('honey_type'),
                         value: _honeyType,
                         items: _honeyTypeOptions,
                         onChanged: (val) => setState(() => _honeyType = val!),
@@ -474,13 +475,13 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
               const SizedBox(height: AppConstants.space24),
 
               // 4. Health & Inspection Section
-              _buildSectionHeader('Health & Inspection', Icons.health_and_safety_outlined),
+              _buildSectionHeader(context.tr('health_inspection'), Icons.health_and_safety_outlined),
               _buildCardContainer([
                 Row(
                   children: [
                     Expanded(
                       child: _buildDatePickerTile(
-                        label: 'Last Inspected',
+                        label: context.tr('last_inspected'),
                         value: dateFormat.format(_lastInspectionDate),
                         onTap: () => _selectDate(context, false),
                       ),
@@ -488,7 +489,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildDropdown(
-                        label: 'Varroa/Mite Status',
+                        label: context.tr('mite_status'),
                         value: _miteStatus,
                         items: _miteStatusOptions,
                         onChanged: (val) => setState(() => _miteStatus = val!),
@@ -501,7 +502,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildDropdown(
-                        label: 'Disease Status',
+                        label: context.tr('disease_status'),
                         value: _diseaseStatus,
                         items: _diseaseStatusOptions,
                         onChanged: (val) => setState(() => _diseaseStatus = val!),
@@ -510,7 +511,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildDropdown(
-                        label: 'Queen Condition',
+                        label: context.tr('queen_condition'),
                         value: _queenCondition,
                         items: _queenConditionOptions,
                         onChanged: (val) => setState(() => _queenCondition = val!),
@@ -520,7 +521,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                 ),
                 const SizedBox(height: AppConstants.space16),
                 _buildDropdown(
-                  label: 'Overall Hive Health',
+                  label: context.tr('overall_health'),
                   value: _overallHealth,
                   items: _overallHealthOptions,
                   onChanged: (val) => setState(() => _overallHealth = val!),
@@ -537,20 +538,20 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Column(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Feeding Required',
-                            style: TextStyle(
+                            context.tr('feeding_required'),
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppConstants.textPrimary,
                             ),
                           ),
                           Text(
-                            'Does this hive currently require supplemental feeding?',
-                            style: TextStyle(
+                            context.tr('feeding_sub'),
+                            style: const TextStyle(
                               fontSize: 12,
                               color: AppConstants.textSecondary,
                             ),
@@ -570,11 +571,11 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
               const SizedBox(height: AppConstants.space24),
 
               // 5. Additional Notes Section
-              _buildSectionHeader('Additional Notes', Icons.notes_outlined),
+              _buildSectionHeader(context.tr('additional_notes'), Icons.notes_outlined),
               _buildCardContainer([
                 _buildTextField(
-                  label: 'Inspection & General Notes',
-                  hint: 'Record observations, brood pattern notes, temperament, syrup feeds...',
+                  label: context.tr('notes'),
+                  hint: context.tr('inspection_notes_hint'),
                   controller: _notesController,
                   maxLines: 4,
                 ),
@@ -587,7 +588,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                 children: [
                   Expanded(
                     child: AppButton(
-                      text: 'Cancel',
+                      text: context.tr('cancel'),
                       variant: AppButtonVariant.outlined,
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -595,7 +596,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   const SizedBox(width: AppConstants.space16),
                   Expanded(
                     child: AppButton(
-                      text: isEditing ? 'Update Hive' : 'Save Hive',
+                      text: isEditing ? context.tr('update_hive') : context.tr('save_hive'),
                       isLoading: _isSaving,
                       variant: AppButtonVariant.primary,
                       onPressed: _saveHive,

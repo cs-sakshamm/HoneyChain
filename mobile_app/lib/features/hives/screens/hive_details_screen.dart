@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import '../widgets/quick_insight_card.dart';
@@ -22,15 +23,15 @@ class HiveDetailsScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Delete this hive?'),
+          title: Text(dialogContext.tr('delete_confirm_title')),
           content: Text(
-            'Are you sure you want to delete "${hive.name}" (${hive.hiveCode})? This action cannot be undone.',
+            '${dialogContext.tr('delete_confirm_msg')} ("${hive.name}")',
             style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
+              child: Text(dialogContext.tr('cancel'), style: const TextStyle(color: AppConstants.textSecondary)),
             ),
             TextButton(
               onPressed: () async {
@@ -41,7 +42,7 @@ class HiveDetailsScreen extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        success ? 'Hive deleted' : 'Failed to delete hive',
+                        success ? context.tr('hive_deleted') : context.tr('failed_to_delete_hive'),
                       ),
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -49,9 +50,9 @@ class HiveDetailsScreen extends StatelessWidget {
                   Navigator.pop(context); // Exit details screen after deletion
                 }
               },
-              child: const Text(
-                'Delete Hive',
-                style: TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600),
+              child: Text(
+                dialogContext.tr('delete_hive'),
+                style: const TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -67,8 +68,8 @@ class HiveDetailsScreen extends StatelessWidget {
 
     if (hive == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Hive Details')),
-        body: const Center(child: Text('Hive not found or deleted.')),
+        appBar: AppBar(title: Text(context.tr('hive_details'))),
+        body: Center(child: Text(context.tr('no_matching_hives'))),
       );
     }
 
@@ -83,6 +84,15 @@ class HiveDetailsScreen extends StatelessWidget {
     final prodSign = prodDiff >= 0 ? '+' : '';
     final prodPctStr = '$prodSign${prodPct.toStringAsFixed(1)}%';
 
+    String translatedHealth = hive.overallHealth;
+    if (hive.overallHealth.toLowerCase() == 'healthy') {
+      translatedHealth = context.tr('healthy');
+    } else if (hive.overallHealth.toLowerCase() == 'needs attention') {
+      translatedHealth = context.tr('needs_attention');
+    } else if (hive.overallHealth.toLowerCase() == 'critical') {
+      translatedHealth = context.tr('critical');
+    }
+
     return Scaffold(
       backgroundColor: AppConstants.background,
       appBar: GlobalAppBar(
@@ -91,7 +101,7 @@ class HiveDetailsScreen extends StatelessWidget {
         extraActions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: AppConstants.primaryDark),
-            tooltip: 'Edit Hive',
+            tooltip: context.tr('edit_hive'),
             onPressed: () {
               Navigator.push(
                 context,
@@ -103,7 +113,7 @@ class HiveDetailsScreen extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded, color: AppConstants.error),
-            tooltip: 'Delete Hive',
+            tooltip: context.tr('delete_hive'),
             onPressed: () => _showDeleteDialog(context, hive),
           ),
         ],
@@ -114,14 +124,15 @@ class HiveDetailsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Card
-            _buildHeaderCard(hive),
+            _buildHeaderCard(context, hive, translatedHealth),
 
             const SizedBox(height: AppConstants.space24),
 
             // Quick Insights Q&A Section
-            _buildSectionTitle('Quick Insights'),
+            _buildSectionTitle(context.tr('quick_insights')),
             const SizedBox(height: AppConstants.space8),
             _buildQuickInsightsSection(
+              context: context,
               hive: hive,
               formattedLastInspection: formattedLastInspection,
               formattedNextInspection: formattedNextInspection,
@@ -132,47 +143,47 @@ class HiveDetailsScreen extends StatelessWidget {
             const SizedBox(height: AppConstants.space24),
 
             // Overview Card
-            _buildSectionTitle('Overview'),
+            _buildSectionTitle(context.tr('overview')),
             const SizedBox(height: AppConstants.space8),
             _buildInfoCard([
-              _buildDetailRow('Colony Strength', hive.colonyStrength),
-              _buildDetailRow('Queen Status', hive.queenStatus),
-              _buildDetailRow('Hive Type', hive.hiveType),
-              _buildDetailRow('Frames (Brood / Total)', hive.occupiedFrameRatio),
-              _buildDetailRow('Bee Breed', hive.beeBreed),
-              _buildDetailRow('Overall Health', hive.overallHealth, isBadge: true, badgeColor: hive.statusColor),
+              _buildDetailRow(context.tr('colony_strength'), hive.colonyStrength),
+              _buildDetailRow(context.tr('queen_status'), hive.queenStatus),
+              _buildDetailRow(context.tr('hive_type'), hive.hiveType),
+              _buildDetailRow('${context.tr('brood_frames')} / ${context.tr('total_frames')}', hive.occupiedFrameRatio),
+              _buildDetailRow(context.tr('bee_breed'), hive.beeBreed),
+              _buildDetailRow(context.tr('overall_health'), translatedHealth, isBadge: true, badgeColor: hive.statusColor),
             ]),
 
             const SizedBox(height: AppConstants.space24),
 
             // Production Card
-            _buildSectionTitle('Production'),
+            _buildSectionTitle(context.tr('production')),
             const SizedBox(height: AppConstants.space8),
             _buildInfoCard([
-              _buildDetailRow('Current Year Production', '${hive.currentYearProductionKg} kg'),
-              _buildDetailRow('Previous Year Production', '${hive.previousYearProductionKg} kg'),
-              _buildDetailRow('Expected Production', '${hive.expectedProductionKg} kg'),
+              _buildDetailRow(context.tr('current_production'), '${hive.currentYearProductionKg} kg'),
+              _buildDetailRow(context.tr('previous_production'), '${hive.previousYearProductionKg} kg'),
+              _buildDetailRow(context.tr('expected_production'), '${hive.expectedProductionKg} kg'),
               _buildDetailRow(
-                'Production Trend',
+                context.tr('production_trend'),
                 '$prodSign${prodDiff.toStringAsFixed(1)} kg ($prodPctStr)',
                 highlightColor: prodDiff >= 0 ? AppConstants.success : AppConstants.error,
               ),
-              _buildDetailRow('Honey Variety / Type', hive.honeyType),
+              _buildDetailRow(context.tr('honey_variety'), hive.honeyType),
             ]),
 
             const SizedBox(height: AppConstants.space24),
 
             // Inspection Card
-            _buildSectionTitle('Inspection'),
+            _buildSectionTitle(context.tr('inspection')),
             const SizedBox(height: AppConstants.space8),
             _buildInfoCard([
-              _buildDetailRow('Last Inspection Date', formattedLastInspection),
-              _buildDetailRow('Next Inspection Due', formattedNextInspection),
-              _buildDetailRow('Disease Status', hive.diseaseStatus),
-              _buildDetailRow('Varroa / Mite Status', hive.miteStatus),
+              _buildDetailRow(context.tr('last_inspected'), formattedLastInspection),
+              _buildDetailRow(context.tr('next_inspection'), formattedNextInspection),
+              _buildDetailRow(context.tr('disease_status'), hive.diseaseStatus),
+              _buildDetailRow(context.tr('mite_status'), hive.miteStatus),
               _buildDetailRow(
-                'Feeding Required',
-                hive.feedingRequired ? 'Yes (Action Required)' : 'No',
+                context.tr('feeding_required'),
+                hive.feedingRequired ? context.tr('yes_action_req') : context.tr('no'),
                 highlightColor: hive.feedingRequired ? AppConstants.warning : AppConstants.textPrimary,
               ),
             ]),
@@ -180,18 +191,18 @@ class HiveDetailsScreen extends StatelessWidget {
             const SizedBox(height: AppConstants.space24),
 
             // Queen Card
-            _buildSectionTitle('Queen Information'),
+            _buildSectionTitle(context.tr('queen')),
             const SizedBox(height: AppConstants.space8),
             _buildInfoCard([
-              _buildDetailRow('Queen Status', hive.queenStatus),
-              _buildDetailRow('Queen Age', '${hive.queenAgeMonths} months'),
-              _buildDetailRow('Queen Condition', hive.queenCondition),
+              _buildDetailRow(context.tr('queen_status'), hive.queenStatus),
+              _buildDetailRow(context.tr('queen_age'), '${hive.queenAgeMonths} months'),
+              _buildDetailRow(context.tr('queen_condition'), hive.queenCondition),
             ]),
 
             const SizedBox(height: AppConstants.space24),
 
             // Additional Notes Card
-            _buildSectionTitle('Notes & Observations'),
+            _buildSectionTitle(context.tr('notes')),
             const SizedBox(height: AppConstants.space8),
             Container(
               width: double.infinity,
@@ -202,7 +213,7 @@ class HiveDetailsScreen extends StatelessWidget {
                 border: Border.all(color: AppConstants.border),
               ),
               child: Text(
-                hive.notes.isNotEmpty ? hive.notes : 'No extra notes recorded for this hive.',
+                hive.notes.isNotEmpty ? hive.notes : context.tr('no_notes'),
                 style: const TextStyle(
                   fontSize: 14,
                   height: 1.5,
@@ -218,7 +229,7 @@ class HiveDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderCard(Hive hive) {
+  Widget _buildHeaderCard(BuildContext context, Hive hive, String translatedHealth) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppConstants.space16),
@@ -285,7 +296,7 @@ class HiveDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  hive.overallHealth,
+                  translatedHealth,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -377,6 +388,7 @@ class HiveDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildQuickInsightsSection({
+    required BuildContext context,
     required Hive hive,
     required String formattedLastInspection,
     required String formattedNextInspection,
@@ -386,74 +398,74 @@ class HiveDetailsScreen extends StatelessWidget {
     return Column(
       children: [
         QuickInsightCard(
-          question: 'How much honey was produced this year?',
+          question: context.tr('qi_q1'),
           answer: '${hive.currentYearProductionKg} kg',
-          subtitle: 'Honey Type: ${hive.honeyType}',
+          subtitle: '${context.tr('honey_type')}: ${hive.honeyType}',
           icon: Icons.scale_outlined,
         ),
         QuickInsightCard(
-          question: 'How does this year\'s production compare with last year?',
+          question: context.tr('qi_q2'),
           answer: prodPctStr,
-          subtitle: '${hive.previousYearProductionKg} kg (last year) ➔ ${hive.currentYearProductionKg} kg (this year)',
+          subtitle: '${hive.previousYearProductionKg} kg (${context.tr('previous_year')}) ➔ ${hive.currentYearProductionKg} kg (${context.tr('current_year')})',
           icon: Icons.trending_up_rounded,
           answerColor: hive.productionDifference >= 0 ? AppConstants.success : AppConstants.error,
         ),
         QuickInsightCard(
-          question: 'Is the hive currently healthy?',
-          answer: hive.isHealthy ? 'Yes — Healthy' : 'No — ${hive.overallHealth}',
-          subtitle: 'Disease Status: ${hive.diseaseStatus} • Mite Status: ${hive.miteStatus}',
+          question: context.tr('qi_q3'),
+          answer: hive.isHealthy ? '${context.tr('yes')} — ${context.tr('healthy')}' : '${context.tr('no')} — ${hive.overallHealth}',
+          subtitle: '${context.tr('disease_status')}: ${hive.diseaseStatus} • ${context.tr('mite_status')}: ${hive.miteStatus}',
           icon: Icons.health_and_safety_outlined,
           answerColor: hive.isHealthy ? AppConstants.success : AppConstants.error,
         ),
         QuickInsightCard(
-          question: 'When was the hive last inspected?',
+          question: context.tr('qi_q4'),
           answer: formattedLastInspection,
-          subtitle: 'Next inspection scheduled: $formattedNextInspection',
+          subtitle: '${context.tr('next_inspection')}: $formattedNextInspection',
           icon: Icons.calendar_today_outlined,
         ),
         QuickInsightCard(
-          question: 'Does this hive need feeding?',
-          answer: hive.feedingRequired ? 'Yes — Syrup/Pollen Required' : 'No — Sufficient Stores',
+          question: context.tr('qi_q5'),
+          answer: hive.feedingRequired ? context.tr('yes_action_req') : context.tr('no'),
           icon: Icons.cookie_outlined,
           answerColor: hive.feedingRequired ? AppConstants.warning : AppConstants.success,
         ),
         QuickInsightCard(
-          question: 'What is the colony strength?',
+          question: context.tr('qi_q6'),
           answer: hive.colonyStrength,
-          subtitle: '${hive.broodFrames} brood frames active',
+          subtitle: '${hive.broodFrames} ${context.tr('brood_frames')}',
           icon: Icons.groups_outlined,
         ),
         QuickInsightCard(
-          question: 'Is the queen healthy?',
-          answer: hive.isQueenHealthy ? 'Yes (${hive.queenCondition})' : 'No (${hive.queenCondition})',
-          subtitle: 'Status: ${hive.queenStatus} • Age: ${hive.queenAgeMonths} months',
+          question: context.tr('qi_q7'),
+          answer: hive.isQueenHealthy ? '${context.tr('yes')} (${hive.queenCondition})' : '${context.tr('no')} (${hive.queenCondition})',
+          subtitle: '${context.tr('queen_status')}: ${hive.queenStatus} • ${context.tr('queen_age')}: ${hive.queenAgeMonths} months',
           icon: Icons.workspace_premium_outlined,
           answerColor: hive.isQueenHealthy ? AppConstants.success : AppConstants.warning,
         ),
         QuickInsightCard(
-          question: 'How many brood frames are present?',
-          answer: '${hive.broodFrames} frames',
+          question: context.tr('qi_q8'),
+          answer: '${hive.broodFrames} ${context.tr('brood_frames')}',
           icon: Icons.grid_on_outlined,
         ),
         QuickInsightCard(
-          question: 'How many frames are currently occupied?',
-          answer: '${hive.occupiedFrameRatio} occupied',
-          subtitle: '${hive.occupiedFramePercentage.toStringAsFixed(0)}% frame occupancy rate',
+          question: context.tr('qi_q9'),
+          answer: '${hive.occupiedFrameRatio}',
+          subtitle: '${hive.occupiedFramePercentage.toStringAsFixed(0)}% occupancy',
           icon: Icons.view_compact_outlined,
         ),
         QuickInsightCard(
-          question: 'What is the expected production this year?',
+          question: context.tr('qi_q10'),
           answer: '${hive.expectedProductionKg} kg',
           icon: Icons.flag_outlined,
         ),
         QuickInsightCard(
-          question: 'How much more production is expected?',
-          answer: remProd > 0 ? '${remProd.toStringAsFixed(1)} kg remaining' : '0 kg (Target Achieved)',
+          question: context.tr('qi_q11'),
+          answer: remProd > 0 ? '${remProd.toStringAsFixed(1)} kg' : '0 kg',
           icon: Icons.hourglass_bottom_outlined,
           answerColor: remProd > 0 ? AppConstants.primaryDark : AppConstants.success,
         ),
         QuickInsightCard(
-          question: 'When should the next inspection happen?',
+          question: context.tr('qi_q12'),
           answer: formattedNextInspection,
           icon: Icons.event_available_outlined,
         ),
@@ -461,3 +473,4 @@ class HiveDetailsScreen extends StatelessWidget {
     );
   }
 }
+

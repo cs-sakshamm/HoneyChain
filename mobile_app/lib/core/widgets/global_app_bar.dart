@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../localization/localization_service.dart';
+import '../theme/app_theme.dart';
 import '../../features/profile/screens/language_setting_screen.dart';
 import 'app_logo.dart';
 
@@ -25,13 +26,13 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppConstants.surface,
+      backgroundColor: context.surfaceColor,
       elevation: 0,
       scrolledUnderElevation: 0.5,
       automaticallyImplyLeading: false,
       leading: showBackButton
           ? IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: AppConstants.textPrimary),
+              icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
               onPressed: () => Navigator.pop(context),
             )
           : null,
@@ -49,10 +50,10 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Text(
                 '• $titleText',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppConstants.textSecondary,
+                  color: context.textSecondaryColor,
                 ),
               ),
             ),
@@ -77,7 +78,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppConstants.primarySoft,
+                  color: context.primarySoftColor,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppConstants.primary.withValues(alpha: 0.3)),
                 ),
@@ -86,14 +87,14 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
                   children: [
                     Text(
                       langCtrl.currentLanguageCode.toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppConstants.primaryDark,
+                        color: context.primaryDarkColor,
                       ),
                     ),
                     const SizedBox(width: 2),
-                    const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppConstants.primaryDark),
+                    Icon(Icons.arrow_drop_down_rounded, size: 18, color: context.primaryDarkColor),
                   ],
                 ),
               ),

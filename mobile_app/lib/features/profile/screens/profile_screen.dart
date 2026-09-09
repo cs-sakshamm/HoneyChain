@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/global_app_bar.dart';
 import '../../authentication/auth_controller.dart';
 import '../controllers/user_controller.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'language_setting_screen.dart';
 import 'theme_setting_screen.dart';
-
-import '../../../core/widgets/global_app_bar.dart';
 
 /// Clean Google Notes-inspired Profile & Settings Screen
 class ProfileScreen extends StatelessWidget {
@@ -21,21 +21,21 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text(AppConstants.logoutTitle),
-          content: const Text(
-            AppConstants.logoutSubtitle,
-            style: TextStyle(fontSize: 14, color: AppConstants.textSecondary),
+          title: Text(dialogContext.tr('logout_title')),
+          content: Text(
+            dialogContext.tr('logout_subtitle'),
+            style: TextStyle(fontSize: 14, color: dialogContext.textSecondaryColor),
           ),
           actions: [
             AppButton(
-              text: AppConstants.logoutCancel,
+              text: dialogContext.tr('logout_cancel'),
               variant: AppButtonVariant.text,
               onPressed: () => Navigator.pop(dialogContext),
             ),
             AppButton(
-              text: AppConstants.logoutConfirm,
+              text: dialogContext.tr('logout_confirm'),
               variant: AppButtonVariant.primary,
-              width: 110,
+              width: 130,
               onPressed: () {
                 Navigator.pop(dialogContext);
                 context.read<AuthController>().signOut();
@@ -52,15 +52,15 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('About HoneyChain'),
-          content: const Text(
-            'HoneyChain v1.0.0\n\nSupply chain management & apiary operations tracking simplified for commercial and artisanal turn-key beekeepers.',
-            style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, height: 1.4),
+          title: Text(dialogContext.tr('about')),
+          content: Text(
+            'HoneyChain v1.0.0\n\n${dialogContext.tr('manage_business_sub')}',
+            style: TextStyle(fontSize: 14, color: dialogContext.textSecondaryColor, height: 1.4),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Close'),
+              child: Text(dialogContext.tr('close')),
             ),
           ],
         );
@@ -75,7 +75,7 @@ class ProfileScreen extends StatelessWidget {
     final user = userCtrl.user;
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       appBar: const GlobalAppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConstants.space24),
@@ -86,39 +86,39 @@ class ProfileScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(AppConstants.space24),
               decoration: BoxDecoration(
-                color: AppConstants.surface,
+                color: context.surfaceColor,
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                border: Border.all(color: AppConstants.border),
+                border: Border.all(color: context.borderColor),
               ),
               child: Column(
                 children: [
                   CircleAvatar(
                     radius: 36,
-                    backgroundColor: AppConstants.primarySoft,
+                    backgroundColor: context.primarySoftColor,
                     child: Text(
                       user.initials,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
-                        color: AppConstants.primaryDark,
+                        color: context.primaryDarkColor,
                       ),
                     ),
                   ),
                   const SizedBox(height: AppConstants.space12),
                   Text(
                     user.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppConstants.textPrimary,
+                      color: context.textPrimaryColor,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     user.email,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppConstants.textSecondary,
+                      color: context.textSecondaryColor,
                     ),
                   ),
                 ],
@@ -128,11 +128,12 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: AppConstants.space24),
 
             // Account Section
-            _buildSectionHeader(langCtrl.tr('account')),
-            _buildMenuCard([
+            _buildSectionHeader(context, context.tr('account')),
+            _buildMenuCard(context, [
               _buildMenuItem(
+                context,
                 icon: Icons.person_outline_rounded,
-                title: langCtrl.tr('edit_profile'),
+                title: context.tr('edit_profile'),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -142,10 +143,11 @@ class ProfileScreen extends StatelessWidget {
                   );
                 },
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: context.borderColor),
               _buildMenuItem(
+                context,
                 icon: Icons.lock_outline_rounded,
-                title: langCtrl.tr('change_password'),
+                title: context.tr('change_password'),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -160,11 +162,12 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: AppConstants.space24),
 
             // Appearance Section
-            _buildSectionHeader(langCtrl.tr('appearance')),
-            _buildMenuCard([
+            _buildSectionHeader(context, context.tr('appearance')),
+            _buildMenuCard(context, [
               _buildMenuItem(
+                context,
                 icon: Icons.palette_outlined,
-                title: langCtrl.tr('theme'),
+                title: context.tr('theme'),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -179,12 +182,13 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: AppConstants.space24),
 
             // Language Section
-            _buildSectionHeader(langCtrl.tr('language')),
-            _buildMenuCard([
+            _buildSectionHeader(context, context.tr('language')),
+            _buildMenuCard(context, [
               _buildMenuItem(
+                context,
                 icon: Icons.language_rounded,
-                title: langCtrl.tr('language'),
-                trailingText: langCtrl.currentLanguage.name,
+                title: context.tr('language'),
+                trailingText: '${langCtrl.currentLanguage.name} (${langCtrl.currentLanguage.nativeName})',
                 onTap: () {
                   Navigator.push(
                     context,
@@ -199,11 +203,12 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: AppConstants.space24),
 
             // Preferences Section
-            _buildSectionHeader(langCtrl.tr('preferences')),
-            _buildMenuCard([
+            _buildSectionHeader(context, context.tr('preferences')),
+            _buildMenuCard(context, [
               _buildMenuItem(
+                context,
                 icon: Icons.info_outline_rounded,
-                title: langCtrl.tr('about'),
+                title: context.tr('about'),
                 onTap: () => _showAboutDialog(context),
               ),
             ]),
@@ -211,11 +216,12 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: AppConstants.space24),
 
             // Security Section
-            _buildSectionHeader(langCtrl.tr('security')),
-            _buildMenuCard([
+            _buildSectionHeader(context, context.tr('security')),
+            _buildMenuCard(context, [
               _buildMenuItem(
+                context,
                 icon: Icons.logout_rounded,
-                title: langCtrl.tr('logout'),
+                title: context.tr('logout'),
                 textColor: AppConstants.error,
                 iconColor: AppConstants.error,
                 onTap: () => _showLogoutDialog(context),
@@ -229,35 +235,36 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppConstants.space8, left: 4),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildMenuCard(List<Widget> children) {
+  Widget _buildMenuCard(BuildContext context, List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: AppConstants.surface,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-        border: Border.all(color: AppConstants.border),
+        border: Border.all(color: context.borderColor),
       ),
       child: Column(children: children),
     );
   }
 
-  Widget _buildMenuItem({
+  Widget _buildMenuItem(
+    BuildContext context, {
     required IconData icon,
     required String title,
     String? trailingText,
@@ -266,13 +273,13 @@ class ProfileScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, size: 20, color: iconColor ?? AppConstants.textSecondary),
+      leading: Icon(icon, size: 20, color: iconColor ?? context.textSecondaryColor),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: textColor ?? AppConstants.textPrimary,
+          color: textColor ?? context.textPrimaryColor,
         ),
       ),
       trailing: Row(
@@ -281,14 +288,15 @@ class ProfileScreen extends StatelessWidget {
           if (trailingText != null) ...[
             Text(
               trailingText,
-              style: const TextStyle(fontSize: 13, color: AppConstants.textSecondary),
+              style: TextStyle(fontSize: 13, color: context.textSecondaryColor),
             ),
             const SizedBox(width: 6),
           ],
-          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppConstants.textMuted),
+          Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
         ],
       ),
       onTap: onTap,
     );
   }
 }
+

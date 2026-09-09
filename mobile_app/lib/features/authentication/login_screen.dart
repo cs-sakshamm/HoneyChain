@@ -77,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Icon(Icons.language_rounded, size: 16, color: AppConstants.textSecondary),
                           const SizedBox(width: 4),
                           Text(
-                            langCtrl.currentLanguageCode.toUpperCase(),
+                            langCtrl.currentLanguage.nativeName,
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -98,81 +98,81 @@ class _LoginScreenState extends State<LoginScreen> {
                   horizontal: AppConstants.space24,
                   vertical: AppConstants.space32,
                 ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // App Brand Logo
-                  const Center(
-                    child: AppLogo(
-                      size: 40,
-                      showWordmark: true,
-                    ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 380),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // App Brand Logo
+                      const Center(
+                        child: AppLogo(
+                          size: 40,
+                          showWordmark: true,
+                        ),
+                      ),
+
+                      const SizedBox(height: AppConstants.space32),
+
+                      // Feedback Banners (Inline Alerts)
+                      if (controller.status == AuthStateStatus.error &&
+                          controller.errorMessage != null)
+                        FeedbackBanner(
+                          message: controller.errorMessage!,
+                          type: FeedbackBannerType.error,
+                          onClose: () => controller.resetError(),
+                        ),
+
+                      if (controller.infoMessage != null)
+                        FeedbackBanner(
+                          message: controller.infoMessage!,
+                          type: FeedbackBannerType.info,
+                        ),
+
+                      // View Content based on AuthMode
+                      switch (controller.mode) {
+                        AuthMode.login => _buildLoginForm(context, controller),
+                        AuthMode.register => _buildRegisterForm(context, controller),
+                        AuthMode.phoneOtp => _buildPhoneOtpForm(context, controller),
+                        AuthMode.forgotPassword =>
+                          _buildForgotPasswordForm(context, controller),
+                      },
+
+                      const SizedBox(height: AppConstants.space32),
+
+                      // Legal Terms Footer
+                      const Text(
+                        AppConstants.legalDisclaimer,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppConstants.textMuted,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-
-                  const SizedBox(height: AppConstants.space32),
-
-                  // Feedback Banners (Inline Alerts)
-                  if (controller.status == AuthStateStatus.error &&
-                      controller.errorMessage != null)
-                    FeedbackBanner(
-                      message: controller.errorMessage!,
-                      type: FeedbackBannerType.error,
-                      onClose: () => controller.resetError(),
-                    ),
-
-                  if (controller.infoMessage != null)
-                    FeedbackBanner(
-                      message: controller.infoMessage!,
-                      type: FeedbackBannerType.info,
-                    ),
-
-                  // View Content based on AuthMode
-                  switch (controller.mode) {
-                    AuthMode.login => _buildLoginForm(controller),
-                    AuthMode.register => _buildRegisterForm(controller),
-                    AuthMode.phoneOtp => _buildPhoneOtpForm(controller),
-                    AuthMode.forgotPassword =>
-                      _buildForgotPasswordForm(controller),
-                  },
-
-                  const SizedBox(height: AppConstants.space32),
-
-                  // Legal Terms Footer
-                  const Text(
-                    AppConstants.legalDisclaimer,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppConstants.textMuted,
-                      height: 1.4,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
-    ),
-  ),
-);
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
   // 1. Production Login Form
   // ---------------------------------------------------------------------------
-  Widget _buildLoginForm(AuthController controller) {
+  Widget _buildLoginForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Sign in to your account',
-          style: TextStyle(
+        Text(
+          context.tr('sign_in_account'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AppConstants.textPrimary,
@@ -180,9 +180,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: AppConstants.space4),
-        const Text(
-          'Manage your business supply chain operations.',
-          style: TextStyle(
+        Text(
+          context.tr('manage_business_sub'),
+          style: const TextStyle(
             fontSize: 14,
             color: AppConstants.textSecondary,
           ),
@@ -193,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Email or Phone Field
         AppTextField(
           controller: _loginEmailOrPhoneController,
-          labelText: 'Business Email or Phone',
+          labelText: context.tr('email_or_phone'),
           hintText: AppConstants.emailOrPhoneHint,
           keyboardType: TextInputType.emailAddress,
           prefixIcon: const Icon(
@@ -208,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Password Field
         AppTextField(
           controller: _loginPasswordController,
-          labelText: 'Password',
+          labelText: context.tr('password'),
           hintText: AppConstants.passwordHint,
           obscureText: !controller.isPasswordVisible,
           prefixIcon: const Icon(
@@ -234,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Align(
           alignment: Alignment.centerRight,
           child: AppButton(
-            text: AppConstants.forgotPasswordText,
+            text: context.tr('forgot_password'),
             variant: AppButtonVariant.text,
             onPressed: () => controller.switchMode(AuthMode.forgotPassword),
           ),
@@ -244,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // Log In Primary Action
         AppButton(
-          text: AppConstants.loginButtonText,
+          text: context.tr('login'),
           isLoading: isLoading,
           onPressed: () => controller.loginWithEmailOrPhone(
             _loginEmailOrPhoneController.text,
@@ -255,14 +255,14 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppConstants.space24),
 
         // Divider
-        const Row(
+        Row(
           children: [
-            Expanded(child: Divider()),
+            const Expanded(child: Divider()),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppConstants.space12),
+              padding: const EdgeInsets.symmetric(horizontal: AppConstants.space12),
               child: Text(
-                AppConstants.orDividerText,
-                style: TextStyle(
+                context.tr('or'),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: AppConstants.textMuted,
@@ -270,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            Expanded(child: Divider()),
+            const Expanded(child: Divider()),
           ],
         ),
 
@@ -282,14 +282,14 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             SocialIconButton(
               icon: const GoogleLogoIcon(size: 20),
-              tooltip: AppConstants.googleSignInText,
+              tooltip: context.tr('google_sign_in'),
               isLoading: isLoading,
               onPressed: () => controller.signInWithGoogle(),
             ),
             const SizedBox(width: AppConstants.space16),
             SocialIconButton(
               icon: const Icon(Icons.apple, size: 22, color: Colors.black),
-              tooltip: AppConstants.appleSignInText,
+              tooltip: context.tr('apple_sign_in'),
               isLoading: isLoading,
               onPressed: () => controller.signInWithApple(),
             ),
@@ -297,7 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
             SocialIconButton(
               icon: const Icon(Icons.smartphone_rounded,
                   size: 20, color: AppConstants.textPrimary),
-              tooltip: AppConstants.phoneSignInText,
+              tooltip: context.tr('phone_sign_in'),
               isLoading: isLoading,
               onPressed: () => _showPhoneInputDialog(context, controller),
             ),
@@ -311,18 +311,18 @@ class _LoginScreenState extends State<LoginScreen> {
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Text(
-              AppConstants.dontHaveAccountText,
-              style: TextStyle(
+            Text(
+              context.tr('dont_have_account'),
+              style: const TextStyle(
                 fontSize: 14,
                 color: AppConstants.textSecondary,
               ),
             ),
             GestureDetector(
               onTap: () => controller.switchMode(AuthMode.register),
-              child: const Text(
-                AppConstants.createAccountLinkText,
-                style: TextStyle(
+              child: Text(
+                context.tr('create_account'),
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppConstants.primaryDark,
@@ -338,15 +338,15 @@ class _LoginScreenState extends State<LoginScreen> {
   // ---------------------------------------------------------------------------
   // 2. Business Account Registration View
   // ---------------------------------------------------------------------------
-  Widget _buildRegisterForm(AuthController controller) {
+  Widget _buildRegisterForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Create Business Account',
-          style: TextStyle(
+        Text(
+          context.tr('create_business_account'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AppConstants.textPrimary,
@@ -354,9 +354,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: AppConstants.space4),
-        const Text(
-          'Get started with HoneyChain for your enterprise.',
-          style: TextStyle(
+        Text(
+          context.tr('get_started_sub'),
+          style: const TextStyle(
             fontSize: 14,
             color: AppConstants.textSecondary,
           ),
@@ -366,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         AppTextField(
           controller: _regBusinessNameController,
-          labelText: 'Legal Business Name',
+          labelText: context.tr('legal_business_name'),
           hintText: AppConstants.businessNameHint,
           prefixIcon: const Icon(
             Icons.domain_rounded,
@@ -378,7 +378,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         AppTextField(
           controller: _regEmailOrPhoneController,
-          labelText: 'Business Email or Phone',
+          labelText: context.tr('email_or_phone'),
           hintText: AppConstants.emailOrPhoneHint,
           keyboardType: TextInputType.emailAddress,
           prefixIcon: const Icon(
@@ -391,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         AppTextField(
           controller: _regPasswordController,
-          labelText: 'Password',
+          labelText: context.tr('password'),
           hintText: AppConstants.passwordHint,
           obscureText: !controller.isPasswordVisible,
           prefixIcon: const Icon(
@@ -414,7 +414,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppConstants.space24),
 
         AppButton(
-          text: AppConstants.createAccountButtonText,
+          text: context.tr('create_account'),
           isLoading: isLoading,
           onPressed: () => controller.registerBusinessAccount(
             businessName: _regBusinessNameController.text,
@@ -428,9 +428,9 @@ class _LoginScreenState extends State<LoginScreen> {
         Center(
           child: GestureDetector(
             onTap: () => controller.switchMode(AuthMode.login),
-            child: const Text(
-              AppConstants.alreadyHaveAccountText,
-              style: TextStyle(
+            child: Text(
+              context.tr('already_have_account'),
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppConstants.primaryDark,
@@ -445,15 +445,15 @@ class _LoginScreenState extends State<LoginScreen> {
   // ---------------------------------------------------------------------------
   // 3. Phone Verification (OTP) View
   // ---------------------------------------------------------------------------
-  Widget _buildPhoneOtpForm(AuthController controller) {
+  Widget _buildPhoneOtpForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          AppConstants.phoneOtpTitle,
-          style: TextStyle(
+        Text(
+          context.tr('phone_auth'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AppConstants.textPrimary,
@@ -473,7 +473,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         AppTextField(
           controller: _otpCodeController,
-          labelText: '6-Digit Verification Code',
+          labelText: context.tr('verification_code'),
           hintText: '• • • • • •',
           keyboardType: TextInputType.number,
           prefixIcon: const Icon(
@@ -486,7 +486,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppConstants.space24),
 
         AppButton(
-          text: AppConstants.verifyOtpButtonText,
+          text: context.tr('verify_otp'),
           isLoading: isLoading,
           onPressed: () => controller.verifyPhoneOtp(_otpCodeController.text),
         ),
@@ -497,13 +497,13 @@ class _LoginScreenState extends State<LoginScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             AppButton(
-              text: 'Back to Sign In',
+              text: context.tr('back_to_sign_in'),
               variant: AppButtonVariant.text,
               onPressed: () => controller.switchMode(AuthMode.login),
             ),
             if (controller.otpCountdown > 0)
               Text(
-                'Resend in ${controller.otpCountdown}s',
+                '${context.tr('resend_in')} ${controller.otpCountdown}s',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppConstants.textMuted,
@@ -512,7 +512,7 @@ class _LoginScreenState extends State<LoginScreen> {
               )
             else
               AppButton(
-                text: AppConstants.resendOtpText,
+                text: context.tr('resend_otp'),
                 variant: AppButtonVariant.text,
                 onPressed: () =>
                     controller.startPhoneAuth(controller.phoneNumberForOtp),
@@ -526,15 +526,15 @@ class _LoginScreenState extends State<LoginScreen> {
   // ---------------------------------------------------------------------------
   // 4. Forgot Password View
   // ---------------------------------------------------------------------------
-  Widget _buildForgotPasswordForm(AuthController controller) {
+  Widget _buildForgotPasswordForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          AppConstants.resetPasswordTitle,
-          style: TextStyle(
+        Text(
+          context.tr('reset_password'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AppConstants.textPrimary,
@@ -542,9 +542,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: AppConstants.space4),
-        const Text(
-          AppConstants.resetPasswordSubtitle,
-          style: TextStyle(
+        Text(
+          context.tr('reset_password_sub'),
+          style: const TextStyle(
             fontSize: 14,
             color: AppConstants.textSecondary,
           ),
@@ -554,7 +554,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         AppTextField(
           controller: _resetIdentifierController,
-          labelText: 'Business Email or Phone',
+          labelText: context.tr('email_or_phone'),
           hintText: AppConstants.emailOrPhoneHint,
           prefixIcon: const Icon(
             Icons.mail_outline_rounded,
@@ -566,7 +566,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppConstants.space24),
 
         AppButton(
-          text: AppConstants.sendResetLinkText,
+          text: context.tr('send_reset_link'),
           isLoading: isLoading,
           onPressed: () => controller
               .sendPasswordReset(_resetIdentifierController.text),
@@ -576,7 +576,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         Center(
           child: AppButton(
-            text: 'Back to Sign In',
+            text: context.tr('back_to_sign_in'),
             variant: AppButtonVariant.text,
             onPressed: () => controller.switchMode(AuthMode.login),
           ),
@@ -593,14 +593,14 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Phone Authentication'),
+          title: Text(dialogContext.tr('phone_auth')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Enter your mobile number to receive a 6-digit OTP code.',
-                style: TextStyle(
+              Text(
+                dialogContext.tr('enter_mobile_otp'),
+                style: const TextStyle(
                   fontSize: 13,
                   color: AppConstants.textSecondary,
                 ),
@@ -616,12 +616,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           actions: [
             AppButton(
-              text: 'Cancel',
+              text: dialogContext.tr('cancel'),
               variant: AppButtonVariant.text,
               onPressed: () => Navigator.pop(dialogContext),
             ),
             AppButton(
-              text: AppConstants.sendOtpButtonText,
+              text: dialogContext.tr('send_otp'),
               width: 160,
               onPressed: () {
                 final phone = _phoneInputController.text;
@@ -673,15 +673,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: AppConstants.space16),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: AppConstants.space24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppConstants.space24),
                     child: Row(
                       children: [
-                        Icon(Icons.language_rounded, size: 20, color: AppConstants.primaryDark),
-                        SizedBox(width: 8),
+                        const Icon(Icons.language_rounded, size: 20, color: AppConstants.primaryDark),
+                        const SizedBox(width: 8),
                         Text(
-                          'Choose Language',
-                          style: TextStyle(
+                          langController.tr('select_language'),
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: AppConstants.textPrimary,
@@ -699,11 +699,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _languageSearchController,
                       onChanged: (_) => setModalState(() {}),
                       style: const TextStyle(fontSize: 14),
-                      decoration: const InputDecoration(
-                        hintText: 'Search language...',
-                        prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppConstants.textMuted),
+                      decoration: InputDecoration(
+                        hintText: langController.tr('search_language_hint'),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppConstants.textMuted),
                         isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         fillColor: AppConstants.background,
                       ),
                     ),
@@ -731,7 +731,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           subtitle: Text(
                             lang.nativeName,
-                            style: const TextStyle(fontSize: 12, color: AppConstants.textSecondary),
+                            style: const TextStyle(fontSize: 13, color: AppConstants.textSecondary, fontWeight: FontWeight.w600),
                           ),
                           trailing: isSelected
                               ? const Icon(Icons.check_rounded, color: AppConstants.primaryDark, size: 20)
@@ -753,3 +753,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

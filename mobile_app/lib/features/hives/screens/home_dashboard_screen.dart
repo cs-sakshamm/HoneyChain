@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../../authentication/auth_controller.dart';
@@ -26,15 +28,15 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Delete this hive?'),
+          title: Text(dialogContext.tr('delete_confirm_title')),
           content: Text(
-            'Are you sure you want to delete "${hive.name}"? This action cannot be undone.',
-            style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
+            '${dialogContext.tr('delete_confirm_msg')} ("${hive.name}")',
+            style: TextStyle(fontSize: 14, color: dialogContext.textSecondaryColor),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
+              child: Text(dialogContext.tr('cancel'), style: TextStyle(color: dialogContext.textSecondaryColor)),
             ),
             TextButton(
               onPressed: () async {
@@ -45,16 +47,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        success ? 'Hive deleted' : 'Failed to delete hive',
+                        success ? context.tr('hive_deleted') : context.tr('failed_to_delete_hive'),
                       ),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
                 }
               },
-              child: const Text(
-                'Delete Hive',
-                style: TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600),
+              child: Text(
+                dialogContext.tr('delete_hive'),
+                style: const TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -77,21 +79,21 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
     String greeting() {
       final hour = DateTime.now().hour;
-      if (hour < 12) return 'Good morning';
-      if (hour < 17) return 'Good afternoon';
-      return 'Good evening';
+      if (hour < 12) return context.tr('greeting_morning');
+      if (hour < 17) return context.tr('greeting_afternoon');
+      return context.tr('greeting_evening');
     }
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       appBar: const GlobalAppBar(),
       body: hiveController.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppConstants.primaryDark),
+          ? Center(
+              child: CircularProgressIndicator(color: context.primaryDarkColor),
             )
           : RefreshIndicator(
               onRefresh: () => hiveController.loadHives(),
-              color: AppConstants.primaryDark,
+              color: context.primaryDarkColor,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppConstants.space24),
@@ -101,19 +103,19 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     // 1. Natural Human Greeting
                     Text(
                       '${greeting()}, $userFirstName',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
-                        color: AppConstants.textPrimary,
+                        color: context.textPrimaryColor,
                         letterSpacing: -0.4,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Here is the current status of your apiaries.',
+                    Text(
+                      context.tr('status_apiaries_sub'),
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppConstants.textSecondary,
+                        color: context.textSecondaryColor,
                       ),
                     ),
 
@@ -137,12 +139,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Recent Hives',
+                        Text(
+                          context.tr('recent_hives'),
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: AppConstants.textPrimary,
+                            color: context.textPrimaryColor,
                             letterSpacing: -0.3,
                           ),
                         ),
@@ -157,20 +159,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                               );
                             },
                             borderRadius: BorderRadius.circular(4),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                               child: Row(
                                 children: [
                                   Text(
-                                    'Show more',
-                                    style: TextStyle(
+                                    context.tr('show_more'),
+                                    style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                       color: AppConstants.primaryDark,
                                     ),
                                   ),
-                                  SizedBox(width: 2),
-                                  Icon(
+                                  const SizedBox(width: 2),
+                                  const Icon(
                                     Icons.arrow_forward_rounded,
                                     size: 16,
                                     color: AppConstants.primaryDark,
@@ -245,26 +247,26 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             ),
           ),
           const SizedBox(height: AppConstants.space16),
-          const Text(
-            'No hives added yet',
-            style: TextStyle(
+          Text(
+            context.tr('no_hives_yet'),
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppConstants.textPrimary,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Create your first hive to start tracking production and health.',
+          Text(
+            context.tr('no_hives_subtitle'),
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
               color: AppConstants.textSecondary,
             ),
           ),
           const SizedBox(height: AppConstants.space24),
           AppButton(
-            text: 'Add Your First Hive',
+            text: context.tr('add_first_hive'),
             icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
             variant: AppButtonVariant.primary,
             width: 220,
@@ -282,3 +284,4 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 }
+

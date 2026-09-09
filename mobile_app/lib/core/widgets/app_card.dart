@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
 
 /// Production Card Container for HoneyChain
 class AppCard extends StatelessWidget {
@@ -24,9 +25,9 @@ class AppCard extends StatelessWidget {
     final cardContent = Container(
       padding: padding ?? const EdgeInsets.all(AppConstants.space16),
       decoration: BoxDecoration(
-        color: backgroundColor ?? AppConstants.surface,
+        color: backgroundColor ?? context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-        border: border ?? Border.all(color: AppConstants.border, width: 1.0),
+        border: border ?? Border.all(color: context.borderColor, width: 1.0),
       ),
       child: child,
     );

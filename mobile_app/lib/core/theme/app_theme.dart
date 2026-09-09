@@ -12,15 +12,26 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.light,
       scaffoldBackgroundColor: AppConstants.background,
       colorScheme: const ColorScheme.light(
         surface: AppConstants.surface,
+        onSurface: AppConstants.textPrimary,
         primary: AppConstants.primary,
         onPrimary: Colors.white,
         secondary: AppConstants.textSecondary,
-        onSurface: AppConstants.textPrimary,
+        onSecondary: Colors.white,
+        onSurfaceVariant: AppConstants.textMuted,
         error: AppConstants.error,
         outline: AppConstants.border,
+        primaryContainer: AppConstants.primarySoft,
+        onPrimaryContainer: AppConstants.primaryDark,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppConstants.surface,
+        foregroundColor: AppConstants.textPrimary,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
       ),
       textTheme: baseTextTheme.copyWith(
         displayMedium: GoogleFonts.inter(
@@ -123,17 +134,152 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme {
-    return ThemeData.dark(useMaterial3: true).copyWith(
-      scaffoldBackgroundColor: const Color(0xFF121212),
+    const darkBackground = Color(0xFF111827); // Gray-900
+    const darkSurface = Color(0xFF1F2937); // Gray-800
+    const darkTextPrimary = Color(0xFFF9FAFB); // Gray-50
+    const darkTextSecondary = Color(0xFFD1D5DB); // Gray-300
+    const darkTextMuted = Color(0xFF9CA3AF); // Gray-400
+    const darkBorder = Color(0xFF374151); // Gray-700
+    const darkPrimaryContainer = Color(0xFF38230D); // Amber dark tint
+    const darkOnPrimaryContainer = Color(0xFFFBBF24); // Amber light highlight
+
+    final baseTextTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme);
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: darkBackground,
       colorScheme: const ColorScheme.dark(
-        surface: Color(0xFF1E1E1E),
+        surface: darkSurface,
+        onSurface: darkTextPrimary,
         primary: AppConstants.primary,
         onPrimary: Colors.white,
-        secondary: Color(0xFF9CA3AF),
-        onSurface: Colors.white,
+        secondary: darkTextSecondary,
+        onSecondary: Colors.black,
+        onSurfaceVariant: darkTextMuted,
         error: AppConstants.error,
-        outline: Color(0xFF374151),
+        outline: darkBorder,
+        primaryContainer: darkPrimaryContainer,
+        onPrimaryContainer: darkOnPrimaryContainer,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: darkSurface,
+        foregroundColor: darkTextPrimary,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+      ),
+      textTheme: baseTextTheme.copyWith(
+        displayMedium: GoogleFonts.inter(
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          color: darkTextPrimary,
+          letterSpacing: -0.5,
+          height: 1.2,
+        ),
+        headlineMedium: GoogleFonts.inter(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: darkTextPrimary,
+          letterSpacing: -0.3,
+          height: 1.3,
+        ),
+        titleMedium: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: darkTextPrimary,
+          height: 1.4,
+        ),
+        bodyLarge: GoogleFonts.inter(
+          fontSize: 15,
+          fontWeight: FontWeight.w400,
+          color: darkTextSecondary,
+          height: 1.5,
+        ),
+        bodyMedium: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: darkTextSecondary,
+          height: 1.4,
+        ),
+        labelLarge: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: darkTextPrimary,
+          letterSpacing: 0.1,
+        ),
+        labelSmall: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: darkTextMuted,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkSurface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        hintStyle: const TextStyle(
+          color: darkTextMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+        labelStyle: const TextStyle(
+          color: darkTextSecondary,
+          fontSize: 14,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+          borderSide: const BorderSide(color: darkBorder, width: 1.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+          borderSide: const BorderSide(color: AppConstants.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+          borderSide: const BorderSide(color: AppConstants.error, width: 1.0),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+          borderSide: const BorderSide(color: AppConstants.error, width: 1.5),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: darkSurface,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+          side: const BorderSide(color: darkBorder, width: 1.0),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkSurface,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+          side: const BorderSide(color: darkBorder, width: 1.0),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: darkBorder,
+        thickness: 1.0,
+        space: 1.0,
       ),
     );
   }
 }
+
+/// Extension on BuildContext for clean dynamic theme token retrieval across all widgets
+extension ThemeContextX on BuildContext {
+  ThemeData get theme => Theme.of(this);
+  ColorScheme get colors => Theme.of(this).colorScheme;
+  Color get scaffoldBg => Theme.of(this).scaffoldBackgroundColor;
+  Color get surfaceColor => Theme.of(this).colorScheme.surface;
+  Color get textPrimaryColor => Theme.of(this).colorScheme.onSurface;
+  Color get textSecondaryColor => Theme.of(this).colorScheme.secondary;
+  Color get textMutedColor => Theme.of(this).colorScheme.onSurfaceVariant;
+  Color get borderColor => Theme.of(this).colorScheme.outline;
+  Color get primarySoftColor => Theme.of(this).colorScheme.primaryContainer;
+  Color get primaryDarkColor => Theme.of(this).colorScheme.onPrimaryContainer;
+}
+

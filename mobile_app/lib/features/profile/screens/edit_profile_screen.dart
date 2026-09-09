@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/user_controller.dart';
@@ -53,7 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Profile updated successfully'),
+        content: Text(context.tr('profile_updated')),
         backgroundColor: AppConstants.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -68,9 +69,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppConstants.background,
-      appBar: const GlobalAppBar(
+      appBar: GlobalAppBar(
         showBackButton: true,
-        titleText: 'Edit Profile',
+        titleText: context.tr('edit_profile'),
       ),
       body: Form(
         key: _formKey,
@@ -89,39 +90,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: Column(
                   children: [
                     _buildInputField(
-                      label: 'Full Name *',
-                      hint: 'Enter full legal name',
+                      label: '${context.tr('full_name')} *',
+                      hint: context.tr('legal_name_hint'),
                       controller: _nameController,
                       validator: (val) =>
-                          (val == null || val.trim().isEmpty) ? 'Name is required' : null,
+                          (val == null || val.trim().isEmpty) ? context.tr('full_name') : null,
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildInputField(
-                      label: 'Business Email *',
+                      label: '${context.tr('business_email')} *',
                       hint: 'email@example.com',
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Email is required';
-                        if (!val.contains('@')) return 'Enter a valid email';
+                        if (val == null || val.trim().isEmpty) return context.tr('business_email');
+                        if (!val.contains('@')) return context.tr('business_email');
                         return null;
                       },
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildInputField(
-                      label: 'Phone Number *',
-                      hint: '+1 (555) 000-0000',
+                      label: '${context.tr('phone')} *',
+                      hint: '+91 9876543210',
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                       validator: (val) =>
-                          (val == null || val.trim().isEmpty) ? 'Phone is required' : null,
+                          (val == null || val.trim().isEmpty) ? context.tr('phone') : null,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: AppConstants.space32),
               AppButton(
-                text: 'Save Changes',
+                text: context.tr('save_changes'),
                 isLoading: _isSaving,
                 variant: AppButtonVariant.primary,
                 onPressed: _saveProfile,
@@ -166,3 +167,4 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 }
+

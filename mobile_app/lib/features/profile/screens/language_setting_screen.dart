@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/global_app_bar.dart';
 
-/// Screen to select Application Language (Flag-free 22-language picker with search)
+/// Screen to select Application Language (Flag-free 12 Indian language picker with search)
 class LanguageSettingScreen extends StatefulWidget {
   const LanguageSettingScreen({super.key});
 
@@ -34,7 +35,7 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       appBar: GlobalAppBar(
         showBackButton: true,
         titleText: langCtrl.tr('select_language'),
@@ -43,28 +44,28 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
         children: [
           // Search Field
           Container(
-            color: AppConstants.surface,
+            color: context.surfaceColor,
             padding: const EdgeInsets.all(AppConstants.space16),
             child: TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(fontSize: 14, color: context.textPrimaryColor),
               decoration: InputDecoration(
                 hintText: langCtrl.tr('search_language_hint'),
-                prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppConstants.textMuted),
+                prefixIcon: Icon(Icons.search_rounded, size: 20, color: context.textMutedColor),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18, color: AppConstants.textMuted),
+                        icon: Icon(Icons.clear_rounded, size: 18, color: context.textMutedColor),
                         onPressed: () => setState(() => _searchController.clear()),
                       )
                     : null,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                fillColor: AppConstants.background,
+                fillColor: context.scaffoldBg,
               ),
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: context.borderColor),
 
           // Flag-free Language List
           Expanded(
@@ -78,10 +79,10 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
 
                 return Container(
                   decoration: BoxDecoration(
-                    color: AppConstants.surface,
+                    color: context.surfaceColor,
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
                     border: Border.all(
-                      color: isSelected ? AppConstants.primaryDark : AppConstants.border,
+                      color: isSelected ? AppConstants.primary : context.borderColor,
                       width: isSelected ? 1.5 : 1.0,
                     ),
                   ),
@@ -91,25 +92,27 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? AppConstants.primaryDark : AppConstants.textPrimary,
+                        color: isSelected ? AppConstants.primary : context.textPrimaryColor,
                       ),
                     ),
                     subtitle: Text(
                       lang.nativeName,
-                      style: const TextStyle(fontSize: 12, color: AppConstants.textSecondary),
+                      style: TextStyle(fontSize: 13, color: context.textSecondaryColor, fontWeight: FontWeight.w600),
                     ),
                     trailing: isSelected
-                        ? const Icon(Icons.check_rounded, color: AppConstants.primaryDark, size: 20)
+                        ? const Icon(Icons.check_rounded, color: AppConstants.primary, size: 20)
                         : null,
-                    onTap: () {
-                      langCtrl.setLanguage(lang.code);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Language changed to ${lang.name}'),
-                          behavior: SnackBarBehavior.floating,
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
+                    onTap: () async {
+                      await langCtrl.setLanguage(lang.code);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${langCtrl.tr('language_changed')} ${lang.name} (${lang.nativeName})'),
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      }
                     },
                   ),
                 );
@@ -121,3 +124,4 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
     );
   }
 }
+

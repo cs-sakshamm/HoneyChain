@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/global_app_bar.dart';
 
@@ -14,44 +16,44 @@ class ThemeSettingScreen extends StatelessWidget {
     final currentMode = themeCtrl.themeMode;
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
-      appBar: const GlobalAppBar(
+      backgroundColor: context.scaffoldBg,
+      appBar: GlobalAppBar(
         showBackButton: true,
-        titleText: 'Theme Settings',
+        titleText: context.tr('theme_settings'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConstants.space24),
         child: Container(
           decoration: BoxDecoration(
-            color: AppConstants.surface,
+            color: context.surfaceColor,
             borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-            border: Border.all(color: AppConstants.border),
+            border: Border.all(color: context.borderColor),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildThemeOption(
                 context,
-                title: 'Light',
-                subtitle: 'Always clean light background',
+                title: context.tr('light'),
+                subtitle: context.tr('light_subtitle'),
                 mode: ThemeMode.light,
                 currentMode: currentMode,
                 onTap: () => themeCtrl.setThemeMode(ThemeMode.light),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: context.borderColor),
               _buildThemeOption(
                 context,
-                title: 'Dark',
-                subtitle: 'Dark background for high contrast',
+                title: context.tr('dark'),
+                subtitle: context.tr('dark_subtitle'),
                 mode: ThemeMode.dark,
                 currentMode: currentMode,
                 onTap: () => themeCtrl.setThemeMode(ThemeMode.dark),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: context.borderColor),
               _buildThemeOption(
                 context,
-                title: 'System Default',
-                subtitle: 'Match your phone system appearance',
+                title: context.tr('system_default'),
+                subtitle: context.tr('system_default_subtitle'),
                 mode: ThemeMode.system,
                 currentMode: currentMode,
                 onTap: () => themeCtrl.setThemeMode(ThemeMode.system),
@@ -78,17 +80,18 @@ class ThemeSettingScreen extends StatelessWidget {
         style: TextStyle(
           fontSize: 15,
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          color: isSelected ? AppConstants.primaryDark : AppConstants.textPrimary,
+          color: isSelected ? AppConstants.primary : context.textPrimaryColor,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(fontSize: 12, color: AppConstants.textSecondary),
+        style: TextStyle(fontSize: 12, color: context.textSecondaryColor),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: AppConstants.primaryDark, size: 22)
-          : const Icon(Icons.circle_outlined, color: AppConstants.textMuted, size: 22),
+          ? const Icon(Icons.check_circle_rounded, color: AppConstants.primary, size: 22)
+          : Icon(Icons.circle_outlined, color: context.textMutedColor, size: 22),
       onTap: onTap,
     );
   }
 }
+

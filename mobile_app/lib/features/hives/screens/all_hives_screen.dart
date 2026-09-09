@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/hive_controller.dart';
 import '../widgets/hive_note_card.dart';
 import 'add_edit_hive_screen.dart';
 import 'hive_details_screen.dart';
-
-import '../../../core/widgets/global_app_bar.dart';
 
 /// Complete "All Hives" screen with search, filtering, sorting, and management
 class AllHivesScreen extends StatelessWidget {
@@ -17,15 +18,15 @@ class AllHivesScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Delete this hive?'),
+          title: Text(dialogContext.tr('delete_confirm_title')),
           content: Text(
-            'Are you sure you want to delete "$hiveName"? This action cannot be undone.',
-            style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
+            '${dialogContext.tr('delete_confirm_msg')} ("$hiveName")',
+            style: TextStyle(fontSize: 14, color: dialogContext.textSecondaryColor),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
+              child: Text(dialogContext.tr('cancel'), style: TextStyle(color: dialogContext.textSecondaryColor)),
             ),
             TextButton(
               onPressed: () async {
@@ -36,14 +37,14 @@ class AllHivesScreen extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        success ? 'Hive deleted' : 'Failed to delete hive',
+                        success ? context.tr('hive_deleted') : context.tr('failed_to_delete_hive'),
                       ),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
                 }
               },
-              child: const Text('Delete Hive', style: TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600)),
+              child: Text(dialogContext.tr('delete_hive'), style: const TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600)),
             ),
           ],
         );
@@ -57,22 +58,22 @@ class AllHivesScreen extends StatelessWidget {
     final hives = controller.filteredAndSortedHives;
 
     final filterOptions = [
-      'All',
-      'Healthy',
-      'Needs Attention',
-      'High Production',
-      'Recently Inspected',
+      {'key': 'All', 'label': context.tr('all')},
+      {'key': 'Healthy', 'label': context.tr('healthy')},
+      {'key': 'Needs Attention', 'label': context.tr('needs_attention')},
+      {'key': 'High Production', 'label': context.tr('high_production')},
+      {'key': 'Recently Inspected', 'label': context.tr('recently_inspected')},
     ];
 
     final sortOptions = [
-      'Name A-Z',
-      'Production High-Low',
-      'Last Inspected',
-      'Date Added',
+      {'key': 'Name A-Z', 'label': context.tr('sort_name')},
+      {'key': 'Production High-Low', 'label': context.tr('sort_production')},
+      {'key': 'Last Inspected', 'label': context.tr('sort_inspected')},
+      {'key': 'Date Added', 'label': context.tr('sort_date_added')},
     ];
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       appBar: GlobalAppBar(
         extraActions: [
           Padding(
@@ -90,21 +91,21 @@ class AllHivesScreen extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppConstants.primarySoft,
+                  color: context.primarySoftColor,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppConstants.primary.withValues(alpha: 0.3)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add_rounded, size: 16, color: AppConstants.primaryDark),
-                    SizedBox(width: 4),
+                    Icon(Icons.add_rounded, size: 16, color: context.primaryDarkColor),
+                    const SizedBox(width: 4),
                     Text(
-                      'Add Hive',
+                      context.tr('add_hive'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppConstants.primaryDark,
+                        color: context.primaryDarkColor,
                       ),
                     ),
                   ],
@@ -118,7 +119,7 @@ class AllHivesScreen extends StatelessWidget {
         children: [
           // Search & Filter Container
           Container(
-            color: AppConstants.surface,
+            color: context.surfaceColor,
             padding: const EdgeInsets.symmetric(
               horizontal: AppConstants.space16,
               vertical: AppConstants.space12,
@@ -128,19 +129,19 @@ class AllHivesScreen extends StatelessWidget {
                 // Search Input Field
                 TextField(
                   onChanged: (val) => controller.setSearchQuery(val),
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(fontSize: 14, color: context.textPrimaryColor),
                   decoration: InputDecoration(
-                    hintText: 'Search by hive name, ID, or location...',
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppConstants.textMuted, size: 20),
+                    hintText: context.tr('search_hives_full_hint'),
+                    prefixIcon: Icon(Icons.search_rounded, color: context.textMutedColor, size: 20),
                     suffixIcon: controller.searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18, color: AppConstants.textMuted),
+                            icon: Icon(Icons.clear_rounded, size: 18, color: context.textMutedColor),
                             onPressed: () => controller.setSearchQuery(''),
                           )
                         : null,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    fillColor: AppConstants.background,
+                    fillColor: context.scaffoldBg,
                   ),
                 ),
                 const SizedBox(height: AppConstants.space12),
@@ -152,22 +153,23 @@ class AllHivesScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       decoration: BoxDecoration(
-                        color: AppConstants.background,
+                        color: context.scaffoldBg,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppConstants.border),
+                        border: Border.all(color: context.borderColor),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: controller.selectedSort,
-                          icon: const Icon(Icons.sort_rounded, size: 16, color: AppConstants.textSecondary),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppConstants.textPrimary),
+                          dropdownColor: context.surfaceColor,
+                          icon: Icon(Icons.sort_rounded, size: 16, color: context.textSecondaryColor),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           onChanged: (val) {
                             if (val != null) controller.setSort(val);
                           },
                           items: sortOptions.map((opt) {
                             return DropdownMenuItem(
-                              value: opt,
-                              child: Text(opt),
+                              value: opt['key']!,
+                              child: Text(opt['label']!),
                             );
                           }).toList(),
                         ),
@@ -179,28 +181,30 @@ class AllHivesScreen extends StatelessWidget {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: filterOptions.map((filter) {
-                            final isSelected = controller.selectedFilter == filter;
+                          children: filterOptions.map((opt) {
+                            final filterKey = opt['key']!;
+                            final filterLabel = opt['label']!;
+                            final isSelected = controller.selectedFilter == filterKey;
                             return Padding(
                               padding: const EdgeInsets.only(right: 6),
                               child: FilterChip(
                                 label: Text(
-                                  filter,
+                                  filterLabel,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSelected ? Colors.white : AppConstants.textSecondary,
+                                    color: isSelected ? Colors.white : context.textSecondaryColor,
                                   ),
                                 ),
                                 selected: isSelected,
-                                selectedColor: AppConstants.primaryDark,
-                                backgroundColor: AppConstants.background,
+                                selectedColor: AppConstants.primary,
+                                backgroundColor: context.scaffoldBg,
                                 side: BorderSide(
-                                  color: isSelected ? AppConstants.primaryDark : AppConstants.border,
+                                  color: isSelected ? AppConstants.primary : context.borderColor,
                                 ),
                                 showCheckmark: false,
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                onSelected: (_) => controller.setFilter(filter),
+                                onSelected: (_) => controller.setFilter(filterKey),
                               ),
                             );
                           }).toList(),
@@ -212,7 +216,7 @@ class AllHivesScreen extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: context.borderColor),
 
           // Main List of Hives
           Expanded(
@@ -275,7 +279,7 @@ class AllHivesScreen extends StatelessWidget {
             ),
             const SizedBox(height: AppConstants.space16),
             Text(
-              hasSearchOrFilter ? 'No matching hives found' : 'No hives added yet',
+              hasSearchOrFilter ? context.tr('no_matching_hives') : context.tr('no_hives_yet'),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -285,8 +289,8 @@ class AllHivesScreen extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               hasSearchOrFilter
-                  ? 'Try adjusting your search query or clear active filters.'
-                  : 'Create your first hive to start tracking production and health.',
+                  ? context.tr('no_matching_hives_subtitle')
+                  : context.tr('no_hives_subtitle'),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -300,7 +304,7 @@ class AllHivesScreen extends StatelessWidget {
                   controller.setSearchQuery('');
                   controller.setFilter('All');
                 },
-                child: const Text('Clear Filters'),
+                child: Text(context.tr('clear_filters')),
               )
             else
               ElevatedButton.icon(
@@ -317,7 +321,7 @@ class AllHivesScreen extends StatelessWidget {
                   );
                 },
                 icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add Your First Hive'),
+                label: Text(context.tr('add_first_hive')),
               ),
           ],
         ),
@@ -325,3 +329,4 @@ class AllHivesScreen extends StatelessWidget {
     );
   }
 }
+

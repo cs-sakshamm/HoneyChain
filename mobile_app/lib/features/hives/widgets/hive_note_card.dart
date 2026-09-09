@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../models/hive_model.dart';
 
 /// Clean Google Notes / Google Keep-inspired Hive Card
@@ -26,15 +28,15 @@ class HiveNoteCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppConstants.space12),
       decoration: BoxDecoration(
-        color: AppConstants.surface,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
         border: Border.all(
-          color: AppConstants.border,
+          color: context.borderColor,
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -60,12 +62,12 @@ class HiveNoteCard extends StatelessWidget {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppConstants.primarySoft,
+                        color: context.primarySoftColor,
                         borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.hive_outlined,
-                        color: AppConstants.primaryDark,
+                        color: context.primaryDarkColor,
                         size: 20,
                       ),
                     ),
@@ -77,10 +79,10 @@ class HiveNoteCard extends StatelessWidget {
                         children: [
                           Text(
                             hive.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: AppConstants.textPrimary,
+                              color: context.textPrimaryColor,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -88,10 +90,10 @@ class HiveNoteCard extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             '${hive.hiveCode} • ${hive.apiaryLocation}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: AppConstants.textSecondary,
+                              color: context.textSecondaryColor,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -100,14 +102,14 @@ class HiveNoteCard extends StatelessWidget {
                       ),
                     ),
                     // Health Badge
-                    _buildHealthBadge(hive),
+                    _buildHealthBadge(context, hive),
                     const SizedBox(width: AppConstants.space4),
                     // Options Popup Menu
                     PopupMenuButton<String>(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.more_vert_rounded,
                         size: 20,
-                        color: AppConstants.textMuted,
+                        color: context.textMutedColor,
                       ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 120),
@@ -121,33 +123,33 @@ class HiveNoteCard extends StatelessWidget {
                         }
                       },
                       itemBuilder: (context) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'view',
                           child: Row(
                             children: [
-                              Icon(Icons.visibility_outlined, size: 18),
-                              SizedBox(width: 8),
-                              Text('View Details', style: TextStyle(fontSize: 13)),
+                              const Icon(Icons.visibility_outlined, size: 18),
+                              const SizedBox(width: 8),
+                              Text(context.tr('view_details'), style: const TextStyle(fontSize: 13)),
                             ],
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'edit',
                           child: Row(
                             children: [
-                              Icon(Icons.edit_outlined, size: 18),
-                              SizedBox(width: 8),
-                              Text('Edit', style: TextStyle(fontSize: 13)),
+                              const Icon(Icons.edit_outlined, size: 18),
+                              const SizedBox(width: 8),
+                              Text(context.tr('edit'), style: const TextStyle(fontSize: 13)),
                             ],
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete_outline_rounded, size: 18, color: AppConstants.error),
-                              SizedBox(width: 8),
-                              Text('Delete', style: TextStyle(fontSize: 13, color: AppConstants.error)),
+                              const Icon(Icons.delete_outline_rounded, size: 18, color: AppConstants.error),
+                              const SizedBox(width: 8),
+                              Text(context.tr('delete'), style: const TextStyle(fontSize: 13, color: AppConstants.error)),
                             ],
                           ),
                         ),
@@ -172,7 +174,7 @@ class HiveNoteCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Production: ${hive.currentYearProductionKg.toStringAsFixed(1)} kg',
+                          '${context.tr('production')}: ${hive.currentYearProductionKg.toStringAsFixed(1)} kg',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -191,7 +193,7 @@ class HiveNoteCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Last inspected: $formattedDate',
+                          '${context.tr('last_inspected')}: $formattedDate',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
@@ -210,10 +212,19 @@ class HiveNoteCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHealthBadge(Hive hive) {
+  Widget _buildHealthBadge(BuildContext context, Hive hive) {
     final isHealthy = hive.isHealthy;
     final bgColor = isHealthy ? AppConstants.successBackground : AppConstants.errorBackground;
     final fgColor = isHealthy ? AppConstants.success : AppConstants.error;
+
+    String translatedHealth = hive.overallHealth;
+    if (hive.overallHealth.toLowerCase() == 'healthy') {
+      translatedHealth = context.tr('healthy');
+    } else if (hive.overallHealth.toLowerCase() == 'needs attention') {
+      translatedHealth = context.tr('needs_attention');
+    } else if (hive.overallHealth.toLowerCase() == 'critical') {
+      translatedHealth = context.tr('critical');
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -223,7 +234,7 @@ class HiveNoteCard extends StatelessWidget {
         border: Border.all(color: fgColor.withValues(alpha: 0.2)),
       ),
       child: Text(
-        hive.overallHealth,
+        translatedHealth,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -233,3 +244,4 @@ class HiveNoteCard extends StatelessWidget {
     );
   }
 }
+

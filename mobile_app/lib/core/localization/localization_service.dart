@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Flag-free Language model representing one of the 22 supported languages
@@ -235,4 +236,11 @@ class LanguageController extends ChangeNotifier {
       'save_changes': 'बदलाव सहेजें',
     },
   };
+}
+
+/// Extension on BuildContext for quick reactive translation lookups
+extension LocalizationContextX on BuildContext {
+  String tr(String key) {
+    return watch<LanguageController>().tr(key);
+  }
 }
