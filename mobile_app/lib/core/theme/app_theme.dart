@@ -34,21 +34,28 @@ class AppTheme {
         scrolledUnderElevation: 0.5,
       ),
       textTheme: baseTextTheme.copyWith(
-        displayMedium: GoogleFonts.inter(
+        displayLarge: GoogleFonts.manrope(
           fontSize: 28,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           color: AppConstants.textPrimary,
-          letterSpacing: -0.5,
+          letterSpacing: -0.6,
           height: 1.2,
         ),
-        headlineMedium: GoogleFonts.inter(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
+        displayMedium: GoogleFonts.manrope(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: AppConstants.textPrimary,
+          letterSpacing: -0.4,
+          height: 1.2,
+        ),
+        headlineMedium: GoogleFonts.manrope(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
           color: AppConstants.textPrimary,
           letterSpacing: -0.3,
           height: 1.3,
         ),
-        titleMedium: GoogleFonts.inter(
+        titleMedium: GoogleFonts.manrope(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: AppConstants.textPrimary,
@@ -66,15 +73,15 @@ class AppTheme {
           color: AppConstants.textSecondary,
           height: 1.4,
         ),
-        labelLarge: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+        labelLarge: GoogleFonts.manrope(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
           color: AppConstants.textPrimary,
           letterSpacing: 0.1,
         ),
         labelSmall: GoogleFonts.inter(
           fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w400,
           color: AppConstants.textMuted,
         ),
       ),
@@ -169,21 +176,28 @@ class AppTheme {
         scrolledUnderElevation: 0.5,
       ),
       textTheme: baseTextTheme.copyWith(
-        displayMedium: GoogleFonts.inter(
+        displayLarge: GoogleFonts.manrope(
           fontSize: 28,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           color: darkTextPrimary,
-          letterSpacing: -0.5,
+          letterSpacing: -0.6,
           height: 1.2,
         ),
-        headlineMedium: GoogleFonts.inter(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
+        displayMedium: GoogleFonts.manrope(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: darkTextPrimary,
+          letterSpacing: -0.4,
+          height: 1.2,
+        ),
+        headlineMedium: GoogleFonts.manrope(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
           color: darkTextPrimary,
           letterSpacing: -0.3,
           height: 1.3,
         ),
-        titleMedium: GoogleFonts.inter(
+        titleMedium: GoogleFonts.manrope(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: darkTextPrimary,
@@ -201,15 +215,15 @@ class AppTheme {
           color: darkTextSecondary,
           height: 1.4,
         ),
-        labelLarge: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+        labelLarge: GoogleFonts.manrope(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
           color: darkTextPrimary,
           letterSpacing: 0.1,
         ),
         labelSmall: GoogleFonts.inter(
           fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w400,
           color: darkTextMuted,
         ),
       ),

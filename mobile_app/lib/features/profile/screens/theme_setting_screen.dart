@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
@@ -77,18 +78,18 @@ class ThemeSettingScreen extends StatelessWidget {
     return ListTile(
       title: Text(
         title,
-        style: TextStyle(
+        style: GoogleFonts.manrope(
           fontSize: 15,
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          color: isSelected ? AppConstants.primary : context.textPrimaryColor,
+          color: isSelected ? context.primaryDarkColor : context.textPrimaryColor,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(fontSize: 12, color: context.textSecondaryColor),
+        style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: AppConstants.primary, size: 22)
+          ? Icon(Icons.check_circle_rounded, color: context.primaryDarkColor, size: 22)
           : Icon(Icons.circle_outlined, color: context.textMutedColor, size: 22),
       onTap: onTap,
     );

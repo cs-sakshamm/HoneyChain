@@ -15,6 +15,7 @@ class AppConstants {
   static const Color honeyAccent = primary; // Alias for compatibility
   static const Color primaryDark = Color(0xFFB45309); // Deep Amber
   static const Color primarySoft = Color(0xFFFFFBEB); // Soft Amber Tint
+  static const Color secondary = Color(0xFF4B5563); // Muted Secondary Color
 
   static const Color background = Color(0xFFF9FAFB); // Neutral Light Background (Gray-50)
   static const Color surface = Color(0xFFFFFFFF); // Pure White Surface
@@ -33,10 +34,13 @@ class AppConstants {
 
   // Spacing Tokens (4px Grid System)
   static const double space4 = 4.0;
+  static const double space6 = 6.0;
   static const double space8 = 8.0;
   static const double space12 = 12.0;
   static const double space16 = 16.0;
+  static const double space20 = 20.0;
   static const double space24 = 24.0;
+  static const double space28 = 28.0;
   static const double space32 = 32.0;
   static const double space48 = 48.0;
 

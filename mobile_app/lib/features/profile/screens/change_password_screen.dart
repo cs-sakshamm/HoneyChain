@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/user_controller.dart';
@@ -50,7 +52,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.tr('password_updated')),
+          content: Text(context.tr('password_updated'), style: GoogleFonts.inter()),
           backgroundColor: AppConstants.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -65,7 +67,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       appBar: GlobalAppBar(
         showBackButton: true,
         titleText: context.tr('change_password'),
@@ -79,13 +81,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               Container(
                 padding: const EdgeInsets.all(AppConstants.space16),
                 decoration: BoxDecoration(
-                  color: AppConstants.surface,
+                  color: context.surfaceColor,
                   borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                  border: Border.all(color: AppConstants.border),
+                  border: Border.all(color: context.borderColor),
                 ),
                 child: Column(
                   children: [
                     _buildPasswordField(
+                      context: context,
                       label: '${context.tr('current_password')} *',
                       controller: _currentPasswordController,
                       obscureText: _obscureCurrent,
@@ -96,6 +99,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildPasswordField(
+                      context: context,
                       label: '${context.tr('new_password')} *',
                       controller: _newPasswordController,
                       obscureText: _obscureNew,
@@ -109,6 +113,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildPasswordField(
+                      context: context,
                       label: '${context.tr('confirm_password')} *',
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirm,
@@ -138,6 +143,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   Widget _buildPasswordField({
+    required BuildContext context,
     required String label,
     required TextEditingController controller,
     required bool obscureText,
@@ -149,25 +155,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: GoogleFonts.manrope(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppConstants.textPrimary,
+            color: context.textPrimaryColor,
           ),
         ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           obscureText: obscureText,
-          style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary),
+          style: GoogleFonts.inter(fontSize: 14, color: context.textPrimaryColor),
           decoration: InputDecoration(
             hintText: '••••••••',
+            hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+            fillColor: context.surfaceColor,
+            filled: true,
             isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: BorderSide(color: context.borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: const BorderSide(color: AppConstants.primary, width: 1.5),
+            ),
             suffixIcon: IconButton(
               icon: Icon(
                 obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                 size: 20,
-                color: AppConstants.textMuted,
+                color: context.textMutedColor,
               ),
               onPressed: onToggleVisibility,
             ),

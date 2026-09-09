@@ -1,27 +1,128 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 import '../localization/localization_service.dart';
 import '../theme/app_theme.dart';
-import '../../features/profile/screens/language_setting_screen.dart';
 import 'app_logo.dart';
 
-/// Reusable Global App Bar for authenticated screens
-/// Renders: [ (←) Logo App Name                        EN ▾ ]
+/// Reusable Global Top App Bar for authenticated screens
+/// Renders: [ (←) Logo App Name                        🔔 ]
 class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showBackButton;
   final String? titleText;
   final List<Widget>? extraActions;
+  final bool hasUnreadNotifications;
 
   const GlobalAppBar({
     super.key,
     this.showBackButton = false,
     this.titleText,
     this.extraActions,
+    this.hasUnreadNotifications = true,
   });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  /// Helper modal sheet to display notifications
+  static void showNotificationsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) {
+        return Padding(
+          padding: const EdgeInsets.all(AppConstants.space24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.borderColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.notifications_active_rounded, color: AppConstants.primary, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    modalContext.tr('notifications'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimaryColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: context.primarySoftColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '1 New',
+                      style: GoogleFonts.manrope(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: context.primaryDarkColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppConstants.warning.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.precision_manufacturing_rounded, size: 18, color: AppConstants.warning),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Maintenance due',
+                          style: GoogleFonts.manrope(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.textPrimaryColor,
+                          ),
+                        ),
+                        Text(
+                          'Service recommended soon.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: context.textMutedColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +151,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Text(
                 '• $titleText',
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: context.textSecondaryColor,
@@ -62,44 +163,40 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         if (extraActions != null) ...extraActions!,
-        // Global Flag-Free Language Selector Chip
-        Consumer<LanguageController>(
-          builder: (context, langCtrl, _) {
-            return InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LanguageSettingScreen(),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: context.primarySoftColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppConstants.primary.withValues(alpha: 0.3)),
+        // Notification Bell Icon with Unread Badge Indicator
+        InkWell(
+          onTap: () => showNotificationsSheet(context),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(6.0),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Icons.notifications_none_rounded,
+                  size: 24,
+                  color: context.textPrimaryColor,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      langCtrl.currentLanguageCode.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: context.primaryDarkColor,
+                if (hasUnreadNotifications)
+                  Positioned(
+                    top: 1,
+                    right: 1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppConstants.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: context.surfaceColor,
+                          width: 1.5,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 2),
-                    Icon(Icons.arrow_drop_down_rounded, size: 18, color: context.primaryDarkColor),
-                  ],
-                ),
-              ),
-            );
-          },
+                  ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(width: AppConstants.space16),
       ],

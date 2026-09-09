@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/global_app_bar.dart';
 
-/// Screen to select Application Language (Flag-free 12 Indian language picker with search)
+/// Clean Flag-free Indian Language Picker (English + 22 Scheduled Indian Languages)
 class LanguageSettingScreen extends StatefulWidget {
   const LanguageSettingScreen({super.key});
 
@@ -49,7 +50,7 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
-              style: TextStyle(fontSize: 14, color: context.textPrimaryColor),
+              style: GoogleFonts.inter(fontSize: 14, color: context.textPrimaryColor),
               decoration: InputDecoration(
                 hintText: langCtrl.tr('search_language_hint'),
                 prefixIcon: Icon(Icons.search_rounded, size: 20, color: context.textMutedColor),
@@ -67,7 +68,7 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
           ),
           Divider(height: 1, color: context.borderColor),
 
-          // Flag-free Language List
+          // 22 Scheduled Indian Languages + English List
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.all(AppConstants.space16),
@@ -89,15 +90,19 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
                   child: ListTile(
                     title: Text(
                       lang.name,
-                      style: TextStyle(
+                      style: GoogleFonts.manrope(
                         fontSize: 15,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                         color: isSelected ? AppConstants.primary : context.textPrimaryColor,
                       ),
                     ),
                     subtitle: Text(
                       lang.nativeName,
-                      style: TextStyle(fontSize: 13, color: context.textSecondaryColor, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: context.textSecondaryColor,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     trailing: isSelected
                         ? const Icon(Icons.check_rounded, color: AppConstants.primary, size: 20)
@@ -107,7 +112,7 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('${langCtrl.tr('language_changed')} ${lang.name} (${lang.nativeName})'),
+                            content: Text('${lang.name} (${lang.nativeName}) selected'),
                             behavior: SnackBarBehavior.floating,
                             duration: const Duration(seconds: 1),
                           ),
@@ -124,4 +129,3 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
     );
   }
 }
-

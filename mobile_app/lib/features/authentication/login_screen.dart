@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/localization/localization_service.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/app_text_field.dart';
@@ -11,7 +13,8 @@ import '../../core/widgets/social_icon_button.dart';
 import 'auth_controller.dart';
 import 'widgets/google_logo_icon.dart';
 
-/// Senior Product Designer Login Screen for HoneyChain Business Owners
+/// Production-Grade Responsive Login Screen for HoneyChain
+/// Supports Desktop Split Layout & Mobile Layout with clean SaaS design principles
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -51,113 +54,262 @@ class _LoginScreenState extends State<LoginScreen> {
     final controller = context.watch<AuthController>();
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       body: SafeArea(
-        child: Stack(
-          children: [
-            // Top Right Small Language Selector [ 🌐 EN ] (Rule #1 Compliant)
-            Positioned(
-              top: 8,
-              right: 16,
-              child: Consumer<LanguageController>(
-                builder: (context, langCtrl, _) {
-                  return InkWell(
-                    onTap: () => _showLanguagePickerModal(context),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppConstants.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppConstants.border),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.language_rounded, size: 16, color: AppConstants.textSecondary),
-                          const SizedBox(width: 4),
-                          Text(
-                            langCtrl.currentLanguage.nativeName,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppConstants.textPrimary,
-                            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth >= 768;
+
+            return Stack(
+              children: [
+                if (isDesktop)
+                  _buildDesktopLayout(context, controller)
+                else
+                  _buildMobileLayout(context, controller),
+
+                // Top Right Small Language Selector [ EN ]
+                Positioned(
+                  top: 16,
+                  right: 20,
+                  child: Consumer<LanguageController>(
+                    builder: (context, langCtrl, _) {
+                      return InkWell(
+                        onTap: () => _showLanguagePickerModal(context),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: context.surfaceColor,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: context.borderColor),
                           ),
-                          const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppConstants.textSecondary),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.space24,
-                  vertical: AppConstants.space32,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.language_rounded, size: 16, color: context.textSecondaryColor),
+                              const SizedBox(width: 6),
+                              Text(
+                                langCtrl.currentLanguage.nativeName,
+                                style: GoogleFonts.manrope(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimaryColor,
+                                ),
+                              ),
+                              Icon(Icons.arrow_drop_down_rounded, size: 18, color: context.textSecondaryColor),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 380),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // DESKTOP SPLIT LAYOUT (Left Side Branding + Right Side Auth Card)
+  // ---------------------------------------------------------------------------
+  Widget _buildDesktopLayout(BuildContext context, AuthController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final leftBg = isDark ? const Color(0xFF161E2E) : context.primarySoftColor.withValues(alpha: 0.4);
+
+    return Row(
+      children: [
+        // Left Column: Tasteful Product Branding
+        Expanded(
+          flex: 5,
+          child: Container(
+            color: leftBg,
+            padding: const EdgeInsets.all(AppConstants.space48),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const AppLogo(
+                  size: 32,
+                  showWordmark: true,
+                ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // App Brand Logo
-                      const Center(
-                        child: AppLogo(
-                          size: 40,
-                          showWordmark: true,
+                      Text(
+                        'Operational supply chain & field intelligence simplified.',
+                        style: GoogleFonts.manrope(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimaryColor,
+                          letterSpacing: -0.8,
+                          height: 1.25,
                         ),
                       ),
-
-                      const SizedBox(height: AppConstants.space32),
-
-                      // Feedback Banners (Inline Alerts)
-                      if (controller.status == AuthStateStatus.error &&
-                          controller.errorMessage != null)
-                        FeedbackBanner(
-                          message: controller.errorMessage!,
-                          type: FeedbackBannerType.error,
-                          onClose: () => controller.resetError(),
+                      const SizedBox(height: AppConstants.space16),
+                      Text(
+                        'Manage field operations, track harvest metrics, and unify yield logistics in one calm, production-ready platform.',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          color: context.textSecondaryColor,
+                          height: 1.6,
                         ),
-
-                      if (controller.infoMessage != null)
-                        FeedbackBanner(
-                          message: controller.infoMessage!,
-                          type: FeedbackBannerType.info,
-                        ),
-
-                      // View Content based on AuthMode
-                      switch (controller.mode) {
-                        AuthMode.login => _buildLoginForm(context, controller),
-                        AuthMode.register => _buildRegisterForm(context, controller),
-                        AuthMode.phoneOtp => _buildPhoneOtpForm(context, controller),
-                        AuthMode.forgotPassword =>
-                          _buildForgotPasswordForm(context, controller),
-                      },
-
-                      const SizedBox(height: AppConstants.space32),
-
-                      // Legal Terms Footer
-                      const Text(
-                        AppConstants.legalDisclaimer,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppConstants.textMuted,
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: AppConstants.space32),
+                      _buildFeatureBadge(context, Icons.analytics_outlined, 'Real-time Field Operations Tracking'),
+                      const SizedBox(height: 12),
+                      _buildFeatureBadge(context, Icons.translate_rounded, 'Multi-Language Support (22 Indian Languages)'),
+                      const SizedBox(height: 12),
+                      _buildFeatureBadge(context, Icons.security_rounded, 'Secure Enterprise Session Security'),
                     ],
                   ),
                 ),
+                Text(
+                  'HoneyChain Operations Platform • v1.0',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: context.textMutedColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Right Column: Focused Auth Card
+        Expanded(
+          flex: 6,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.space48,
+                vertical: AppConstants.space32,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildAuthContent(context, controller),
+                  ],
+                ),
               ),
             ),
-          ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureBadge(BuildContext context, IconData icon, String label) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Icon(icon, size: 16, color: context.primaryDarkColor),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: context.textPrimaryColor,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // MOBILE SINGLE-COLUMN LAYOUT
+  // ---------------------------------------------------------------------------
+  Widget _buildMobileLayout(BuildContext context, AuthController controller) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppConstants.space24,
+          vertical: AppConstants.space32,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: AppConstants.space16),
+              const Center(
+                child: AppLogo(
+                  size: 36,
+                  showWordmark: true,
+                ),
+              ),
+              const SizedBox(height: AppConstants.space32),
+              _buildAuthContent(context, controller),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // SHARED AUTH CONTENT ROUTER
+  // ---------------------------------------------------------------------------
+  Widget _buildAuthContent(BuildContext context, AuthController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Feedback Banners (Inline Error / Info Alerts)
+        if (controller.status == AuthStateStatus.error && controller.errorMessage != null) ...[
+          FeedbackBanner(
+            message: controller.errorMessage!,
+            type: FeedbackBannerType.error,
+            onClose: () => controller.resetError(),
+          ),
+          const SizedBox(height: AppConstants.space16),
+        ],
+
+        if (controller.infoMessage != null) ...[
+          FeedbackBanner(
+            message: controller.infoMessage!,
+            type: FeedbackBannerType.info,
+          ),
+          const SizedBox(height: AppConstants.space16),
+        ],
+
+        // Active Mode Form
+        switch (controller.mode) {
+          AuthMode.login => _buildLoginForm(context, controller),
+          AuthMode.register => _buildRegisterForm(context, controller),
+          AuthMode.phoneOtp => _buildPhoneOtpForm(context, controller),
+          AuthMode.forgotPassword => _buildForgotPasswordForm(context, controller),
+        },
+
+        const SizedBox(height: AppConstants.space32),
+
+        // Legal Terms Footer
+        Text(
+          AppConstants.legalDisclaimer,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: context.textMutedColor,
+            height: 1.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
@@ -166,25 +318,26 @@ class _LoginScreenState extends State<LoginScreen> {
   // ---------------------------------------------------------------------------
   Widget _buildLoginForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          context.tr('sign_in_account'),
-          style: const TextStyle(
-            fontSize: 20,
+          context.tr('welcome_back'),
+          style: GoogleFonts.manrope(
+            fontSize: 24,
             fontWeight: FontWeight.w700,
-            color: AppConstants.textPrimary,
-            letterSpacing: -0.3,
+            color: context.textPrimaryColor,
+            letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: AppConstants.space4),
         Text(
-          context.tr('manage_business_sub'),
-          style: const TextStyle(
+          context.tr('sign_in_sub'),
+          style: GoogleFonts.inter(
             fontSize: 14,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
 
@@ -196,10 +349,10 @@ class _LoginScreenState extends State<LoginScreen> {
           labelText: context.tr('email_or_phone'),
           hintText: AppConstants.emailOrPhoneHint,
           keyboardType: TextInputType.emailAddress,
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.mail_outline_rounded,
             size: 18,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
 
@@ -211,10 +364,10 @@ class _LoginScreenState extends State<LoginScreen> {
           labelText: context.tr('password'),
           hintText: AppConstants.passwordHint,
           obscureText: !controller.isPasswordVisible,
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.lock_outline_rounded,
             size: 18,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
           suffixIcon: GestureDetector(
             onTap: () => controller.togglePasswordVisibility(),
@@ -223,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
               size: 18,
-              color: AppConstants.textSecondary,
+              color: context.textSecondaryColor,
             ),
           ),
         ),
@@ -257,26 +410,25 @@ class _LoginScreenState extends State<LoginScreen> {
         // Divider
         Row(
           children: [
-            const Expanded(child: Divider()),
+            Expanded(child: Divider(color: context.borderColor)),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppConstants.space12),
               child: Text(
                 context.tr('or'),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppConstants.textMuted,
-                  letterSpacing: 0.5,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: context.textMutedColor,
                 ),
               ),
             ),
-            const Expanded(child: Divider()),
+            Expanded(child: Divider(color: context.borderColor)),
           ],
         ),
 
         const SizedBox(height: AppConstants.space24),
 
-        // Provider Options in a single horizontal row (48x48 Icon Boxes)
+        // Provider Options Row
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -288,15 +440,15 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(width: AppConstants.space16),
             SocialIconButton(
-              icon: const Icon(Icons.apple, size: 22, color: Colors.black),
+              icon: Icon(Icons.apple, size: 22, color: isDark ? Colors.white : Colors.black),
               tooltip: context.tr('apple_sign_in'),
               isLoading: isLoading,
               onPressed: () => controller.signInWithApple(),
             ),
             const SizedBox(width: AppConstants.space16),
             SocialIconButton(
-              icon: const Icon(Icons.smartphone_rounded,
-                  size: 20, color: AppConstants.textPrimary),
+              icon: Icon(Icons.smartphone_rounded,
+                  size: 20, color: context.textPrimaryColor),
               tooltip: context.tr('phone_sign_in'),
               isLoading: isLoading,
               onPressed: () => _showPhoneInputDialog(context, controller),
@@ -304,28 +456,28 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
 
-        const SizedBox(height: AppConstants.space32),
+        const SizedBox(height: AppConstants.space28),
 
         // Switch to Create Business Account
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               context.tr('dont_have_account'),
-              style: const TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 14,
-                color: AppConstants.textSecondary,
+                color: context.textSecondaryColor,
               ),
             ),
+            const SizedBox(width: 4),
             GestureDetector(
               onTap: () => controller.switchMode(AuthMode.register),
               child: Text(
                 context.tr('create_account'),
-                style: const TextStyle(
+                style: GoogleFonts.manrope(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppConstants.primaryDark,
+                  fontWeight: FontWeight.w700,
+                  color: context.primaryDarkColor,
                 ),
               ),
             ),
@@ -346,19 +498,19 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Text(
           context.tr('create_business_account'),
-          style: const TextStyle(
-            fontSize: 20,
+          style: GoogleFonts.manrope(
+            fontSize: 22,
             fontWeight: FontWeight.w700,
-            color: AppConstants.textPrimary,
-            letterSpacing: -0.3,
+            color: context.textPrimaryColor,
+            letterSpacing: -0.4,
           ),
         ),
         const SizedBox(height: AppConstants.space4),
         Text(
           context.tr('get_started_sub'),
-          style: const TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 14,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
 
@@ -368,10 +520,10 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: _regBusinessNameController,
           labelText: context.tr('legal_business_name'),
           hintText: AppConstants.businessNameHint,
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.domain_rounded,
             size: 18,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
         const SizedBox(height: AppConstants.space16),
@@ -381,10 +533,10 @@ class _LoginScreenState extends State<LoginScreen> {
           labelText: context.tr('email_or_phone'),
           hintText: AppConstants.emailOrPhoneHint,
           keyboardType: TextInputType.emailAddress,
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.mail_outline_rounded,
             size: 18,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
         const SizedBox(height: AppConstants.space16),
@@ -394,10 +546,10 @@ class _LoginScreenState extends State<LoginScreen> {
           labelText: context.tr('password'),
           hintText: AppConstants.passwordHint,
           obscureText: !controller.isPasswordVisible,
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.lock_outline_rounded,
             size: 18,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
           suffixIcon: GestureDetector(
             onTap: () => controller.togglePasswordVisibility(),
@@ -406,7 +558,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
               size: 18,
-              color: AppConstants.textSecondary,
+              color: context.textSecondaryColor,
             ),
           ),
         ),
@@ -430,10 +582,10 @@ class _LoginScreenState extends State<LoginScreen> {
             onTap: () => controller.switchMode(AuthMode.login),
             child: Text(
               context.tr('already_have_account'),
-              style: const TextStyle(
+              style: GoogleFonts.manrope(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppConstants.primaryDark,
+                fontWeight: FontWeight.w700,
+                color: context.primaryDarkColor,
               ),
             ),
           ),
@@ -453,19 +605,19 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Text(
           context.tr('phone_auth'),
-          style: const TextStyle(
-            fontSize: 20,
+          style: GoogleFonts.manrope(
+            fontSize: 22,
             fontWeight: FontWeight.w700,
-            color: AppConstants.textPrimary,
-            letterSpacing: -0.3,
+            color: context.textPrimaryColor,
+            letterSpacing: -0.4,
           ),
         ),
         const SizedBox(height: AppConstants.space4),
         Text(
           'Sent to ${controller.phoneNumberForOtp}',
-          style: const TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 14,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
 
@@ -476,10 +628,10 @@ class _LoginScreenState extends State<LoginScreen> {
           labelText: context.tr('verification_code'),
           hintText: '• • • • • •',
           keyboardType: TextInputType.number,
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.pin_rounded,
             size: 18,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
 
@@ -504,9 +656,9 @@ class _LoginScreenState extends State<LoginScreen> {
             if (controller.otpCountdown > 0)
               Text(
                 '${context.tr('resend_in')} ${controller.otpCountdown}s',
-                style: const TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: 13,
-                  color: AppConstants.textMuted,
+                  color: context.textMutedColor,
                   fontWeight: FontWeight.w500,
                 ),
               )
@@ -534,19 +686,19 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Text(
           context.tr('reset_password'),
-          style: const TextStyle(
-            fontSize: 20,
+          style: GoogleFonts.manrope(
+            fontSize: 22,
             fontWeight: FontWeight.w700,
-            color: AppConstants.textPrimary,
-            letterSpacing: -0.3,
+            color: context.textPrimaryColor,
+            letterSpacing: -0.4,
           ),
         ),
         const SizedBox(height: AppConstants.space4),
         Text(
           context.tr('reset_password_sub'),
-          style: const TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 14,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
 
@@ -556,10 +708,10 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: _resetIdentifierController,
           labelText: context.tr('email_or_phone'),
           hintText: AppConstants.emailOrPhoneHint,
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.mail_outline_rounded,
             size: 18,
-            color: AppConstants.textSecondary,
+            color: context.textSecondaryColor,
           ),
         ),
 
@@ -593,16 +745,20 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(dialogContext.tr('phone_auth')),
+          backgroundColor: context.surfaceColor,
+          title: Text(
+            dialogContext.tr('phone_auth'),
+            style: GoogleFonts.manrope(fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 dialogContext.tr('enter_mobile_otp'),
-                style: const TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: 13,
-                  color: AppConstants.textSecondary,
+                  color: context.textSecondaryColor,
                 ),
               ),
               const SizedBox(height: AppConstants.space16),
@@ -610,7 +766,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _phoneInputController,
                 hintText: AppConstants.enterPhoneNumberHint,
                 keyboardType: TextInputType.phone,
-                prefixIcon: const Icon(Icons.phone_rounded, size: 18),
+                prefixIcon: Icon(Icons.phone_rounded, size: 18, color: context.textSecondaryColor),
               ),
             ],
           ),
@@ -638,7 +794,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showLanguagePickerModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppConstants.surface,
+      backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppConstants.borderRadiusLarge)),
@@ -668,7 +824,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppConstants.border,
+                      color: context.borderColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -677,14 +833,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: AppConstants.space24),
                     child: Row(
                       children: [
-                        const Icon(Icons.language_rounded, size: 20, color: AppConstants.primaryDark),
+                        Icon(Icons.language_rounded, size: 20, color: context.primaryDarkColor),
                         const SizedBox(width: 8),
                         Text(
                           langController.tr('select_language'),
-                          style: const TextStyle(
+                          style: GoogleFonts.manrope(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: AppConstants.textPrimary,
+                            color: context.textPrimaryColor,
                           ),
                         ),
                       ],
@@ -698,18 +854,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: TextField(
                       controller: _languageSearchController,
                       onChanged: (_) => setModalState(() {}),
-                      style: const TextStyle(fontSize: 14),
+                      style: GoogleFonts.inter(fontSize: 14, color: context.textPrimaryColor),
                       decoration: InputDecoration(
                         hintText: langController.tr('search_language_hint'),
-                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppConstants.textMuted),
+                        hintStyle: GoogleFonts.inter(fontSize: 14, color: context.textMutedColor),
+                        prefixIcon: Icon(Icons.search_rounded, size: 18, color: context.textMutedColor),
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        fillColor: AppConstants.background,
+                        fillColor: context.scaffoldBg,
+                        filled: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                          borderSide: BorderSide(color: context.borderColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                          borderSide: BorderSide(color: context.borderColor),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: AppConstants.space12),
-                  const Divider(height: 1),
+                  Divider(height: 1, color: context.borderColor),
 
                   // Flag-free Language List
                   Expanded(
@@ -723,18 +889,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         return ListTile(
                           title: Text(
                             lang.name,
-                            style: TextStyle(
+                            style: GoogleFonts.manrope(
                               fontSize: 14,
                               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? AppConstants.primaryDark : AppConstants.textPrimary,
+                              color: isSelected ? context.primaryDarkColor : context.textPrimaryColor,
                             ),
                           ),
                           subtitle: Text(
                             lang.nativeName,
-                            style: const TextStyle(fontSize: 13, color: AppConstants.textSecondary, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor, fontWeight: FontWeight.w600),
                           ),
                           trailing: isSelected
-                              ? const Icon(Icons.check_rounded, color: AppConstants.primaryDark, size: 20)
+                              ? Icon(Icons.check_rounded, color: context.primaryDarkColor, size: 20)
                               : null,
                           onTap: () {
                             langController.setLanguage(lang.code);
@@ -753,4 +919,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

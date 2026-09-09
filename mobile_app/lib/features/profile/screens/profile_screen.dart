@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../../authentication/auth_controller.dart';
 import '../controllers/user_controller.dart';
@@ -12,55 +12,46 @@ import 'edit_profile_screen.dart';
 import 'language_setting_screen.dart';
 import 'theme_setting_screen.dart';
 
-/// Clean Google Notes-inspired Profile & Settings Screen
-class ProfileScreen extends StatelessWidget {
+/// Clean Minimal Harvester Profile Screen
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _notificationsEnabled = true;
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(dialogContext.tr('logout_title')),
-          content: Text(
-            dialogContext.tr('logout_subtitle'),
-            style: TextStyle(fontSize: 14, color: dialogContext.textSecondaryColor),
+          backgroundColor: context.surfaceColor,
+          title: Text(
+            dialogContext.tr('logout'),
+            style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
           ),
-          actions: [
-            AppButton(
-              text: dialogContext.tr('logout_cancel'),
-              variant: AppButtonVariant.text,
-              onPressed: () => Navigator.pop(dialogContext),
-            ),
-            AppButton(
-              text: dialogContext.tr('logout_confirm'),
-              variant: AppButtonVariant.primary,
-              width: 130,
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                context.read<AuthController>().signOut();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showAboutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(dialogContext.tr('about')),
           content: Text(
-            'HoneyChain v1.0.0\n\n${dialogContext.tr('manage_business_sub')}',
-            style: TextStyle(fontSize: 14, color: dialogContext.textSecondaryColor, height: 1.4),
+            'Confirm logging out of your account?',
+            style: GoogleFonts.inter(fontSize: 14, color: dialogContext.textSecondaryColor),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: Text(dialogContext.tr('close')),
+              child: Text(dialogContext.tr('cancel'), style: GoogleFonts.inter(color: dialogContext.textSecondaryColor)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                context.read<AuthController>().signOut();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.error,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(dialogContext.tr('logout'), style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
             ),
           ],
         );
@@ -78,13 +69,34 @@ class ProfileScreen extends StatelessWidget {
       backgroundColor: context.scaffoldBg,
       appBar: const GlobalAppBar(),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppConstants.space24),
+        padding: const EdgeInsets.all(AppConstants.space20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Header Card
+            // Screen Title
+            Text(
+              context.tr('profile'),
+              style: GoogleFonts.manrope(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: context.textPrimaryColor,
+                letterSpacing: -0.4,
+              ),
+            ),
+
+            const SizedBox(height: AppConstants.space16),
+
+            // Account Section (User Info Card & Security Actions)
+            Text(
+              context.tr('account'),
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: context.textSecondaryColor,
+              ),
+            ),
+            const SizedBox(height: 6),
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppConstants.space24),
               decoration: BoxDecoration(
                 color: context.surfaceColor,
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
@@ -92,141 +104,212 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 36,
-                    backgroundColor: context.primarySoftColor,
-                    child: Text(
-                      user.initials,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: context.primaryDarkColor,
+                  // User Info Header
+                  Padding(
+                    padding: const EdgeInsets.all(AppConstants.space16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: context.primarySoftColor,
+                          child: Text(
+                            user.initials,
+                            style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: context.primaryDarkColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user.name,
+                                style: GoogleFonts.manrope(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimaryColor,
+                                ),
+                              ),
+                              Text(
+                                '${context.tr('role_operator')} · ${user.email}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: context.textSecondaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: context.borderColor),
+                  // Edit Profile Link
+                  ListTile(
+                    title: Text(
+                      context.tr('edit_profile'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.textPrimaryColor,
                       ),
                     ),
+                    trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const EditProfileScreen(),
+                        ),
+                      );
+                    },
                   ),
-                  const SizedBox(height: AppConstants.space12),
-                  Text(
-                    user.name,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: context.textPrimaryColor,
+                  Divider(height: 1, color: context.borderColor),
+                  // Change Password Link
+                  ListTile(
+                    title: Text(
+                      context.tr('change_password'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.textPrimaryColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    user.email,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: context.textSecondaryColor,
-                    ),
+                    trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChangePasswordScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: AppConstants.space24),
-
-            // Account Section
-            _buildSectionHeader(context, context.tr('account')),
-            _buildMenuCard(context, [
-              _buildMenuItem(
-                context,
-                icon: Icons.person_outline_rounded,
-                title: context.tr('edit_profile'),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EditProfileScreen(),
-                    ),
-                  );
-                },
-              ),
-              Divider(height: 1, color: context.borderColor),
-              _buildMenuItem(
-                context,
-                icon: Icons.lock_outline_rounded,
-                title: context.tr('change_password'),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ChangePasswordScreen(),
-                    ),
-                  );
-                },
-              ),
-            ]),
-
-            const SizedBox(height: AppConstants.space24),
-
-            // Appearance Section
-            _buildSectionHeader(context, context.tr('appearance')),
-            _buildMenuCard(context, [
-              _buildMenuItem(
-                context,
-                icon: Icons.palette_outlined,
-                title: context.tr('theme'),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ThemeSettingScreen(),
-                    ),
-                  );
-                },
-              ),
-            ]),
-
-            const SizedBox(height: AppConstants.space24),
-
-            // Language Section
-            _buildSectionHeader(context, context.tr('language')),
-            _buildMenuCard(context, [
-              _buildMenuItem(
-                context,
-                icon: Icons.language_rounded,
-                title: context.tr('language'),
-                trailingText: '${langCtrl.currentLanguage.name} (${langCtrl.currentLanguage.nativeName})',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LanguageSettingScreen(),
-                    ),
-                  );
-                },
-              ),
-            ]),
-
-            const SizedBox(height: AppConstants.space24),
+            const SizedBox(height: AppConstants.space20),
 
             // Preferences Section
-            _buildSectionHeader(context, context.tr('preferences')),
-            _buildMenuCard(context, [
-              _buildMenuItem(
-                context,
-                icon: Icons.info_outline_rounded,
-                title: context.tr('about'),
-                onTap: () => _showAboutDialog(context),
+            Text(
+              context.tr('preferences'),
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: context.textSecondaryColor,
               ),
-            ]),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(
+                color: context.surfaceColor,
+                borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                border: Border.all(color: context.borderColor),
+              ),
+              child: Column(
+                children: [
+                  // Language
+                  ListTile(
+                    title: Text(
+                      context.tr('language'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.textPrimaryColor,
+                      ),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          langCtrl.currentLanguage.nativeName,
+                          style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LanguageSettingScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, color: context.borderColor),
+                  // Appearance
+                  ListTile(
+                    title: Text(
+                      context.tr('appearance'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.textPrimaryColor,
+                      ),
+                    ),
+                    trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ThemeSettingScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, color: context.borderColor),
+                  // Notifications Toggle
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    title: Text(
+                      context.tr('notifications'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.textPrimaryColor,
+                      ),
+                    ),
+                    value: _notificationsEnabled,
+                    activeColor: AppConstants.primary,
+                    onChanged: (val) {
+                      setState(() {
+                        _notificationsEnabled = val;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
 
-            const SizedBox(height: AppConstants.space24),
+            const SizedBox(height: AppConstants.space20),
 
-            // Security Section
-            _buildSectionHeader(context, context.tr('security')),
-            _buildMenuCard(context, [
-              _buildMenuItem(
-                context,
-                icon: Icons.logout_rounded,
-                title: context.tr('logout'),
-                textColor: AppConstants.error,
-                iconColor: AppConstants.error,
+            // Account Action: Log out
+            Container(
+              decoration: BoxDecoration(
+                color: context.surfaceColor,
+                borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                border: Border.all(color: context.borderColor),
+              ),
+              child: ListTile(
+                title: Text(
+                  context.tr('logout'),
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppConstants.error,
+                  ),
+                ),
+                trailing: const Icon(Icons.logout_rounded, size: 18, color: AppConstants.error),
                 onTap: () => _showLogoutDialog(context),
               ),
-            ]),
+            ),
 
             const SizedBox(height: AppConstants.space32),
           ],
@@ -234,69 +317,4 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppConstants.space8, left: 4),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: context.textSecondaryColor,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuCard(BuildContext context, List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-        border: Border.all(color: context.borderColor),
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    String? trailingText,
-    Color? textColor,
-    Color? iconColor,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, size: 20, color: iconColor ?? context.textSecondaryColor),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: textColor ?? context.textPrimaryColor,
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailingText != null) ...[
-            Text(
-              trailingText,
-              style: TextStyle(fontSize: 13, color: context.textSecondaryColor),
-            ),
-            const SizedBox(width: 6),
-          ],
-          Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
-        ],
-      ),
-      onTap: onTap,
-    );
-  }
 }
-

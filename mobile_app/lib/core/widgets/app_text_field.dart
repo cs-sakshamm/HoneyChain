@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
 
 /// Production Input Field Component for HoneyChain
 class AppTextField extends StatelessWidget {
@@ -40,13 +42,13 @@ class AppTextField extends StatelessWidget {
         if (labelText != null) ...[
           Text(
             labelText!,
-            style: const TextStyle(
+            style: GoogleFonts.manrope(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppConstants.textPrimary,
+              color: context.textPrimaryColor,
             ),
           ),
-          const SizedBox(height: AppConstants.space4),
+          const SizedBox(height: AppConstants.space6),
         ],
         TextFormField(
           controller: controller,
@@ -54,15 +56,40 @@ class AppTextField extends StatelessWidget {
           keyboardType: keyboardType,
           onChanged: onChanged,
           validator: validator,
-          style: const TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: AppConstants.textPrimary,
+            color: context.textPrimaryColor,
           ),
           decoration: InputDecoration(
             hintText: hintText,
+            hintStyle: GoogleFonts.inter(
+              fontSize: 14,
+              color: context.textMutedColor,
+            ),
             helperText: helperText,
+            helperStyle: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
             errorText: errorText,
+            errorStyle: GoogleFonts.inter(fontSize: 12, color: AppConstants.error),
+            fillColor: context.surfaceColor,
+            filled: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: BorderSide(color: context.borderColor, width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: const BorderSide(color: AppConstants.primary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: const BorderSide(color: AppConstants.error, width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: const BorderSide(color: AppConstants.error, width: 1.5),
+            ),
             prefixIcon: prefixIcon != null
                 ? Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -83,3 +110,4 @@ class AppTextField extends StatelessWidget {
     );
   }
 }
+

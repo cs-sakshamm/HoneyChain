@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
-import '../../../core/widgets/app_button.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/user_controller.dart';
 
@@ -54,7 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(context.tr('profile_updated')),
+        content: Text('Profile updated successfully'),
         backgroundColor: AppConstants.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -68,7 +69,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       appBar: GlobalAppBar(
         showBackButton: true,
         titleText: context.tr('edit_profile'),
@@ -76,56 +77,93 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppConstants.space24),
+          padding: const EdgeInsets.all(AppConstants.space20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                context.tr('edit_profile'),
+                style: GoogleFonts.manrope(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: context.textPrimaryColor,
+                  letterSpacing: -0.4,
+                ),
+              ),
+
+              const SizedBox(height: AppConstants.space16),
+
               Container(
                 padding: const EdgeInsets.all(AppConstants.space16),
                 decoration: BoxDecoration(
-                  color: AppConstants.surface,
+                  color: context.surfaceColor,
                   borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                  border: Border.all(color: AppConstants.border),
+                  border: Border.all(color: context.borderColor),
                 ),
                 child: Column(
                   children: [
                     _buildInputField(
-                      label: '${context.tr('full_name')} *',
-                      hint: context.tr('legal_name_hint'),
+                      context,
+                      label: 'Full Name *',
+                      hint: 'Enter your full name',
                       controller: _nameController,
-                      validator: (val) =>
-                          (val == null || val.trim().isEmpty) ? context.tr('full_name') : null,
+                      validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter your name' : null,
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildInputField(
-                      label: '${context.tr('business_email')} *',
+                      context,
+                      label: 'Email *',
                       hint: 'email@example.com',
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) return context.tr('business_email');
-                        if (!val.contains('@')) return context.tr('business_email');
+                        if (val == null || val.trim().isEmpty) return 'Please enter your email';
+                        if (!val.contains('@')) return 'Enter a valid email';
                         return null;
                       },
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildInputField(
-                      label: '${context.tr('phone')} *',
+                      context,
+                      label: 'Phone Number *',
                       hint: '+91 9876543210',
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
-                      validator: (val) =>
-                          (val == null || val.trim().isEmpty) ? context.tr('phone') : null,
+                      validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter phone number' : null,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: AppConstants.space32),
-              AppButton(
-                text: context.tr('save_changes'),
-                isLoading: _isSaving,
-                variant: AppButtonVariant.primary,
-                onPressed: _saveProfile,
+
+              const SizedBox(height: AppConstants.space24),
+
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                    ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          'Save Changes',
+                          style: GoogleFonts.manrope(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
               ),
             ],
           ),
@@ -134,7 +172,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildInputField({
+  Widget _buildInputField(
+    BuildContext context, {
     required String label,
     required String hint,
     required TextEditingController controller,
@@ -146,17 +185,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: GoogleFonts.manrope(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppConstants.textPrimary,
+            color: context.textPrimaryColor,
           ),
         ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary),
+          style: GoogleFonts.inter(fontSize: 14, color: context.textPrimaryColor),
           decoration: InputDecoration(
             hintText: hint,
             isDense: true,
@@ -167,4 +206,3 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 }
-

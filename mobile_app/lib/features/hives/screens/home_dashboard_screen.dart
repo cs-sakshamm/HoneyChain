@@ -1,68 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../../authentication/auth_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
-import '../widgets/add_hive_card.dart';
-import '../widgets/hive_note_card.dart';
-import 'add_edit_hive_screen.dart';
 import 'all_hives_screen.dart';
-import 'hive_details_screen.dart';
+import 'start_harvesting_screen.dart';
 
-/// Post-login Home/Dashboard Screen inspired by Google Keep / Google Notes
-class HomeDashboardScreen extends StatefulWidget {
+/// Distinctive, Minimal Harvester Home Screen
+class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
 
-  @override
-  State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
-}
-
-class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
-  void _showDeleteConfirmation(BuildContext context, Hive hive) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(dialogContext.tr('delete_confirm_title')),
-          content: Text(
-            '${dialogContext.tr('delete_confirm_msg')} ("${hive.name}")',
-            style: TextStyle(fontSize: 14, color: dialogContext.textSecondaryColor),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(dialogContext.tr('cancel'), style: TextStyle(color: dialogContext.textSecondaryColor)),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                final controller = context.read<HiveController>();
-                final success = await controller.deleteHive(hive.id);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success ? context.tr('hive_deleted') : context.tr('failed_to_delete_hive'),
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              child: Text(
-                dialogContext.tr('delete_hive'),
-                style: const TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  String _greeting(BuildContext context) {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return context.tr('greeting_morning');
+    if (hour < 17) return context.tr('greeting_afternoon');
+    return context.tr('greeting_evening');
   }
 
   @override
@@ -71,217 +28,417 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final user = authController.currentUser;
     final hiveController = context.watch<HiveController>();
 
-    final userDisplayName = user?.displayName ?? 'Beekeeper';
+    final userDisplayName = user?.displayName ?? 'Harvester';
     final userFirstName = userDisplayName.split(' ').first;
-
-    final recentHives = hiveController.recentHives;
-    final totalHivesCount = hiveController.hives.length;
-
-    String greeting() {
-      final hour = DateTime.now().hour;
-      if (hour < 12) return context.tr('greeting_morning');
-      if (hour < 17) return context.tr('greeting_afternoon');
-      return context.tr('greeting_evening');
-    }
+    final primaryHive = hiveController.hives.isNotEmpty ? hiveController.hives.first : null;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
       appBar: const GlobalAppBar(),
-      body: hiveController.isLoading
-          ? Center(
-              child: CircularProgressIndicator(color: context.primaryDarkColor),
-            )
-          : RefreshIndicator(
-              onRefresh: () => hiveController.loadHives(),
-              color: context.primaryDarkColor,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(AppConstants.space24),
+      body: RefreshIndicator(
+        onRefresh: () => hiveController.loadHives(),
+        color: context.primaryDarkColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(AppConstants.space20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Header Greeting
+              Text(
+                '${_greeting(context)}, $userFirstName',
+                style: GoogleFonts.manrope(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: context.textPrimaryColor,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                context.tr('harvest_overview_sub'),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: context.textSecondaryColor,
+                ),
+              ),
+
+              const SizedBox(height: AppConstants.space24),
+
+              // 2. Today's Progress Card (One Strong Number)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppConstants.space20),
+                decoration: BoxDecoration(
+                  color: context.surfaceColor,
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                  border: Border.all(color: context.borderColor),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. Natural Human Greeting
                     Text(
-                      '${greeting()}, $userFirstName',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: context.textPrimaryColor,
-                        letterSpacing: -0.4,
+                      context.tr('todays_progress'),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: context.textMutedColor,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      context.tr('status_apiaries_sub'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: context.textSecondaryColor,
-                      ),
-                    ),
-
-                    const SizedBox(height: AppConstants.space24),
-
-                    // 2. Prominent Add Hive Card
-                    AddHiveCard(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AddEditHiveScreen(),
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: AppConstants.space32),
-
-                    // 2. Recent Hives Section Header
+                    const SizedBox(height: 6),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(
-                          context.tr('recent_hives'),
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                          '8.5 acres',
+                          style: GoogleFonts.manrope(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
                             color: context.textPrimaryColor,
-                            letterSpacing: -0.3,
+                            letterSpacing: -0.8,
                           ),
                         ),
-                        if (totalHivesCount > 0)
-                          InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const AllHivesScreen(),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(4),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    context.tr('show_more'),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppConstants.primaryDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  const Icon(
-                                    Icons.arrow_forward_rounded,
-                                    size: 16,
-                                    color: AppConstants.primaryDark,
-                                  ),
-                                ],
-                              ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppConstants.success.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '71% completed',
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppConstants.success,
                             ),
                           ),
+                        ),
                       ],
                     ),
-
-                    const SizedBox(height: AppConstants.space16),
-
-                    // 3. Recent Hives List or Empty State
-                    if (recentHives.isEmpty)
-                      _buildEmptyState(context)
-                    else
-                      Column(
-                        children: recentHives.map((hive) {
-                          return HiveNoteCard(
-                            hive: hive,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => HiveDetailsScreen(hiveId: hive.id),
-                                ),
-                              );
-                            },
-                            onEdit: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddEditHiveScreen(hive: hive),
-                                ),
-                              );
-                            },
-                            onDelete: () => _showDeleteConfirmation(context, hive),
-                          );
-                        }).toList(),
-                      ),
-
-                    const SizedBox(height: AppConstants.space32),
                   ],
                 ),
               ),
-            ),
+
+              const SizedBox(height: AppConstants.space16),
+
+              // 3. Current Field Section with Clean Icon-Only Hive Shortcut
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    context.tr('current_field'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimaryColor,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.hive_outlined, size: 20, color: context.primaryDarkColor),
+                    tooltip: context.tr('all_hives'),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AllHivesScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              _buildCurrentFieldSection(context, primaryHive),
+
+              const SizedBox(height: AppConstants.space16),
+
+              // 4. Compact Machine & Fuel Level Row
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildCompactInfoBox(
+                      context,
+                      label: context.tr('machine'),
+                      value: context.tr('machine_ready'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildCompactInfoBox(
+                      context,
+                      label: context.tr('fuel_level'),
+                      value: '72%',
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppConstants.space12),
+
+              // 5. Weather Compact Row
+              _buildCompactInfoBox(
+                context,
+                label: context.tr('weather'),
+                value: '28°C · Clear',
+              ),
+
+              const SizedBox(height: AppConstants.space16),
+
+              // 6. Maintenance Alert Notice
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppConstants.warning.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                  border: Border.all(color: AppConstants.warning.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, size: 20, color: AppConstants.warning),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.tr('maintenance_due'),
+                            style: GoogleFonts.manrope(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppConstants.warning,
+                            ),
+                          ),
+                          Text(
+                            context.tr('maintenance_sub'),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: context.textSecondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppConstants.space24),
+
+              // 7. Strongest Visual Action: Start Harvest CTA
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StartHarvestingScreen(hive: primaryHive),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, size: 22, color: Colors.white),
+                  label: Text(
+                    context.tr('start_harvest'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: AppConstants.space32),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildCurrentFieldSection(BuildContext context, Hive? hive) {
+    final fieldName = hive?.name ?? 'North Field - Hive #04';
+    final locationName = hive?.location.isNotEmpty == true ? hive!.location : 'Sector 4, West Ridge';
+    final cropType = hive?.queenStatus.isNotEmpty == true ? hive!.queenStatus : 'Wheat / Mustard';
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppConstants.space32),
       decoration: BoxDecoration(
-        color: AppConstants.surface,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-        border: Border.all(color: AppConstants.border, width: 1.0),
+        border: Border.all(color: context.borderColor),
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: AppConstants.primarySoft,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.hive_outlined,
-              size: 36,
-              color: AppConstants.primaryDark,
-            ),
-          ),
-          const SizedBox(height: AppConstants.space16),
-          Text(
-            context.tr('no_hives_yet'),
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppConstants.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            context.tr('no_hives_subtitle'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppConstants.textSecondary,
-            ),
-          ),
-          const SizedBox(height: AppConstants.space24),
-          AppButton(
-            text: context.tr('add_first_hive'),
-            icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-            variant: AppButtonVariant.primary,
-            width: 220,
-            onPressed: () {
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+        child: InkWell(
+          onTap: () {
+            if (hive != null) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const AddEditHiveScreen(),
+                  builder: (context) => HiveDetailsScreen(hive: hive),
                 ),
               );
-            },
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AllHivesScreen(),
+                ),
+              );
+            }
+          },
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.space16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fieldName,
+                            style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$locationName · $cropType',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: context.textSecondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: context.primarySoftColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        context.tr('in_progress'),
+                        style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: context.primaryDarkColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.space12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '71% complete',
+                      style: GoogleFonts.manrope(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.textPrimaryColor,
+                      ),
+                    ),
+                    Text(
+                      '8.5 / 12.0 acres',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: context.textMutedColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: 0.71,
+                    minHeight: 6,
+                    backgroundColor: context.borderColor,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppConstants.primary),
+                  ),
+                ),
+                const SizedBox(height: AppConstants.space12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      context.tr('view_hive_details'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.primaryDarkColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: context.primaryDarkColor,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactInfoBox(
+    BuildContext context, {
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: context.textSecondaryColor,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.manrope(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: context.textPrimaryColor,
+            ),
           ),
         ],
       ),
     );
   }
 }
-
