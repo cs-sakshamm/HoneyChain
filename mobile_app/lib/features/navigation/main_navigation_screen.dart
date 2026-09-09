@@ -288,11 +288,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                         });
                       },
                     ),
-                    // 2. Search (All Hives) Tab
+                    // 2. All Hives Tab
                     _buildPinterestNavItem(
                       index: 1,
-                      icon: Icons.search_rounded,
-                      activeIcon: Icons.search_rounded,
+                      icon: Icons.hive_outlined,
+                      activeIcon: Icons.hive_rounded,
                       label: context.tr('hives'),
                       isSelected: _currentIndex == 1,
                       onTap: () {
