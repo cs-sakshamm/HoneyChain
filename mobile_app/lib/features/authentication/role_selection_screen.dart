@@ -243,7 +243,7 @@ class _RoleCard extends StatelessWidget {
               child: Icon(
                 item.icon,
                 size: 36,
-                color: AppConstants.primaryDark,
+                color: context.accentColor,
               ),
             ),
             const SizedBox(height: 20),
@@ -362,7 +362,9 @@ class _LanguageSelector extends StatelessWidget {
                         final lang = LanguageController.supportedLanguages[index];
                         final isSelected = lang.code == langCtrl.currentLanguageCode;
 
-                        return ListTile(
+                        return Material(
+                          type: MaterialType.transparency,
+                          child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
                           onTap: () {
                             langCtrl.setLanguage(lang.code);
@@ -385,6 +387,7 @@ class _LanguageSelector extends StatelessWidget {
                           trailing: isSelected
                               ? Icon(Icons.check_circle_rounded, color: context.primaryDarkColor)
                               : null,
+                        ),
                         );
                       },
                     ),

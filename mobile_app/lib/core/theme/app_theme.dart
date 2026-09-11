@@ -299,8 +299,22 @@ extension ThemeContextX on BuildContext {
   Color get errorColor => AppConstants.error;
   Color get successColor => AppConstants.success;
   Color get warningColor => AppConstants.warning;
-  Color get successBgColor => AppConstants.successBackground;
-  Color get errorBgColor => AppConstants.errorBackground;
-  Color get warningBgColor => AppConstants.warningBackground;
+
+  /// Brightness-aware tinted backgrounds for status pills/banners.
+  /// Light mode uses pastel fills; dark mode uses translucent fills over the
+  /// dark surface so badges remain readable without blinding light chips.
+  Color get successBgColor =>
+      _isDark ? AppConstants.success.withValues(alpha: 0.15) : AppConstants.successBackground;
+  Color get errorBgColor =>
+      _isDark ? AppConstants.error.withValues(alpha: 0.15) : AppConstants.errorBackground;
+  Color get warningBgColor =>
+      _isDark ? AppConstants.warning.withValues(alpha: 0.15) : AppConstants.warningBackground;
+
+  bool get _isDark => Theme.of(this).brightness == Brightness.dark;
+
+  /// Theme-aware "primary" for icon/text accents: near-black in light mode,
+  /// near-white in dark mode (so it never disappears on dark surfaces).
+  Color get accentColor =>
+      _isDark ? Colors.white : AppConstants.primary;
 }
 

@@ -1135,14 +1135,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         final lang = filteredLanguages[index];
                         final isSelected = lang.code == langController.currentLanguageCode;
 
-                        return ListTile(
-                          title: Text(
-                            lang.name,
-                            style: GoogleFonts.manrope(
-                              fontSize: 14,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? context.honeyAccent : context.textPrimaryColor,
-                            ),
+                        return Material(
+                          type: MaterialType.transparency,
+                          child: ListTile(
+                            title: Text(
+                              lang.name,
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? context.honeyAccent : context.textPrimaryColor,
+                              ),
                           ),
                           subtitle: Text(
                             lang.nativeName,
@@ -1159,6 +1161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             langController.setLanguage(lang.code);
                             Navigator.pop(modalContext);
                           },
+                        ),
                         );
                       },
                     ),

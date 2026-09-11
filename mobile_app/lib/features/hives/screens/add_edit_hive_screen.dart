@@ -279,7 +279,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
+      backgroundColor: context.scaffoldBg,
       appBar: GlobalAppBar(
         showBackButton: true,
         titleText: isEditing ? context.tr('edit_hive') : context.tr('add_new_hive'),
@@ -532,9 +532,9 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppConstants.background,
+                    color: context.scaffoldBg,
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                    border: Border.all(color: AppConstants.border),
+                    border: Border.all(color: context.borderColor),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -544,17 +544,17 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                         children: [
                           Text(
                             context.tr('feeding_required'),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: AppConstants.textPrimary,
+                              color: context.textPrimaryColor,
                             ),
                           ),
                           Text(
                             context.tr('feeding_sub'),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppConstants.textSecondary,
+                              color: context.textSecondaryColor,
                             ),
                           ),
                         ],
@@ -622,10 +622,10 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
           const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: AppConstants.textPrimary,
+              color: context.textPrimaryColor,
             ),
           ),
         ],
@@ -638,9 +638,9 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(AppConstants.space16),
       decoration: BoxDecoration(
-        color: AppConstants.surface,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-        border: Border.all(color: AppConstants.border, width: 1.0),
+        border: Border.all(color: context.borderColor, width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -662,10 +662,10 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppConstants.textPrimary,
+            color: context.textPrimaryColor,
           ),
         ),
         const SizedBox(height: 6),
@@ -673,7 +673,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
           controller: controller,
           keyboardType: keyboardType,
           maxLines: maxLines,
-          style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary),
+          style: TextStyle(fontSize: 14, color: context.textPrimaryColor),
           decoration: InputDecoration(
             hintText: hint,
             isDense: true,
@@ -695,10 +695,10 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppConstants.textPrimary,
+            color: context.textPrimaryColor,
           ),
         ),
         const SizedBox(height: 6),
@@ -706,8 +706,10 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
           initialValue: value,
           onChanged: onChanged,
           isDense: true,
-          style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary),
+          style: TextStyle(fontSize: 14, color: context.textPrimaryColor),
+          dropdownColor: context.surfaceColor,
           decoration: const InputDecoration(isDense: true),
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
           items: items.map((item) {
             return DropdownMenuItem<String>(
               value: item,
@@ -729,10 +731,10 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppConstants.textPrimary,
+            color: context.textPrimaryColor,
           ),
         ),
         const SizedBox(height: 6),
@@ -742,18 +744,18 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: AppConstants.surface,
+              color: context.surfaceColor,
               borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              border: Border.all(color: AppConstants.border),
+              border: Border.all(color: context.borderColor),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary),
+                  style: TextStyle(fontSize: 14, color: context.textPrimaryColor),
                 ),
-                const Icon(Icons.calendar_month_outlined, size: 18, color: AppConstants.textSecondary),
+                Icon(Icons.calendar_month_outlined, size: 18, color: context.textSecondaryColor),
               ],
             ),
           ),

@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/models/workflow_request.dart';
 import '../../core/theme/theme_controller.dart';
+import '../../core/theme/theme_context.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -73,12 +74,12 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
                         children: [
                           Text(
                             event['eventType'],
-                            style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16, color: context.colors.primary),
+                            style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16, color: context.primaryDarkColor),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: event['status'] == 'CONFIRMED' ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                              color: event['status'] == 'CONFIRMED' ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12)
                             ),
                             child: Text(event['status'], style: TextStyle(color: event['status'] == 'CONFIRMED' ? Colors.green : Colors.orange)),

@@ -123,10 +123,10 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppConstants.primarySoft,
+                            color: context.primarySoftColor,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.add_shopping_cart_rounded, color: context.textPrimaryColor),
+                          child: Icon(Icons.add_shopping_cart_rounded, color: context.accentColor),
                         ),
                         const SizedBox(width: AppConstants.space16),
                         Expanded(

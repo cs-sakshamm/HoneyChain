@@ -52,7 +52,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Icon(Icons.notifications_active_rounded, color: AppConstants.primary, size: 22),
+                  Icon(Icons.notifications_active_rounded, color: modalContext.accentColor, size: 22),
                   const SizedBox(width: 8),
                   Text(
                     modalContext.tr('notifications'),
@@ -131,13 +131,20 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       scrolledUnderElevation: 0.5,
       automaticallyImplyLeading: false,
-      leading: showBackButton
-          ? IconButton(
-              icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
-              onPressed: () => Navigator.pop(context),
+      leading: Navigator.canPop(context)
+          ? Container(
+              margin: const EdgeInsets.only(left: 8),
+              decoration: BoxDecoration(
+                color: context.surfaceColor,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
+                onPressed: () => Navigator.pop(context),
+              ),
             )
           : null,
-      titleSpacing: showBackButton ? 0 : AppConstants.space24,
+      titleSpacing: Navigator.canPop(context) ? 0 : AppConstants.space24,
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

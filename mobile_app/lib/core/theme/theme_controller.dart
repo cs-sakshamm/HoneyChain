@@ -6,8 +6,15 @@ class ThemeController extends ChangeNotifier {
   static const String _prefKey = 'honeychain_theme_mode';
 
   ThemeMode _themeMode = ThemeMode.light;
-
+  
   ThemeMode get themeMode => _themeMode;
+
+  /// Convenience method to toggle between Light and Dark theme
+  void toggleTheme() {
+    final newMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    setThemeMode(newMode);
+  }
+
 
   ThemeController() {
     _loadTheme();

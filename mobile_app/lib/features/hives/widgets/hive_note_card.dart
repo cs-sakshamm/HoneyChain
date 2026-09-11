@@ -122,14 +122,14 @@ class HiveNoteCard extends StatelessWidget {
                           onDelete();
                         }
                       },
-                      itemBuilder: (context) => [
+                      itemBuilder: (popupContext) => [
                         PopupMenuItem(
                           value: 'view',
                           child: Row(
                             children: [
-                              const Icon(Icons.visibility_outlined, size: 18),
+                              Icon(Icons.visibility_outlined, size: 18, color: popupContext.textPrimaryColor),
                               const SizedBox(width: 8),
-                              Text(context.tr('view_details'), style: const TextStyle(fontSize: 13)),
+                              Text(context.tr('view_details'), style: TextStyle(fontSize: 13, color: popupContext.textPrimaryColor)),
                             ],
                           ),
                         ),
@@ -137,9 +137,9 @@ class HiveNoteCard extends StatelessWidget {
                           value: 'edit',
                           child: Row(
                             children: [
-                              const Icon(Icons.edit_outlined, size: 18),
+                              Icon(Icons.edit_outlined, size: 18, color: popupContext.textPrimaryColor),
                               const SizedBox(width: 8),
-                              Text(context.tr('edit'), style: const TextStyle(fontSize: 13)),
+                              Text(context.tr('edit'), style: TextStyle(fontSize: 13, color: popupContext.textPrimaryColor)),
                             ],
                           ),
                         ),
@@ -167,18 +167,18 @@ class HiveNoteCard extends StatelessWidget {
                     // Production Metric
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.scale_outlined,
                           size: 15,
-                          color: AppConstants.textSecondary,
+                          color: context.textSecondaryColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${context.tr('production')}: ${hive.currentYearProductionKg.toStringAsFixed(1)} kg',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: AppConstants.textPrimary,
+                            color: context.textPrimaryColor,
                           ),
                         ),
                       ],
@@ -186,18 +186,18 @@ class HiveNoteCard extends StatelessWidget {
                     // Last Inspected Date
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.calendar_today_outlined,
                           size: 14,
-                          color: AppConstants.textMuted,
+                          color: context.textMutedColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${context.tr('last_inspected')}: $formattedDate',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
-                            color: AppConstants.textSecondary,
+                            color: context.textSecondaryColor,
                           ),
                         ),
                       ],
@@ -214,8 +214,8 @@ class HiveNoteCard extends StatelessWidget {
 
   Widget _buildHealthBadge(BuildContext context, Hive hive) {
     final isHealthy = hive.isHealthy;
-    final bgColor = isHealthy ? AppConstants.successBackground : AppConstants.errorBackground;
-    final fgColor = isHealthy ? AppConstants.success : AppConstants.error;
+    final bgColor = isHealthy ? context.successBgColor : context.errorBgColor;
+    final fgColor = isHealthy ? context.successColor : context.errorColor;
 
     String translatedHealth = hive.overallHealth;
     if (hive.overallHealth.toLowerCase() == 'healthy') {

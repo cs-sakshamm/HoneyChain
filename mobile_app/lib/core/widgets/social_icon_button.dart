@@ -39,12 +39,12 @@ class SocialIconButton extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(context.accentColor),
                     ),
                   )
                 : icon,

@@ -24,11 +24,12 @@ class ThemeSettingScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConstants.space24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: context.surfaceColor,
+        child: Material(
+          color: context.surfaceColor,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-            border: Border.all(color: context.borderColor),
+            side: BorderSide(color: context.borderColor),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

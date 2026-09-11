@@ -78,11 +78,12 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
                 final lang = filteredLanguages[index];
                 final isSelected = lang.code == langCtrl.currentLanguageCode;
 
-                return Container(
-                  decoration: BoxDecoration(
-                    color: context.surfaceColor,
+                return Material(
+                  color: context.surfaceColor,
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                    border: Border.all(
+                    side: BorderSide(
                       color: isSelected ? AppConstants.primary : context.borderColor,
                       width: isSelected ? 1.5 : 1.0,
                     ),

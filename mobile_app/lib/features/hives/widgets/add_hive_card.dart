@@ -19,7 +19,7 @@ class AddHiveCard extends StatelessWidget {
         color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
         border: Border.all(
-          color: AppConstants.primary.withValues(alpha: 0.4),
+          color: context.accentColor.withValues(alpha: 0.4),
           width: 1.5,
         ),
         boxShadow: [
@@ -51,13 +51,13 @@ class AddHiveCard extends StatelessWidget {
                     color: context.primarySoftColor,
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                     border: Border.all(
-                      color: AppConstants.primary.withValues(alpha: 0.2),
+                      color: context.accentColor.withValues(alpha: 0.2),
                       width: 1.0,
                     ),
                   ),
                   child: Icon(
                     Icons.add_rounded,
-                    color: context.primaryDarkColor,
+                    color: context.accentColor,
                     size: 28,
                   ),
                 ),

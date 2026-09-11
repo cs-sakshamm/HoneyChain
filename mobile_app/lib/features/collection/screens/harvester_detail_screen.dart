@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -246,9 +246,11 @@ class HarvesterDetailScreen extends StatelessWidget {
                   final hive = connectedHives[index];
                   return Container(
                     margin: const EdgeInsets.only(bottom: AppConstants.space12),
-                    child: ListTile(
-                      tileColor: context.surfaceColor,
-                      shape: RoundedRectangleBorder(
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        tileColor: context.surfaceColor,
+                        shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
                         side: BorderSide(color: context.borderColor),
                       ),
@@ -294,6 +296,7 @@ class HarvesterDetailScreen extends StatelessWidget {
                         );
                       },
                     ),
+                  ),
                   );
                 },
               ),

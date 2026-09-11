@@ -138,7 +138,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                   ],
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildNavItem(
                       index: 0,

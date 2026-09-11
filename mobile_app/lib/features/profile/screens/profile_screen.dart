@@ -96,11 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: context.surfaceColor,
+            Material(
+              color: context.surfaceColor,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                border: Border.all(color: context.borderColor),
+                side: BorderSide(color: context.borderColor),
               ),
               child: Column(
                 children: [
@@ -205,11 +206,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: context.surfaceColor,
+            Material(
+              color: context.surfaceColor,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                border: Border.all(color: context.borderColor),
+                side: BorderSide(color: context.borderColor),
               ),
               child: Column(
                 children: [
@@ -291,11 +293,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: AppConstants.space20),
 
             // Account Action: Log out
-            Container(
-              decoration: BoxDecoration(
-                color: context.surfaceColor,
+            Material(
+              color: context.surfaceColor,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                border: Border.all(color: context.borderColor),
+                side: BorderSide(color: context.borderColor),
               ),
               child: ListTile(
                 title: Text(
