@@ -20,6 +20,7 @@ model User {
   labReports          LabReport[]
   packagingRecords    PackagingRecord[]
   provenanceEvents    ProvenanceEvent[]
+  harvesterVerification HarvesterVerification?
 }
 
 model Harvest {
@@ -120,3 +121,61 @@ model ProvenanceEvent {
   batch              Batch    @relation(fields: [batchId], references: [id])
   actor              User     @relation(fields: [actorId], references: [id])
 }
+
+model HarvesterVerification {
+  id                      String    @id @default(uuid())
+  harvesterId             String    @unique
+  
+  // 1. Government ID
+  governmentIdType        String?   // PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
+  governmentIdReference   String?   // Masked reference e.g. DOC-NAT-***9481
+  governmentIdDocHash     String?   // Tamper-evident checksum
+  governmentIdVerified    String    @default("Not Started") // Not Started, Pending, Verified, Rejected
+  governmentIdSubmittedAt DateTime?
+
+  // 2. Mobile Number + OTP
+  mobileNumber            String?
+  mobileVerified          String    @default("Not Started") // Not Started, Pending, Verified
+  mobileVerifiedAt        DateTime?
+
+  // 3. Beekeeper Registration ID
+  registrationId          String?
+  registrationType        String?   // STATE_REGISTRY, COOPERATIVE, APICULTURE_BOARD
+  registrationVerified    String    @default("Not Started") // Not Started, Pending, Verified, Rejected
+  registrationSubmittedAt DateTime?
+
+  // 4. Apiary Location
+  apiaryName              String?
+  apiaryLocation          String?   // Public Generalized Region
+  apiaryCoordinates       String?   // Private/Secure GPS coordinates off-chain
+  locationVerified        String    @default("Not Started") // Not Started, Pending, Verified
+  locationSubmittedAt     DateTime?
+
+  // 5. Blockchain / Final Verification
+  verificationStatus      String    @default("Not Started") // Not Started, In Progress, Pending Review, Verified, Rejected, Blockchain Pending, Blockchain Failed
+  verificationId          String?   @unique // HV-2026-XXXX
+  verificationHash        String?   // SHA-256 canonical hash
+  blockchainNetwork       String?   // Local Hardhat, Ethereum Sepolia, Polygon Amoy
+  transactionHash         String?
+  blockNumber             Int?
+  
+  reviewNotes             String?
+  verifiedAt              DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  harvester               User      @relation(fields: [harvesterId], references: [id])
+}
+
+model MobileOtp {
+  id            String   @id @default(uuid())
+  mobile        String
+  otpHash       String
+  expiresAt     DateTime
+  attempts      Int      @default(0)
+  cooldownUntil DateTime
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+

@@ -10,6 +10,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../profile/controllers/user_controller.dart';
+import '../../verification/controllers/verification_controller.dart';
+import '../../verification/screens/harvester_verification_screen.dart';
+import '../../verification/screens/verification_certificate_screen.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
@@ -343,89 +346,132 @@ class _AddHiveCard extends StatelessWidget {
   }
 }
 
-/// Harvester identity card showing persisted BSID + BSP Pass, with one-time
-/// generation gated behind a complete profile.
+/// Harvester identity & verification status card with direct navigation to
+/// the 5-parameter verification workflow.
 class _IdentityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final userCtrl = context.watch<UserController>();
-    final user = userCtrl.user;
-    final complete = user.isProfileComplete;
+    final verCtrl = context.watch<VerificationController>();
+    final ver = verCtrl.verification;
+    final isVerified = ver.isFullyVerified;
+
+    final badgeColor = isVerified
+        ? context.successColor
+        : ver.completedStepsCount > 0
+            ? context.primaryColor
+            : context.textMutedColor;
+
+    final badgeBg = isVerified
+        ? context.successBgColor
+        : context.primarySoftColor;
+
+    final statusLabel = isVerified
+        ? 'Verified ✓'
+        : ver.completedStepsCount > 0
+            ? '${ver.completedStepsCount}/5 Steps'
+            : 'Not Verified';
 
     return Container(
-      padding: const EdgeInsets.all(AppConstants.space16),
       decoration: BoxDecoration(
         color: context.surfaceColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(
+          color: isVerified ? context.successColor.withValues(alpha: 0.35) : context.borderColor,
+          width: isVerified ? 1.5 : 1.0,
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: context.primarySoftColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.badge_outlined, size: 20, color: context.primaryDarkColor),
-          ),
-          const SizedBox(width: AppConstants.space16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            if (isVerified) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.space16),
+            child: Row(
               children: [
-                Text(
-                  context.tr('identity_section'),
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: context.textPrimaryColor,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isVerified ? context.successBgColor : context.primarySoftColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isVerified ? Icons.verified_rounded : Icons.shield_outlined,
+                    size: 20,
+                    color: isVerified ? context.successColor : context.primaryDarkColor,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  userCtrl.hasIdentity
-                      ? '${user.bsid}  ·  ${user.bspPass}'
-                      : complete
-                          ? 'No identity issued yet'
-                          : context.tr('complete_profile_first'),
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: context.textSecondaryColor,
+                const SizedBox(width: AppConstants.space16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Harvester Verification',
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: badgeBg,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              statusLabel,
+                              style: GoogleFonts.manrope(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: badgeColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isVerified
+                            ? '${ver.verificationId} · Blockchain Recorded'
+                            : '5 Parameters · Complete to unlock blockchain badge',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: context.textSecondaryColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: context.textMutedColor,
                 ),
               ],
             ),
           ),
-          if (!userCtrl.hasIdentity)
-            TextButton(
-              onPressed: complete
-                  ? () async {
-                      final ok = await userCtrl.generateIdentity();
-                      if (ok && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(context.tr('ids_generated'))),
-                        );
-                      }
-                    }
-                  : null,
-              style: TextButton.styleFrom(
-                backgroundColor: complete ? context.primarySoftColor : Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-              child: Text(
-                context.tr('generate_ids'),
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: complete ? context.primaryDarkColor : context.textMutedColor,
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

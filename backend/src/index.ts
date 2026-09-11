@@ -3,6 +3,8 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { ethers } from 'ethers';
 import * as crypto from 'crypto';
+import verificationRoutes from './routes/verificationRoutes';
+import { verificationService } from './services/verificationService';
 
 const app = express();
 app.use(cors());
@@ -172,6 +174,23 @@ app.get('/api/batches', async (req, res) => {
     }
   });
   res.json(batches);
+});
+
+// Mount Harvester Verification Routes
+app.use('/api/verification', verificationRoutes);
+
+// Direct public verification endpoint: /api/verify/harvester/:verificationId
+app.get('/api/verify/harvester/:verificationId', async (req, res) => {
+  try {
+    const verificationId = String(req.params.verificationId);
+    const result = await verificationService.getPublicVerificationByVerificationId(verificationId);
+    if (!result.found) {
+      return res.status(404).json({ success: false, ...result });
+    }
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
 });
 
 const port = process.env.PORT || 3000;

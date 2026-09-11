@@ -8,6 +8,7 @@ import 'core/theme/theme_controller.dart';
 import 'features/authentication/auth_controller.dart';
 import 'features/hives/controllers/hive_controller.dart';
 import 'features/profile/controllers/user_controller.dart';
+import 'features/verification/controllers/verification_controller.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,9 @@ void main() {
         ),
         ChangeNotifierProvider<UserController>(
           create: (_) => UserController(),
+        ),
+        ChangeNotifierProvider<VerificationController>(
+          create: (_) => VerificationController(),
         ),
         ChangeNotifierProvider<WorkflowController>(
           create: (_) => WorkflowController(),

@@ -148,7 +148,7 @@ class AppTheme {
     const darkTextMuted = Color(0xFF71717A); // Zinc-500
     const darkBorder = Color(0xFF27272A); // Zinc-800
     const darkPrimaryContainer = Color(0xFF27272A); // Zinc-800
-    const darkOnPrimaryContainer = Color(0xFFFAFAFA); // Zinc-50
+    
 
     final baseTextTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme);
 

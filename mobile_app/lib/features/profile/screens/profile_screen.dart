@@ -6,6 +6,10 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../authentication/auth_controller.dart';
+import '../../verification/controllers/verification_controller.dart';
+import '../../verification/screens/harvester_verification_screen.dart';
+import '../../verification/screens/public_verification_lookup_screen.dart';
+import '../../verification/screens/verification_certificate_screen.dart';
 import '../controllers/user_controller.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
@@ -216,6 +220,46 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     _buildSettingsTile(
                       context,
+                      title: 'Harvester Verification',
+                      icon: Icons.verified_user_outlined,
+                      trailingBadge: context.watch<VerificationController>().verification.isFullyVerified
+                          ? 'Verified ✓'
+                          : '${context.watch<VerificationController>().verification.completedStepsCount}/5 Steps',
+                      badgeColor: context.watch<VerificationController>().verification.isFullyVerified
+                          ? context.successColor
+                          : context.primaryDarkColor,
+                      badgeBg: context.watch<VerificationController>().verification.isFullyVerified
+                          ? context.successBgColor
+                          : context.primarySoftColor,
+                      onTap: () {
+                        if (context.read<VerificationController>().verification.isFullyVerified) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
+                          );
+                        }
+                      },
+                    ),
+                    Divider(height: 1, indent: 56, color: context.borderColor),
+                    _buildSettingsTile(
+                      context,
+                      title: 'Public QR Verifier',
+                      icon: Icons.qr_code_scanner_rounded,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PublicVerificationLookupScreen()),
+                        );
+                      },
+                    ),
+                    Divider(height: 1, indent: 56, color: context.borderColor),
+                    _buildSettingsTile(
+                      context,
                       title: context.tr('notifications'),
                       icon: Icons.notifications_none_rounded,
                       onTap: () {
@@ -303,7 +347,15 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsTile(BuildContext context, {required String title, required IconData icon, required VoidCallback onTap}) {
+  Widget _buildSettingsTile(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+    String? trailingBadge,
+    Color? badgeColor,
+    Color? badgeBg,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -332,6 +384,24 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              if (trailingBadge != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: badgeBg ?? context.primarySoftColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    trailingBadge,
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: badgeColor ?? context.primaryDarkColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
             ],
           ),

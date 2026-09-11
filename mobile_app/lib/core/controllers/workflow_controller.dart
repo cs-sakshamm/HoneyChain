@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/workflow_request.dart';
@@ -130,10 +130,48 @@ class WorkflowController extends ChangeNotifier {
   }
 
   // Placeholder methods for UI compatibility
-  void acceptRequest(String id) {}
-  void denyRequest(String id, String reason) {}
-  void updateStatus(String id, RequestStatus newStatus) {}
-  void markLabRejected(String id, String reason) {}
+  void acceptRequest(String id) {
+    updateStatus(id, RequestStatus.accepted);
+  }
+  void denyRequest(String id, String reason) {
+    updateStatus(id, RequestStatus.denied);
+  }
+  void updateStatus(String id, RequestStatus newStatus) {
+    final index = _requests.indexWhere((r) => r.id == id);
+    if (index != -1) {
+      final req = _requests[index];
+      // Note: In a real app this would call an API, for now we update locally to make the UI work
+      _requests[index] = WorkflowRequest(
+        id: req.id,
+        batchId: req.batchId,
+        harvesterName: req.harvesterName,
+        collectionType: req.collectionType,
+        location: req.location,
+        description: req.description,
+        estimatedQuantityKg: req.estimatedQuantityKg,
+        notes: req.notes,
+        createdAt: req.createdAt,
+        status: newStatus,
+        dataHash: req.dataHash,
+        txHash: req.txHash,
+        blockNumber: req.blockNumber,
+        labSampleId: req.labSampleId,
+        moistureContent: req.moistureContent,
+        purityGrade: req.purityGrade,
+        contaminantsFound: req.contaminantsFound,
+        qualityScore: req.qualityScore,
+        labNotes: req.labNotes,
+        labReportDate: req.labReportDate,
+        packagingApprovedDate: req.packagingApprovedDate,
+        qrGenerated: req.qrGenerated,
+        denialReason: req.denialReason,
+      );
+      notifyListeners();
+    }
+  }
+  void markLabRejected(String id, String reason) {
+    updateStatus(id, RequestStatus.labRejected);
+  }
     // Restore aliases for UI compatibility
   List<WorkflowRequest> get pendingCollectionRequests => _requests.where((r) => r.status == RequestStatus.pending).toList();
   List<WorkflowRequest> get collectionHistory => _requests.where((r) => r.status != RequestStatus.pending && r.status != RequestStatus.accepted).toList();
