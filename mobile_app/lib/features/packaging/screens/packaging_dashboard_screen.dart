@@ -35,16 +35,25 @@ class PackagingDashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: AppBar(
-        title: Text(
-          'Packaging Dashboard',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        backgroundColor: context.surfaceColor,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      body: allDisplayRequests.isEmpty
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: Text(
+                'Packaging Dashboard',
+                style: GoogleFonts.manrope(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: context.textPrimaryColor,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            Expanded(
+              child: allDisplayRequests.isEmpty
           ? _buildEmptyState(context)
           : ListView.separated(
               padding: const EdgeInsets.symmetric(
@@ -58,6 +67,10 @@ class PackagingDashboardScreen extends StatelessWidget {
                 return _PackagingBatchCard(request: request);
               },
             ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

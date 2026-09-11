@@ -103,6 +103,7 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      extendBody: true,
       body: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: IndexedStack(

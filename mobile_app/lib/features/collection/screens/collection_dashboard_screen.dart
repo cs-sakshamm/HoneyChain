@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -21,35 +21,40 @@ class CollectionDashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: context.surfaceColor,
-        elevation: 0,
-        centerTitle: false,
-        title: Column(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              context.tr('collection_processing') == 'collection_processing' 
-                  ? 'Collection & Processing' 
-                  : context.tr('collection_processing'),
-              style: GoogleFonts.manrope(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimaryColor,
-                letterSpacing: -0.5,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.tr('collection_processing') == 'collection_processing' 
+                        ? 'Collection & Processing' 
+                        : context.tr('collection_processing'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: context.textPrimaryColor,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${requests.length} ${context.tr('pending_requests') == 'pending_requests' ? 'pending requests' : context.tr('pending_requests')}',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: context.textSecondaryColor,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Text(
-              '${requests.length} ${context.tr('pending_requests') == 'pending_requests' ? 'pending requests' : context.tr('pending_requests')}',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: context.textSecondaryColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: requests.isEmpty
+            Expanded(
+              child: requests.isEmpty
           ? _buildEmptyState(context)
           : ListView.separated(
               padding: const EdgeInsets.all(AppConstants.space16),
@@ -60,6 +65,10 @@ class CollectionDashboardScreen extends StatelessWidget {
                 return _buildRequestCard(context, req);
               },
             ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -25,6 +25,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
   final _contaminantsController = TextEditingController();
   final _qualityScoreController = TextEditingController();
   final _notesController = TextEditingController();
+  bool _hasDataSource = false;
 
   @override
   void dispose() {
@@ -70,37 +71,53 @@ class _LabReportScreenState extends State<LabReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: context.surfaceColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Lab Report — ${widget.request.batchId}',
-          style: GoogleFonts.manrope(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: context.textPrimaryColor,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(
-            color: context.borderColor,
-            height: 1.0,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppConstants.space16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Material(
+                    color: context.surfaceColor,
+                    borderRadius: BorderRadius.circular(30),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(30),
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: context.borderColor),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Lab Report — ${widget.request.batchId}',
+                      style: GoogleFonts.manrope(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: context.textPrimaryColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppConstants.space24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
               Text(
                 'Enter Test Results',
                 style: GoogleFonts.manrope(
@@ -171,17 +188,88 @@ class _LabReportScreenState extends State<LabReportScreen> {
                 labelText: 'Lab Notes (Optional)',
                 hintText: 'Any additional observations...',
                 keyboardType: TextInputType.multiline,
-              ), // maxLines not standard param in this AppTextField, removing. Wait, it isn't in the provided signature!
+              ),
+              const SizedBox(height: AppConstants.space24),
+              // Data Source Upload Section
+              Container(
+                padding: const EdgeInsets.all(AppConstants.space16),
+                decoration: BoxDecoration(
+                  color: _hasDataSource ? AppConstants.success.withValues(alpha: 0.1) : context.surfaceColor,
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                  border: Border.all(
+                    color: _hasDataSource ? AppConstants.success.withValues(alpha: 0.5) : context.borderColor,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _hasDataSource ? Icons.check_circle_rounded : Icons.upload_file_rounded,
+                      color: _hasDataSource ? AppConstants.success : context.primaryDarkColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: AppConstants.space12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _hasDataSource ? 'Data Source Uploaded' : 'Data Source Required',
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _hasDataSource ? AppConstants.success : context.textPrimaryColor,
+                            ),
+                          ),
+                          Text(
+                            _hasDataSource ? 'report_data.csv attached' : 'Upload raw lab data to proceed',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: context.textSecondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!_hasDataSource)
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _hasDataSource = true;
+                          });
+                        },
+                        child: Text(
+                          'Upload',
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w700,
+                            color: context.primaryDarkColor,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (!_hasDataSource)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'A valid data source is required to generate this lab report.',
+                    style: GoogleFonts.inter(fontSize: 12, color: AppConstants.error),
+                  ),
+                ),
               const SizedBox(height: AppConstants.space32),
               AppButton(
                 text: 'Submit Lab Report',
                 variant: AppButtonVariant.primary,
-                onPressed: _submitReport,
+                onPressed: _hasDataSource ? _submitReport : null,
               ),
             ],
           ),
         ),
       ),
+    ),
+  ],
+),
     );
   }
 }
+

@@ -103,6 +103,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      extendBody: true,
       body: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: IndexedStack(

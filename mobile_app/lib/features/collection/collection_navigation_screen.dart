@@ -104,6 +104,7 @@ class _CollectionNavigationScreenState extends State<CollectionNavigationScreen>
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      extendBody: true,
       body: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: IndexedStack(

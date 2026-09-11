@@ -79,35 +79,78 @@ class HiveDetailsScreen extends StatelessWidget {
       );
     }
 
-    final cropType = hive.queenStatus.isNotEmpty ? hive.queenStatus : 'Wheat';
+    final cropType = hive.queenStatus.isNotEmpty ? hive.queenStatus : 'Mated';
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: GlobalAppBar(
-        showBackButton: true,
-        titleText: hive.name,
-        extraActions: [
-          IconButton(
-            icon: Icon(Icons.edit_outlined, color: context.primaryDarkColor),
-            tooltip: context.tr('edit_hive'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddEditHiveScreen(hive: hive),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: AppConstants.error),
-            tooltip: context.tr('delete_hive'),
-            onPressed: () => _showDeleteDialog(context, hive),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Material(
+                    color: context.surfaceColor,
+                    borderRadius: BorderRadius.circular(30),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(30),
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: context.borderColor),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Material(
+                    color: context.surfaceColor,
+                    borderRadius: BorderRadius.circular(30),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(30),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddEditHiveScreen(hive: hive),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: context.borderColor),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Icon(Icons.edit_outlined, size: 20, color: context.primaryDarkColor),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Material(
+                    color: AppConstants.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(30),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(30),
+                      onTap: () => _showDeleteDialog(context, hive),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppConstants.error.withValues(alpha: 0.3)),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: const Icon(Icons.delete_outline_rounded, size: 20, color: AppConstants.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppConstants.space20),

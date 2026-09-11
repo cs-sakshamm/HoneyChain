@@ -105,6 +105,7 @@ class _PackagingNavigationScreenState extends State<PackagingNavigationScreen> w
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      extendBody: true,
       body: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: IndexedStack(
