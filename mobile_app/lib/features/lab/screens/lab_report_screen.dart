@@ -25,7 +25,14 @@ class _LabReportScreenState extends State<LabReportScreen> {
   final _contaminantsController = TextEditingController();
   final _qualityScoreController = TextEditingController();
   final _notesController = TextEditingController();
-  bool _hasDataSource = false;
+
+  /// A report may only be generated from a real data source: the batch's
+  /// on-chain provenance data hash recorded when the batch was submitted.
+  /// No synthetic/demo data source is ever accepted.
+  bool get _hasDataSource {
+    final hash = widget.request.dataHash;
+    return hash != null && hash.isNotEmpty;
+  }
 
   @override
   void dispose() {
@@ -213,7 +220,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _hasDataSource ? 'Data Source Uploaded' : 'Data Source Required',
+                                    _hasDataSource ? 'Data Source Verified' : 'Data Source Required',
                                     style: GoogleFonts.manrope(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
@@ -221,7 +228,9 @@ class _LabReportScreenState extends State<LabReportScreen> {
                                     ),
                                   ),
                                   Text(
-                                    _hasDataSource ? 'report_data.csv attached' : 'Upload raw lab data to proceed',
+                                    _hasDataSource
+                                        ? 'On-chain batch data: ${widget.request.dataHash!.substring(0, widget.request.dataHash!.length > 20 ? 20 : widget.request.dataHash!.length)}…'
+                                        : 'This batch has no on-chain provenance data yet.',
                                     style: GoogleFonts.inter(
                                       fontSize: 12,
                                       color: context.textSecondaryColor,
@@ -230,21 +239,6 @@ class _LabReportScreenState extends State<LabReportScreen> {
                                 ],
                               ),
                             ),
-                            if (!_hasDataSource)
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _hasDataSource = true;
-                                  });
-                                },
-                                child: Text(
-                                  'Upload',
-                                  style: GoogleFonts.manrope(
-                                    fontWeight: FontWeight.w700,
-                                    color: context.primaryDarkColor,
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),
@@ -252,7 +246,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            'A valid data source is required to generate this lab report.',
+                            'Reports can only be generated from real submitted data. Ask the harvester to record this batch on-chain first.',
                             style: GoogleFonts.inter(fontSize: 12, color: AppConstants.error),
                           ),
                         ),

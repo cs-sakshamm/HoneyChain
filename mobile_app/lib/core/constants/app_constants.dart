@@ -7,14 +7,20 @@ class AppConstants {
   // App Identity
   static const String appName = 'HoneyChain';
   static const String appTagline = 'Supply chain management simplified for business owners.';
+
+  // Backend / API base (single source of truth for mobile → backend calls)
+  static const String backendBaseUrl = 'http://127.0.0.1:3000';
   static const String legalDisclaimer =
       'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
 
-  // Design Tokens: Color Palette (Premium Monochrome & Honey Accent)
-  static const Color primary = Color(0xFF18181B); // Zinc-900
+  // Design Tokens: Color Palette (Honey Brand & Neutrals)
+  // Honey is the single brand accent across BOTH themes (buttons, icons,
+  // highlights, active states, progress). Neutrals carry the surfaces/text.
+  static const Color primary = honeyAccent; // Honey — brand primary
+  static const Color onPrimary = Color(0xFF1C1917); // Stone-900: readable on honey
   static const Color honeyAccent = Color(0xFFEAB308); // Yellow-500 (Honey)
   static const Color primaryDark = Color(0xFF09090B); // Zinc-950
-  static const Color primarySoft = Color(0xFFF4F4F5); // Zinc-100
+  static const Color primarySoft = Color(0xFFFEF9C3); // Yellow-100 (honey tint)
   static const Color secondary = Color(0xFF52525B); // Zinc-500
 
   static const Color background = Color(0xFFFFFFFF); // Pure White Background
@@ -101,4 +107,8 @@ class AppConstants {
   static const String logoutSubtitle = 'Are you sure you want to end your current session?';
   static const String logoutCancel = 'Cancel';
   static const String logoutConfirm = 'Log Out';
+
+  // Harvester identity (issued by backend when available; locally unique otherwise)
+  static const String bsidPrefix = 'BSID';
+  static const String bspPassPrefix = 'BSP';
 }

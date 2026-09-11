@@ -8,7 +8,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../models/hive_model.dart';
 
-/// Extremely Focused Operational Screen for Harvester Operator
+/// Harvest Session Screen for Harvester Operator
+/// Timer starts at 0 when session begins. No fake pre-seeded values.
 class StartHarvestingScreen extends StatefulWidget {
   final Hive? hive;
 
@@ -22,9 +23,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
   bool _isHarvestActive = false;
   bool _isPaused = false;
   Timer? _timer;
-  int _secondsElapsed = 2712; // Simulated initial active operational time (45m 12s)
-  double _harvestedArea = 8.5;
-  final double _totalArea = 12.0;
+  int _secondsElapsed = 0; // Always starts at 0 — real session time only
 
   @override
   void dispose() {
@@ -42,6 +41,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
     }
     setState(() {
       _isHarvestActive = true;
+      _secondsElapsed = 0;
     });
     _startTimer();
   }
@@ -50,12 +50,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!_isPaused && mounted) {
-        setState(() {
-          _secondsElapsed++;
-          if (_secondsElapsed % 20 == 0 && _harvestedArea < _totalArea) {
-            _harvestedArea = (_harvestedArea + 0.1).clamp(0.0, _totalArea);
-          }
-        });
+        setState(() => _secondsElapsed++);
       }
     });
   }
@@ -68,38 +63,45 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
   }
 
   void _showFinishConfirmation() {
+    _timer?.cancel();
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: context.surfaceColor,
           title: Text(
-            dialogContext.tr('finish_harvest'),
+            context.tr('finish_harvest') == 'finish_harvest' ? 'Finish Harvest?' : context.tr('finish_harvest'),
             style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
           ),
           content: Text(
-            'Confirm completing harvest for ${widget.hive?.name ?? "Field A"}?',
-            style: GoogleFonts.inter(fontSize: 14, color: dialogContext.textSecondaryColor),
+            'Session time: ${_formatTimer(_secondsElapsed)}. This will mark the hive session as complete.',
+            style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(dialogContext.tr('cancel'), style: GoogleFonts.inter(color: dialogContext.textSecondaryColor)),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _startTimer(); // Resume timer if dismissed
+              },
+              child: Text(context.tr('cancel') == 'cancel' ? 'Cancel' : context.tr('cancel')),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
+                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Harvest log saved successfully.'),
-                    behavior: SnackBarBehavior.floating,
+                  SnackBar(
+                    content: Text('Harvest session logged: ${_formatTimer(_secondsElapsed)}'),
+                    backgroundColor: AppConstants.success,
                   ),
                 );
-                Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: context.colors.primary,
-                foregroundColor: context.colors.onPrimary,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                ),
               ),
               child: Text('Confirm & Save', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
             ),
@@ -111,41 +113,56 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fieldName = widget.hive?.name ?? 'Field A';
-    final cropType = widget.hive?.queenStatus.isNotEmpty == true ? widget.hive!.queenStatus : 'Wheat';
+    final hive = widget.hive;
+    final hiveName = hive?.name ?? 'Unknown Hive';
+    final hiveType = hive?.hiveType ?? '';
+    final queenStatus = hive?.queenStatus ?? '';
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: context.surfaceColor,
-        elevation: 0,
-        scrolledUnderElevation: 0.5,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          _isHarvestActive ? context.tr('harvesting_in_progress') : context.tr('start_harvest'),
-          style: GoogleFonts.manrope(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: context.textPrimaryColor,
-          ),
-        ),
-      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppConstants.space20),
-          child: _isHarvestActive
-              ? _buildActiveHarvestView(context, fieldName, cropType)
-              : _buildPreHarvestView(context, fieldName, cropType),
+        bottom: false,
+        child: Column(
+          children: [
+            // Header row with pill back button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  _PillBackButton(),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      _isHarvestActive
+                          ? (context.tr('harvesting_in_progress') == 'harvesting_in_progress' ? 'Harvest In Progress' : context.tr('harvesting_in_progress'))
+                          : (context.tr('start_harvest') == 'start_harvest' ? 'Start Harvest' : context.tr('start_harvest')),
+                      style: GoogleFonts.manrope(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: context.textPrimaryColor,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.space20),
+                child: _isHarvestActive
+                    ? _buildActiveHarvestView(context, hiveName, queenStatus)
+                    : _buildPreHarvestView(context, hiveName, hiveType, queenStatus),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // Pre-Harvest Screen View
-  Widget _buildPreHarvestView(BuildContext context, String fieldName, String cropType) {
+  // Pre-Harvest view with real hive data only
+  Widget _buildPreHarvestView(BuildContext context, String hiveName, String hiveType, String queenStatus) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -163,13 +180,23 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildPreItem(context, 'Field', fieldName),
-                    const Divider(height: 20),
-                    _buildPreItem(context, 'Crop', cropType),
-                    const Divider(height: 20),
-                    _buildPreItem(context, 'Area', '12 acres'),
-                    const Divider(height: 20),
-                    _buildPreItem(context, context.tr('machine'), context.tr('machine_ready')),
+                    _buildInfoRow(context, 'Hive', hiveName),
+                    if (hiveType.isNotEmpty) ...[
+                      const Divider(height: 20),
+                      _buildInfoRow(context, 'Type', hiveType),
+                    ],
+                    if (queenStatus.isNotEmpty) ...[
+                      const Divider(height: 20),
+                      _buildInfoRow(context, 'Queen Status', queenStatus),
+                    ],
+                    if (widget.hive?.colonyStrength != null) ...[
+                      const Divider(height: 20),
+                      _buildInfoRow(context, 'Colony Strength', '${widget.hive!.colonyStrength}/10'),
+                    ],
+                    if (widget.hive?.currentYearProductionKg != null && widget.hive!.currentYearProductionKg > 0) ...[
+                      const Divider(height: 20),
+                      _buildInfoRow(context, 'This Year', '${widget.hive!.currentYearProductionKg.toStringAsFixed(1)} kg'),
+                    ],
                   ],
                 ),
               ),
@@ -189,7 +216,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
               ),
             ),
             child: Text(
-              context.tr('start_harvest'),
+              context.tr('start_harvest') == 'start_harvest' ? 'Begin Harvest Session' : context.tr('start_harvest'),
               style: GoogleFonts.manrope(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -202,39 +229,24 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
     );
   }
 
-  Widget _buildPreItem(BuildContext context, String label, String value) {
+  Widget _buildInfoRow(BuildContext context, String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: context.textSecondaryColor,
-          ),
-        ),
-        Text(
-          value,
-          style: GoogleFonts.manrope(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: context.textPrimaryColor,
-          ),
-        ),
+        Text(label, style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor)),
+        Text(value, style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimaryColor)),
       ],
     );
   }
 
-  // Active Harvesting Screen View (Time, Harvested area, Area remaining, Machine)
-  Widget _buildActiveHarvestView(BuildContext context, String fieldName, String cropType) {
-    final areaRemaining = (_totalArea - _harvestedArea).clamp(0.0, _totalArea);
-
+  // Active harvest view — real wall-clock timer only, no fake data
+  Widget _buildActiveHarvestView(BuildContext context, String hiveName, String queenStatus) {
     return Column(
       children: [
         Expanded(
           child: Column(
             children: [
-              // Digital Operational Timer
+              // Session Timer — starts at 0:00:00 when user begins
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
@@ -246,7 +258,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                 child: Column(
                   children: [
                     Text(
-                      context.tr('time'),
+                      'Session Time',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -263,13 +275,31 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                         letterSpacing: -1.0,
                       ),
                     ),
+                    if (_isPaused) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: context.warningBgColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'Paused',
+                          style: GoogleFonts.manrope(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: context.warningColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
 
               const SizedBox(height: AppConstants.space16),
 
-              // Active Metrics Box
+              // Hive info during active session
               Container(
                 padding: const EdgeInsets.all(AppConstants.space16),
                 decoration: BoxDecoration(
@@ -279,23 +309,13 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildPreItem(
-                      context,
-                      context.tr('harvested_area'),
-                      '${_harvestedArea.toStringAsFixed(1)} acres',
-                    ),
+                    _buildInfoRow(context, 'Hive', hiveName),
+                    if (queenStatus.isNotEmpty) ...[
+                      const Divider(height: 20),
+                      _buildInfoRow(context, 'Queen Status', queenStatus),
+                    ],
                     const Divider(height: 20),
-                    _buildPreItem(
-                      context,
-                      context.tr('area_remaining'),
-                      '${areaRemaining.toStringAsFixed(1)} acres',
-                    ),
-                    const Divider(height: 20),
-                    _buildPreItem(
-                      context,
-                      context.tr('machine'),
-                      _isPaused ? 'Paused' : 'Active (Fuel: 72%)',
-                    ),
+                    _buildInfoRow(context, 'Status', _isPaused ? 'Paused' : 'Active'),
                   ],
                 ),
               ),
@@ -303,18 +323,14 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
           ),
         ),
 
-        // Action Buttons: Pause & Finish Harvest
+        // Pause & Finish buttons
         Row(
           children: [
             Expanded(
               child: SizedBox(
                 height: 48,
                 child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _isPaused = !_isPaused;
-                    });
-                  },
+                  onPressed: () => setState(() => _isPaused = !_isPaused),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: context.borderColor),
                     shape: RoundedRectangleBorder(
@@ -322,12 +338,10 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                     ),
                   ),
                   child: Text(
-                    _isPaused ? context.tr('resume_harvest') : context.tr('pause'),
-                    style: GoogleFonts.manrope(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.textPrimaryColor,
-                    ),
+                    _isPaused
+                        ? (context.tr('resume_harvest') == 'resume_harvest' ? 'Resume' : context.tr('resume_harvest'))
+                        : (context.tr('pause') == 'pause' ? 'Pause' : context.tr('pause')),
+                    style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
                   ),
                 ),
               ),
@@ -346,12 +360,8 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                     ),
                   ),
                   child: Text(
-                    context.tr('finish_harvest'),
-                    style: GoogleFonts.manrope(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.onPrimary,
-                    ),
+                    context.tr('finish_harvest') == 'finish_harvest' ? 'Finish' : context.tr('finish_harvest'),
+                    style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w700, color: context.colors.onPrimary),
                   ),
                 ),
               ),
@@ -359,6 +369,29 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
     );
   }
 }

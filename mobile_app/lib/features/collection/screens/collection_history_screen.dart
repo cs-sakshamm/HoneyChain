@@ -20,33 +20,47 @@ class CollectionHistoryScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: context.surfaceColor,
-        elevation: 0,
-        centerTitle: false,
-        title: Text(
-          context.tr('processing_history') == 'processing_history' 
-              ? 'Processing History' 
-              : context.tr('processing_history'),
-          style: GoogleFonts.manrope(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: context.textPrimaryColor,
-            letterSpacing: -0.5,
-          ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  _PillBackButton(),
+                  const SizedBox(width: 14),
+                  Text(
+                    context.tr('processing_history') == 'processing_history'
+                        ? 'Processing History'
+                        : context.tr('processing_history'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: context.textPrimaryColor,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: requests.isEmpty
+                  ? _buildEmptyState(context)
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(AppConstants.space16),
+                      itemCount: requests.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
+                      itemBuilder: (context, index) {
+                        final req = requests[index];
+                        return _buildHistoryCard(context, req);
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
-      body: requests.isEmpty
-          ? _buildEmptyState(context)
-          : ListView.separated(
-              padding: const EdgeInsets.all(AppConstants.space16),
-              itemCount: requests.length,
-              separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
-              itemBuilder: (context, index) {
-                final req = requests[index];
-                return _buildHistoryCard(context, req);
-              },
-            ),
     );
   }
 
@@ -55,27 +69,16 @@ class CollectionHistoryScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_outlined, size: 64, color: context.textMutedColor.withOpacity(0.5)),
+          Icon(Icons.history_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
           const SizedBox(height: AppConstants.space16),
           Text(
-            context.tr('no_history') == 'no_history' 
-                ? 'No history yet' 
-                : context.tr('no_history'),
-            style: GoogleFonts.manrope(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: context.textPrimaryColor,
-            ),
+            context.tr('no_history') == 'no_history' ? 'No history yet' : context.tr('no_history'),
+            style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
           ),
           const SizedBox(height: AppConstants.space8),
           Text(
-            context.tr('no_history_subtitle') == 'no_history_subtitle' 
-                ? 'Processed requests will appear here.' 
-                : context.tr('no_history_subtitle'),
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: context.textSecondaryColor,
-            ),
+            'Processed requests will appear here.',
+            style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
           ),
         ],
       ),
@@ -93,22 +96,14 @@ class CollectionHistoryScreen extends StatelessWidget {
               StatusBadge(status: req.status),
               Text(
                 req.batchId,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: context.textMutedColor,
-                ),
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textMutedColor),
               ),
             ],
           ),
           const SizedBox(height: AppConstants.space12),
           Text(
             req.harvesterName,
-            style: GoogleFonts.manrope(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: context.textPrimaryColor,
-            ),
+            style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
           ),
           const SizedBox(height: AppConstants.space8),
           Row(
@@ -116,13 +111,7 @@ class CollectionHistoryScreen extends StatelessWidget {
               Icon(Icons.location_on_outlined, size: 16, color: context.textSecondaryColor),
               const SizedBox(width: AppConstants.space4),
               Expanded(
-                child: Text(
-                  req.location,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: context.textSecondaryColor,
-                  ),
-                ),
+                child: Text(req.location, style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor)),
               ),
             ],
           ),
@@ -134,10 +123,7 @@ class CollectionHistoryScreen extends StatelessWidget {
               Expanded(
                 child: Text(
                   DateFormat('MMM d, yyyy • h:mm a').format(req.createdAt),
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: context.textSecondaryColor,
-                  ),
+                  style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
                 ),
               ),
             ],
@@ -154,25 +140,41 @@ class CollectionHistoryScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  context.tr('est_quantity') == 'est_quantity' ? 'Est. Quantity:' : context.tr('est_quantity'),
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: context.textSecondaryColor,
-                  ),
+                  'Est. Quantity:',
+                  style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
                 ),
                 const SizedBox(width: AppConstants.space8),
                 Text(
                   '${req.estimatedQuantityKg.toStringAsFixed(1)} kg',
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: context.textPrimaryColor,
-                  ),
+                  style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/constants/app_constants.dart';
+
 import '../../core/localization/localization_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../profile/screens/profile_screen.dart';
@@ -146,21 +146,21 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
                       index: 0,
                       icon: Icons.science_outlined,
                       activeIcon: Icons.science_rounded,
-                      label: context.tr('samples') ?? 'Samples',
+                      label: context.tr('samples'),
                       isSelected: _currentIndex == 0,
                     ),
                     _buildNavItem(
                       index: 1,
                       icon: Icons.history_outlined,
                       activeIcon: Icons.history_rounded,
-                      label: context.tr('history') ?? 'History',
+                      label: context.tr('history'),
                       isSelected: _currentIndex == 1,
                     ),
                     _buildNavItem(
                       index: 2,
                       icon: Icons.person_outline_rounded,
                       activeIcon: Icons.person_rounded,
-                      label: context.tr('profile') ?? 'Profile',
+                      label: context.tr('profile'),
                       isSelected: _currentIndex == 2,
                     ),
                   ],

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import '../models/hive_model.dart';
 import '../services/hive_storage_service.dart';
@@ -65,6 +67,32 @@ class HiveController extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Whether a hive code is already taken by another hive.
+  bool isHiveCodeTaken(String code, {String? excludingHiveId}) {
+    final normalized = code.trim().toLowerCase();
+    return _hives.any(
+      (h) => h.id != excludingHiveId && h.hiveCode.trim().toLowerCase() == normalized,
+    );
+  }
+
+  /// Issue a unique hive identity code (e.g. "H-7F3A2C").
+  ///
+  /// The backend should be the authoritative issuer once the identity
+  /// endpoint exists; locally we generate a collision-checked code against
+  /// every stored hive so identifiers stay unique.
+  String generateUniqueHiveCode() {
+    final rng = Random.secure();
+    String code;
+    do {
+      final hex = List.generate(
+        3,
+        (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0'),
+      ).join().toUpperCase();
+      code = 'H-$hex';
+    } while (isHiveCodeTaken(code));
+    return code;
   }
 
   /// Set search query

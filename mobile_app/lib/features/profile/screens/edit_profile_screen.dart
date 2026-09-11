@@ -1,10 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/user_controller.dart';
 
 /// Form screen to Edit User Profile
@@ -70,27 +69,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: GlobalAppBar(
-        showBackButton: true,
-        titleText: context.tr('edit_profile'),
-      ),
-      body: Form(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  _PillBackButton(),
+                  const SizedBox(width: 14),
+                  Text(
+                    context.tr('edit_profile') == 'edit_profile' ? 'Edit Profile' : context.tr('edit_profile'),
+                    style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: context.textPrimaryColor, letterSpacing: -0.3),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Form(
         key: _formKey,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppConstants.space20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                context.tr('edit_profile'),
-                style: GoogleFonts.manrope(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: context.textPrimaryColor,
-                  letterSpacing: -0.4,
-                ),
-              ),
-
               const SizedBox(height: AppConstants.space16),
 
               Container(
@@ -169,8 +173,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         ),
       ),
+            ),
+          ],
+        ),
+      ),
     );
   }
+
 
   Widget _buildInputField(
     BuildContext context, {
@@ -207,5 +216,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 }
 
-
-
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
+    );
+  }
+}

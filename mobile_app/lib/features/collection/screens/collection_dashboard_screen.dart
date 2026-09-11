@@ -77,7 +77,7 @@ class CollectionDashboardScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inbox_outlined, size: 64, color: context.textMutedColor.withOpacity(0.5)),
+          Icon(Icons.inbox_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
           const SizedBox(height: AppConstants.space16),
           Text(
             context.tr('no_pending_requests') == 'no_pending_requests' 

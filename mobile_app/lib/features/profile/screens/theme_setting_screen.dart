@@ -5,7 +5,6 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_controller.dart';
-import '../../../core/widgets/global_app_bar.dart';
 
 /// Screen to select Theme Mode (Light, Dark, System Default)
 class ThemeSettingScreen extends StatelessWidget {
@@ -18,11 +17,26 @@ class ThemeSettingScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: GlobalAppBar(
-        showBackButton: true,
-        titleText: context.tr('theme_settings'),
-      ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  _PillBackButton(),
+                  const SizedBox(width: 14),
+                  Text(
+                    context.tr('theme_settings') == 'theme_settings' ? 'Appearance' : context.tr('theme_settings'),
+                    style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: context.textPrimaryColor, letterSpacing: -0.3),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConstants.space24),
         child: Material(
           color: context.surfaceColor,
@@ -32,6 +46,7 @@ class ThemeSettingScreen extends StatelessWidget {
             side: BorderSide(color: context.borderColor),
           ),
           child: Column(
+
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildThemeOption(
@@ -62,6 +77,10 @@ class ThemeSettingScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    ),
+          ],
         ),
       ),
     );
@@ -97,3 +116,27 @@ class ThemeSettingScreen extends StatelessWidget {
   }
 }
 
+/// Reusable pill-style back button used across all secondary screens
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
+    );
+  }
+}

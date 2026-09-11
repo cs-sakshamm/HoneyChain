@@ -4,11 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_constants.dart';
-import '../../../core/localization/localization_service.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/global_app_bar.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../hives/controllers/hive_controller.dart';
 import '../../hives/screens/hive_details_screen.dart';
@@ -36,10 +34,28 @@ class HarvesterDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: const GlobalAppBar(titleText: 'Harvester Details'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppConstants.space20),
-        child: Column(
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  _PillBackButton(),
+                  const SizedBox(width: 14),
+                  Text(
+                    'Harvester Details',
+                    style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: context.textPrimaryColor, letterSpacing: -0.3),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppConstants.space20),
+              child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Harvester Info Card
@@ -58,6 +74,7 @@ class HarvesterDetailScreen extends StatelessWidget {
                     child: Text(
                       request.harvesterName.isNotEmpty ? request.harvesterName[0].toUpperCase() : 'H',
                       style: GoogleFonts.manrope(
+
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                         color: context.textPrimaryColor,
@@ -302,8 +319,34 @@ class HarvesterDetailScreen extends StatelessWidget {
               ),
           ],
         ),
+            ),
+          ],
+        ),
+        ),
       ),
     );
   }
 }
 
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
+    );
+  }
+}

@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
@@ -7,7 +8,6 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/theme/app_theme.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
-import '../../../core/widgets/global_app_bar.dart';
 
 /// Form screen for creating or editing a Hive
 class AddEditHiveScreen extends StatefulWidget {
@@ -128,7 +128,11 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     final h = widget.hive;
 
     _nameController = TextEditingController(text: h?.name ?? '');
-    _hiveCodeController = TextEditingController(text: h?.hiveCode ?? '');
+    // Issue a unique hive identity code for new hives (editable if needed).
+    _hiveCodeController = TextEditingController(
+      text: h?.hiveCode ??
+          context.read<HiveController>().generateUniqueHiveCode(),
+    );
     _apiaryLocationController = TextEditingController(text: h?.apiaryLocation ?? '');
     _totalFramesController = TextEditingController(text: h?.totalFrames.toString() ?? '10');
     _broodFramesController = TextEditingController(text: h?.broodFrames.toString() ?? '6');
@@ -205,6 +209,23 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
 
     setState(() => _isSaving = true);
 
+    final controller = context.read<HiveController>();
+    final code = _hiveCodeController.text.trim();
+
+    // Enforce globally unique hive identity codes.
+    if (controller.isHiveCodeTaken(code, excludingHiveId: widget.hive?.id)) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hive code "$code" is already in use. Please choose another.'),
+          backgroundColor: AppConstants.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final now = DateTime.now();
     final isEditing = widget.hive != null;
 
@@ -238,7 +259,6 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       updatedAt: now,
     );
 
-    final controller = context.read<HiveController>();
     bool success;
     if (isEditing) {
       success = await controller.updateHive(hiveData);
@@ -280,13 +300,31 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: GlobalAppBar(
-        showBackButton: true,
-        titleText: isEditing ? context.tr('edit_hive') : context.tr('add_new_hive'),
-      ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  const _PillBackButton(),
+                  const SizedBox(width: 14),
+                  Text(
+                    isEditing ? context.tr('edit_hive') : context.tr('add_new_hive'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: context.textPrimaryColor,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Form(
+                key: _formKey,        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppConstants.space24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -610,6 +648,10 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
           ),
         ),
       ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -765,3 +807,25 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
   }
 }
 
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
+    );
+  }
+}

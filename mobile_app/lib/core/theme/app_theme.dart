@@ -17,8 +17,8 @@ class AppTheme {
       colorScheme: const ColorScheme.light(
         surface: AppConstants.surface,
         onSurface: AppConstants.textPrimary,
-        primary: AppConstants.primary,
-        onPrimary: Colors.white,
+        primary: AppConstants.honeyAccent,
+        onPrimary: AppConstants.onPrimary,
         secondary: AppConstants.textSecondary,
         onSecondary: Colors.white,
         onSurfaceVariant: AppConstants.textMuted,
@@ -160,14 +160,14 @@ class AppTheme {
         surface: darkSurface,
         onSurface: darkTextPrimary,
         primary: AppConstants.honeyAccent,
-        onPrimary: darkBackground,
+        onPrimary: AppConstants.onPrimary,
         secondary: darkTextSecondary,
         onSecondary: darkTextPrimary,
         onSurfaceVariant: darkTextMuted,
         error: AppConstants.error,
         outline: darkBorder,
         primaryContainer: darkPrimaryContainer,
-        onPrimaryContainer: darkOnPrimaryContainer,
+        onPrimaryContainer: AppConstants.honeyAccent,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: darkSurface,
@@ -293,6 +293,8 @@ extension ThemeContextX on BuildContext {
   Color get textSecondaryColor => Theme.of(this).colorScheme.secondary;
   Color get textMutedColor => Theme.of(this).colorScheme.onSurfaceVariant;
   Color get borderColor => Theme.of(this).colorScheme.outline;
+  Color get primaryColor => Theme.of(this).colorScheme.primary;
+  Color get onPrimaryColor => Theme.of(this).colorScheme.onPrimary;
   Color get primarySoftColor => Theme.of(this).colorScheme.primaryContainer;
   Color get primaryDarkColor => Theme.of(this).colorScheme.onPrimaryContainer;
   Color get honeyAccent => AppConstants.honeyAccent;

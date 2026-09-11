@@ -18,132 +18,158 @@ class LabHistoryScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: context.surfaceColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Text(
-          'Lab History',
-          style: GoogleFonts.manrope(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: context.textPrimaryColor,
-          ),
-        ),
-        centerTitle: false,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(
-            color: context.borderColor,
-            height: 1.0,
-          ),
-        ),
-      ),
-      body: history.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.history_rounded,
-                    size: 64,
-                    color: context.textMutedColor,
-                  ),
-                  const SizedBox(height: AppConstants.space16),
+                  _PillBackButton(),
+                  const SizedBox(width: 14),
                   Text(
-                    'No history found',
+                    'Lab History',
                     style: GoogleFonts.manrope(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: context.textSecondaryColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: context.textPrimaryColor,
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ],
               ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(AppConstants.space16),
-              itemCount: history.length,
-              separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
-              itemBuilder: (context, index) {
-                final req = history[index];
-                final formattedDate = req.labReportDate != null
-                    ? DateFormat('MMM dd, yyyy').format(req.labReportDate!)
-                    : 'Unknown Date';
-
-                return AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Sample: ${req.labSampleId ?? 'N/A'}',
-                              style: GoogleFonts.manrope(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: context.textPrimaryColor,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: AppConstants.space8),
-                          StatusBadge(status: req.status),
-                        ],
-                      ),
-                      const SizedBox(height: AppConstants.space12),
-                      Row(
-                        children: [
-                          Icon(Icons.tag_rounded, size: 16, color: context.textSecondaryColor),
-                          const SizedBox(width: AppConstants.space8),
-                          Text(
-                            'Batch: ${req.batchId}',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: context.textSecondaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppConstants.space8),
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today_outlined, size: 16, color: context.textSecondaryColor),
-                          const SizedBox(width: AppConstants.space8),
-                          Text(
-                            'Tested: $formattedDate',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: context.textSecondaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (req.qualityScore != null) ...[
-                        const SizedBox(height: AppConstants.space8),
-                        Row(
-                          children: [
-                            Icon(Icons.score_outlined, size: 16, color: context.textSecondaryColor),
-                            const SizedBox(width: AppConstants.space8),
-                            Text(
-                              'Quality Score: ${req.qualityScore}',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: context.textPrimaryColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              },
             ),
+            Expanded(
+              child: history.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.science_outlined, size: 64, color: context.textMutedColor),
+                          const SizedBox(height: AppConstants.space16),
+                          Text(
+                            'No lab history yet',
+                            style: GoogleFonts.manrope(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: context.textSecondaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: AppConstants.space8),
+                          Text(
+                            'Completed lab reports will appear here.',
+                            style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(AppConstants.space16),
+                      itemCount: history.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
+                      itemBuilder: (context, index) {
+                        final req = history[index];
+                        final formattedDate = req.labReportDate != null
+                            ? DateFormat('MMM dd, yyyy').format(req.labReportDate!)
+                            : 'Unknown Date';
+
+                        return AppCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Sample: ${req.labSampleId ?? 'N/A'}',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: context.textPrimaryColor,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppConstants.space8),
+                                  StatusBadge(status: req.status),
+                                ],
+                              ),
+                              const SizedBox(height: AppConstants.space12),
+                              Row(
+                                children: [
+                                  Icon(Icons.tag_rounded, size: 16, color: context.textSecondaryColor),
+                                  const SizedBox(width: AppConstants.space8),
+                                  Text(
+                                    'Batch: ${req.batchId}',
+                                    style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppConstants.space8),
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_today_outlined, size: 16, color: context.textSecondaryColor),
+                                  const SizedBox(width: AppConstants.space8),
+                                  Text(
+                                    'Tested: $formattedDate',
+                                    style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
+                                  ),
+                                ],
+                              ),
+                              if (req.qualityScore != null) ...[
+                                const SizedBox(height: AppConstants.space8),
+                                Row(
+                                  children: [
+                                    Icon(Icons.score_outlined, size: 16, color: context.successColor),
+                                    const SizedBox(width: AppConstants.space8),
+                                    Text(
+                                      'Quality Score: ${req.qualityScore}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.textPrimaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
     );
   }
 }

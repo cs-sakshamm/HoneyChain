@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -9,9 +10,11 @@ import '../controllers/user_controller.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'language_setting_screen.dart';
+import 'notifications_screen.dart';
 import 'theme_setting_screen.dart';
 
-/// Clean Minimal Pinterest-style Profile Screen
+/// Profile page — polished card-based layout, pill actions, both themes.
+/// The old notification ON/OFF toggle has been removed by design.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -58,6 +61,7 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final userCtrl = context.watch<UserController>();
     final user = userCtrl.user;
+    final complete = user.isProfileComplete;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -69,7 +73,6 @@ class ProfileScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppConstants.space24),
-              // Screen Title
               Text(
                 context.tr('profile'),
                 style: GoogleFonts.manrope(
@@ -81,20 +84,14 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppConstants.space24),
 
-              // Profile Card
+              // ── Profile card ──
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(AppConstants.space24),
                 decoration: BoxDecoration(
                   color: context.surfaceColor,
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: context.textPrimaryColor.withValues(alpha: 0.04),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: context.borderColor),
                 ),
                 child: Column(
                   children: [
@@ -110,7 +107,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppConstants.space16),
                     Text(
                       user.name.isEmpty ? 'Unknown User' : user.name,
                       style: GoogleFonts.manrope(
@@ -119,12 +116,12 @@ class ProfileScreen extends StatelessWidget {
                         color: context.textPrimaryColor,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                       decoration: BoxDecoration(
-                        color: context.primarySoftColor.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(16),
+                        color: context.primarySoftColor,
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         context.tr('role_operator'),
@@ -135,25 +132,13 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      user.email.isEmpty ? 'No email' : user.email,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: context.textSecondaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      user.phone.isEmpty ? 'No phone' : user.phone,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: context.textSecondaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildPillButton(
-                      context,
+                    const SizedBox(height: AppConstants.space20),
+                    // Account info rows
+                    _infoRow(context, Icons.alternate_email_rounded, user.email.isEmpty ? 'No email' : user.email),
+                    const SizedBox(height: 10),
+                    _infoRow(context, Icons.call_rounded, user.phone.isEmpty ? 'No phone' : user.phone),
+                    const SizedBox(height: AppConstants.space20),
+                    _PillAction(
                       label: context.tr('edit_profile'),
                       icon: Icons.edit_rounded,
                       onTap: () {
@@ -167,29 +152,30 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
 
-              if (!user.isProfileComplete) ...[
+              // ── Profile completion banner ──
+              if (!complete) ...[
                 const SizedBox(height: AppConstants.space16),
                 Container(
                   padding: const EdgeInsets.all(AppConstants.space20),
                   decoration: BoxDecoration(
-                    color: AppConstants.warning.withValues(alpha: 0.1),
+                    color: context.warningBgColor,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppConstants.warning.withValues(alpha: 0.3)),
+                    border: Border.all(color: context.warningColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber_rounded, color: AppConstants.warning, size: 28),
-                      const SizedBox(width: 16),
+                      Icon(Icons.warning_amber_rounded, color: context.warningColor, size: 28),
+                      const SizedBox(width: AppConstants.space16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Profile Incomplete',
+                              context.tr('profile_incomplete_title'),
                               style: GoogleFonts.manrope(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
-                                color: AppConstants.warning,
+                                color: context.warningColor,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -209,9 +195,10 @@ class ProfileScreen extends StatelessWidget {
               ],
 
               const SizedBox(height: AppConstants.space24),
-              
+
+              // ── Settings & activity ──
               Text(
-                'Settings & Security',
+                context.tr('preferences'),
                 style: GoogleFonts.manrope(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -219,14 +206,26 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppConstants.space16),
-              
               Container(
                 decoration: BoxDecoration(
                   color: context.surfaceColor,
                   borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: context.borderColor),
                 ),
                 child: Column(
                   children: [
+                    _buildSettingsTile(
+                      context,
+                      title: context.tr('notifications'),
+                      icon: Icons.notifications_none_rounded,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                        );
+                      },
+                    ),
+                    Divider(height: 1, indent: 56, color: context.borderColor),
                     _buildSettingsTile(
                       context,
                       title: context.tr('language'),
@@ -267,40 +266,18 @@ class ProfileScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: AppConstants.space32),
-              
+
+              // ── Logout pill ──
               Center(
-                child: Material(
-                  color: AppConstants.error.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(30),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _showLogoutDialog(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.logout_rounded, size: 20, color: AppConstants.error),
-                          const SizedBox(width: 8),
-                          Text(
-                            context.tr('logout'),
-                            style: GoogleFonts.manrope(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppConstants.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                child: _PillAction(
+                  label: context.tr('logout'),
+                  icon: Icons.logout_rounded,
+                  destructive: true,
+                  onTap: () => _showLogoutDialog(context),
                 ),
               ),
 
-              const SizedBox(height: 100), // Bottom padding for nav
+              const SizedBox(height: 120), // clear the floating bottom nav
             ],
           ),
         ),
@@ -308,36 +285,21 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPillButton(BuildContext context, {required String label, required IconData icon, required VoidCallback onTap}) {
-    return Material(
-      color: context.primarySoftColor.withValues(alpha: 0.2),
-      borderRadius: BorderRadius.circular(30),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: context.primaryDarkColor),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: context.primaryDarkColor,
-                ),
-              ),
-            ],
+  Widget _infoRow(BuildContext context, IconData icon, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: context.textMutedColor),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: context.textSecondaryColor,
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -354,12 +316,12 @@ class ProfileScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: context.scaffoldBg,
+                  color: context.primarySoftColor,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 20, color: context.textPrimaryColor),
+                child: Icon(icon, size: 20, color: context.primaryDarkColor),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppConstants.space16),
               Expanded(
                 child: Text(
                   title,
@@ -371,6 +333,56 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Filled pill button used for primary profile actions.
+class _PillAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  const _PillAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = destructive ? AppConstants.error : context.primaryDarkColor;
+    final bg = destructive
+        ? AppConstants.error.withValues(alpha: 0.1)
+        : context.primarySoftColor;
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(30),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
             ],
           ),
         ),

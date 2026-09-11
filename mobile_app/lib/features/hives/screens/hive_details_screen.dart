@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
@@ -74,8 +73,20 @@ class HiveDetailsScreen extends StatelessWidget {
     if (hive == null) {
       return Scaffold(
         backgroundColor: context.scaffoldBg,
-        appBar: AppBar(title: Text(context.tr('hives'))),
-        body: Center(child: Text(context.tr('no_matching_hives'))),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _PillBackButton(),
+                ),
+              ),
+              Expanded(child: Center(child: Text(context.tr('no_matching_hives')))),
+            ],
+          ),
+        ),
       );
     }
 
@@ -449,6 +460,29 @@ class HiveDetailsScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
     );
   }
 }
