@@ -402,6 +402,7 @@ class HiveDetailsScreen extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 

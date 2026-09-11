@@ -31,7 +31,7 @@ class HomeDashboardScreen extends StatelessWidget {
     final userFirstName = userDisplayName.split(' ').first;
     
     // Sort hives to show most recently updated first
-    final List<HiveModel> sortedHives = List.from(hiveController.hives);
+    final List<Hive> sortedHives = List.from(hiveController.hives);
     sortedHives.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     final primaryHive = sortedHives.isNotEmpty ? sortedHives.first : null;
 
@@ -302,7 +302,7 @@ class HomeDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHiveCard(BuildContext context, HiveModel hive) {
+  Widget _buildHiveCard(BuildContext context, Hive hive) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppConstants.space16),
       child: Material(

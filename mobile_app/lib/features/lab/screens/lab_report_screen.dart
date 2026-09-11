@@ -118,158 +118,158 @@ class _LabReportScreenState extends State<LabReportScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-              Text(
-                'Enter Test Results',
-                style: GoogleFonts.manrope(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: context.textPrimaryColor,
-                ),
-              ),
-              const SizedBox(height: AppConstants.space8),
-              Text(
-                'Sample ID: ${widget.request.labSampleId}',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: context.textSecondaryColor,
-                ),
-              ),
-              const SizedBox(height: AppConstants.space24),
-              AppTextField(
-                controller: _moistureController,
-                labelText: 'Moisture Content (%)',
-                hintText: 'e.g. 15.5',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Required';
-                  if (double.tryParse(val) == null) return 'Must be a number';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppConstants.space16),
-              AppTextField(
-                controller: _purityController,
-                labelText: 'Purity Grade (%)',
-                hintText: 'e.g. 98.0',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Required';
-                  if (double.tryParse(val) == null) return 'Must be a number';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppConstants.space16),
-              AppTextField(
-                controller: _contaminantsController,
-                labelText: 'Contaminants Found',
-                hintText: 'e.g. None, Traces of pollen',
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppConstants.space16),
-              AppTextField(
-                controller: _qualityScoreController,
-                labelText: 'Quality Score (1-100)',
-                hintText: 'e.g. 95',
-                keyboardType: TextInputType.number,
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Required';
-                  final score = double.tryParse(val);
-                  if (score == null) return 'Must be a number';
-                  if (score < 1 || score > 100) return 'Must be between 1 and 100';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppConstants.space16),
-              AppTextField(
-                controller: _notesController,
-                labelText: 'Lab Notes (Optional)',
-                hintText: 'Any additional observations...',
-                keyboardType: TextInputType.multiline,
-              ),
-              const SizedBox(height: AppConstants.space24),
-              // Data Source Upload Section
-              Container(
-                padding: const EdgeInsets.all(AppConstants.space16),
-                decoration: BoxDecoration(
-                  color: _hasDataSource ? AppConstants.success.withValues(alpha: 0.1) : context.surfaceColor,
-                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                  border: Border.all(
-                    color: _hasDataSource ? AppConstants.success.withValues(alpha: 0.5) : context.borderColor,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _hasDataSource ? Icons.check_circle_rounded : Icons.upload_file_rounded,
-                      color: _hasDataSource ? AppConstants.success : context.primaryDarkColor,
-                      size: 24,
-                    ),
-                    const SizedBox(width: AppConstants.space12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _hasDataSource ? 'Data Source Uploaded' : 'Data Source Required',
-                            style: GoogleFonts.manrope(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: _hasDataSource ? AppConstants.success : context.textPrimaryColor,
-                            ),
-                          ),
-                          Text(
-                            _hasDataSource ? 'report_data.csv attached' : 'Upload raw lab data to proceed',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: context.textSecondaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (!_hasDataSource)
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _hasDataSource = true;
-                          });
-                        },
-                        child: Text(
-                          'Upload',
-                          style: GoogleFonts.manrope(
-                            fontWeight: FontWeight.w700,
-                            color: context.primaryDarkColor,
-                          ),
+                      Text(
+                        'Enter Test Results',
+                        style: GoogleFonts.manrope(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimaryColor,
                         ),
                       ),
-                  ],
-                ),
-              ),
-              if (!_hasDataSource)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'A valid data source is required to generate this lab report.',
-                    style: GoogleFonts.inter(fontSize: 12, color: AppConstants.error),
+                      const SizedBox(height: AppConstants.space8),
+                      Text(
+                        'Sample ID: ${widget.request.labSampleId}',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: context.textSecondaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.space24),
+                      AppTextField(
+                        controller: _moistureController,
+                        labelText: 'Moisture Content (%)',
+                        hintText: 'e.g. 15.5',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (val) {
+                          if (val == null || val.isEmpty) return 'Required';
+                          if (double.tryParse(val) == null) return 'Must be a number';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.space16),
+                      AppTextField(
+                        controller: _purityController,
+                        labelText: 'Purity Grade (%)',
+                        hintText: 'e.g. 98.0',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (val) {
+                          if (val == null || val.isEmpty) return 'Required';
+                          if (double.tryParse(val) == null) return 'Must be a number';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.space16),
+                      AppTextField(
+                        controller: _contaminantsController,
+                        labelText: 'Contaminants Found',
+                        hintText: 'e.g. None, Traces of pollen',
+                        validator: (val) {
+                          if (val == null || val.isEmpty) return 'Required';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.space16),
+                      AppTextField(
+                        controller: _qualityScoreController,
+                        labelText: 'Quality Score (1-100)',
+                        hintText: 'e.g. 95',
+                        keyboardType: TextInputType.number,
+                        validator: (val) {
+                          if (val == null || val.isEmpty) return 'Required';
+                          final score = double.tryParse(val);
+                          if (score == null) return 'Must be a number';
+                          if (score < 1 || score > 100) return 'Must be between 1 and 100';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.space16),
+                      AppTextField(
+                        controller: _notesController,
+                        labelText: 'Lab Notes (Optional)',
+                        hintText: 'Any additional observations...',
+                        keyboardType: TextInputType.multiline,
+                      ),
+                      const SizedBox(height: AppConstants.space24),
+                      // Data Source Upload Section
+                      Container(
+                        padding: const EdgeInsets.all(AppConstants.space16),
+                        decoration: BoxDecoration(
+                          color: _hasDataSource ? AppConstants.success.withValues(alpha: 0.1) : context.surfaceColor,
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                          border: Border.all(
+                            color: _hasDataSource ? AppConstants.success.withValues(alpha: 0.5) : context.borderColor,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _hasDataSource ? Icons.check_circle_rounded : Icons.upload_file_rounded,
+                              color: _hasDataSource ? AppConstants.success : context.primaryDarkColor,
+                              size: 24,
+                            ),
+                            const SizedBox(width: AppConstants.space12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _hasDataSource ? 'Data Source Uploaded' : 'Data Source Required',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: _hasDataSource ? AppConstants.success : context.textPrimaryColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    _hasDataSource ? 'report_data.csv attached' : 'Upload raw lab data to proceed',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: context.textSecondaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!_hasDataSource)
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _hasDataSource = true;
+                                  });
+                                },
+                                child: Text(
+                                  'Upload',
+                                  style: GoogleFonts.manrope(
+                                    fontWeight: FontWeight.w700,
+                                    color: context.primaryDarkColor,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (!_hasDataSource)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'A valid data source is required to generate this lab report.',
+                            style: GoogleFonts.inter(fontSize: 12, color: AppConstants.error),
+                          ),
+                        ),
+                      const SizedBox(height: AppConstants.space32),
+                      AppButton(
+                        text: 'Submit Lab Report',
+                        variant: AppButtonVariant.primary,
+                        onPressed: _hasDataSource ? _submitReport : null,
+                      ),
+                    ],
                   ),
                 ),
-              const SizedBox(height: AppConstants.space32),
-              AppButton(
-                text: 'Submit Lab Report',
-                variant: AppButtonVariant.primary,
-                onPressed: _hasDataSource ? _submitReport : null,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    ),
-  ],
-),
     );
   }
 }
-
