@@ -126,7 +126,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                             color: AppConstants.primarySoft,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.add_shopping_cart_rounded, color: AppConstants.primaryDark),
+                          child: const Icon(Icons.add_shopping_cart_rounded, color: context.textPrimaryColor),
                         ),
                         const SizedBox(width: AppConstants.space16),
                         Expanded(

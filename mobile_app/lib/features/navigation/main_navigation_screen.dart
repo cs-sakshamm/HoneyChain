@@ -131,8 +131,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                   border: Border.all(color: borderColor, width: 1.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(
-                          alpha: Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.06),
+                      color: context.textPrimaryColor.withValues(alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
@@ -179,7 +178,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     required String label,
     required bool isSelected,
   }) {
-    final activeColor = AppConstants.textPrimary;
+    final activeColor = context.textPrimaryColor;
     final inactiveColor = context.textMutedColor;
     final pillBg = isSelected ? context.primarySoftColor : Colors.transparent;
 

@@ -131,8 +131,8 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
                   border: Border.all(color: borderColor, width: 1.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(
-                          alpha: Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.06),
+                      color: context.textPrimaryColor.withValues(
+                          alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
@@ -179,7 +179,7 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
     required String label,
     required bool isSelected,
   }) {
-    final activeColor = AppConstants.textPrimary;
+    final activeColor = context.textPrimaryColor;
     final inactiveColor = context.textMutedColor;
     final pillBg = isSelected ? context.primarySoftColor : Colors.transparent;
 

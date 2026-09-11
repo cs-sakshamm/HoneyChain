@@ -56,7 +56,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
       SnackBar(
         content: Text(
           'Lab report submitted successfully',
-          style: GoogleFonts.inter(color: Colors.white),
+          style: GoogleFonts.inter(color: context.colors.onPrimary),
         ),
         backgroundColor: AppConstants.success,
         behavior: SnackBarBehavior.floating,

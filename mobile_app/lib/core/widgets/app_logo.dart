@@ -25,8 +25,8 @@ class AppLogo extends StatelessWidget {
       height: size,
       child: CustomPaint(
         painter: _HoneyChainLogoPainter(
-          primaryColor: AppConstants.primary,
-          secondaryColor: AppConstants.primaryDark,
+          primaryColor: context.colors.primary,
+          secondaryColor: context.textPrimaryColor,
         ),
       ),
     );
@@ -35,8 +35,8 @@ class AppLogo extends StatelessWidget {
       return mark;
     }
 
-    final textColor = isDark ? Colors.white : AppConstants.textPrimary;
-    final subtitleColor = isDark ? Colors.white70 : AppConstants.textSecondary;
+    final textColor = context.textPrimaryColor;
+    final subtitleColor = context.textSecondaryColor;
 
     return Row(
       mainAxisSize: MainAxisSize.min,

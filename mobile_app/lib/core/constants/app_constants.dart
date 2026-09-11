@@ -10,27 +10,28 @@ class AppConstants {
   static const String legalDisclaimer =
       'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
 
-  // Design Tokens: Color Palette (Premium Monochrome)
-  static const Color primary = Color(0xFF000000); // Pure Black
-  static const Color honeyAccent = primary; // Alias for compatibility
-  static const Color primaryDark = Color(0xFF000000); // Pure Black
-  static const Color primarySoft = Color(0xFFF3F4F6); // Light Grey (Gray-100)
-  static const Color secondary = Color(0xFF4B5563); // Muted Secondary Color
+  // Design Tokens: Color Palette (Premium Monochrome & Honey Accent)
+  static const Color primary = Color(0xFF18181B); // Zinc-900
+  static const Color honeyAccent = Color(0xFFEAB308); // Yellow-500 (Honey)
+  static const Color primaryDark = Color(0xFF09090B); // Zinc-950
+  static const Color primarySoft = Color(0xFFF4F4F5); // Zinc-100
+  static const Color secondary = Color(0xFF52525B); // Zinc-500
 
   static const Color background = Color(0xFFFFFFFF); // Pure White Background
   static const Color surface = Color(0xFFFFFFFF); // Pure White Surface
-  static const Color border = Color(0xFFE5E7EB); // Subtle Border (Gray-200)
-  static const Color borderFocus = Color(0xFF000000); // Active Input Focus
+  static const Color border = Color(0xFFE4E4E7); // Zinc-200
+  static const Color borderFocus = Color(0xFFEAB308); // Honey Accent
 
-  static const Color textPrimary = Color(0xFF000000); // Pure Black
-  static const Color textSecondary = Color(0xFF4B5563); // Muted Body Text (Gray-600)
-  static const Color textMuted = Color(0xFF9CA3AF); // Placeholder / Caption (Gray-400)
+  static const Color textPrimary = Color(0xFF09090B); // Zinc-950
+  static const Color textSecondary = Color(0xFF52525B); // Zinc-500
+  static const Color textMuted = Color(0xFFA1A1AA); // Zinc-400
 
-  static const Color success = Color(0xFF000000); // Pure Black
-  static const Color successBackground = Color(0xFFF3F4F6); // Gray 100
-  static const Color error = Color(0xFF000000); // Pure Black
-  static const Color errorBackground = Color(0xFFF3F4F6); // Gray 100
-  static const Color warning = Color(0xFF000000); // Changed to black to remove orange
+  static const Color success = Color(0xFF22C55E); // Green-500
+  static const Color successBackground = Color(0xFFF0FDF4); // Green-50
+  static const Color error = Color(0xFFEF4444); // Red-500
+  static const Color errorBackground = Color(0xFFFEF2F2); // Red-50
+  static const Color warning = Color(0xFFF59E0B); // Amber-500
+  static const Color warningBackground = Color(0xFFFFFBEB); // Amber-50
 
   // Spacing Tokens (4px Grid System)
   static const double space4 = 4.0;

@@ -126,7 +126,7 @@ class HiveDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '$cropType · 12 acres',
+                    '${hive.hiveType} • ${hive.totalFrames} Frames',
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       color: context.textSecondaryColor,
@@ -135,9 +135,9 @@ class HiveDetailsScreen extends StatelessWidget {
 
                   const SizedBox(height: AppConstants.space20),
 
-                  // 1. Field Overview Section
+                  // 1. Hive Overview Section
                   Text(
-                    context.tr('field_overview'),
+                    context.tr('overview') == 'overview' ? 'Hive Overview' : context.tr('overview'),
                     style: GoogleFonts.manrope(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -154,13 +154,59 @@ class HiveDetailsScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _buildRowItem(context, context.tr('total_area'), '12 acres'),
+                        _buildRowItem(context, 'Colony Strength', hive.colonyStrength),
                         const Divider(height: 16),
-                        _buildRowItem(context, context.tr('harvested'), '8.5 acres'),
+                        _buildRowItem(context, 'Honey Type', hive.honeyType),
                         const Divider(height: 16),
-                        _buildRowItem(context, context.tr('area_remaining'), '3.5 acres'),
+                        _buildRowItem(context, 'Expected Production', '${hive.expectedProductionKg.toStringAsFixed(1)} kg'),
                         const Divider(height: 16),
-                        _buildRowItem(context, context.tr('progress'), '71% complete'),
+                        _buildRowItem(context, 'Overall Health', hive.overallHealth),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: AppConstants.space20),
+
+                  // 7-Day Hive History Section
+                  Text(
+                    '7-Day Hive History',
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppConstants.space16),
+                    decoration: BoxDecoration(
+                      color: context.surfaceColor,
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                      border: Border.all(color: context.borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_rounded, size: 32, color: context.textMutedColor),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No historical data available.',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.textPrimaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sensor and production data (temperature, humidity, weight, anomalies) will appear here once IoT devices are connected.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: context.textSecondaryColor,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   ),
@@ -294,7 +340,7 @@ class HiveDetailsScreen extends StatelessWidget {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.primary,
+                  backgroundColor: context.colors.primary,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
@@ -305,7 +351,7 @@ class HiveDetailsScreen extends StatelessWidget {
                   style: GoogleFonts.manrope(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: context.colors.onPrimary,
                   ),
                 ),
               ),

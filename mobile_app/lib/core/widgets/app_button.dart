@@ -44,8 +44,8 @@ class AppButton extends StatelessWidget {
           child: ElevatedButton(
             onPressed: isDisabled ? null : onPressed,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primary,
-              foregroundColor: Colors.white,
+              backgroundColor: context.colors.primary,
+              foregroundColor: context.colors.onPrimary,
               disabledBackgroundColor: context.borderColor,
               disabledForegroundColor: context.textMutedColor,
               elevation: 0,
@@ -54,7 +54,7 @@ class AppButton extends StatelessWidget {
               ),
               padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
             ),
-            child: _buildChild(Colors.white),
+            child: _buildChild(context.colors.onPrimary),
           ),
         );
 
@@ -101,7 +101,7 @@ class AppButton extends StatelessWidget {
         return TextButton(
           onPressed: isDisabled ? null : onPressed,
           style: TextButton.styleFrom(
-            foregroundColor: context.primaryDarkColor,
+            foregroundColor: context.textPrimaryColor,
             padding: const EdgeInsets.symmetric(horizontal: AppConstants.space8, vertical: AppConstants.space4),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -112,7 +112,7 @@ class AppButton extends StatelessWidget {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(context.primaryDarkColor),
+                    valueColor: AlwaysStoppedAnimation<Color>(context.textPrimaryColor),
                   ),
                 )
               : Text(

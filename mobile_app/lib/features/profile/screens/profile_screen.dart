@@ -49,7 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.error,
-                foregroundColor: Colors.white,
+                foregroundColor: context.colors.onPrimary,
               ),
               child: Text(dialogContext.tr('logout'), style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
             ),

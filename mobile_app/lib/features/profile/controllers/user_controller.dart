@@ -13,6 +13,8 @@ class UserProfile {
     required this.phone,
   });
 
+  bool get isProfileComplete => name.trim().isNotEmpty && email.trim().isNotEmpty && phone.trim().isNotEmpty;
+
   String get initials {
     if (name.trim().isEmpty) return 'U';
     final parts = name.trim().split(' ');

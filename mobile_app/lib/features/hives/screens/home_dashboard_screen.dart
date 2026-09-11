@@ -240,17 +240,17 @@ class HomeDashboardScreen extends StatelessWidget {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.play_arrow_rounded, size: 22, color: Colors.white),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 22, color: context.colors.onPrimary),
                   label: Text(
                     context.tr('start_harvest'),
                     style: GoogleFonts.manrope(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: context.colors.onPrimary,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primary,
+                    backgroundColor: context.colors.primary,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
@@ -376,7 +376,7 @@ class HomeDashboardScreen extends StatelessWidget {
                     value: 0.71,
                     minHeight: 6,
                     backgroundColor: context.borderColor,
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppConstants.primary),
+                    valueColor: const AlwaysStoppedAnimation<Color>(context.colors.primary),
                   ),
                 ),
                 const SizedBox(height: AppConstants.space12),

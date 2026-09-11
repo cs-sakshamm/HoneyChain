@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../profile/controllers/user_controller.dart';
 import '../models/hive_model.dart';
 
 /// Extremely Focused Operational Screen for Harvester Operator
@@ -31,6 +33,13 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
   }
 
   void _beginHarvest() {
+    final userCtrl = context.read<UserController>();
+    if (!userCtrl.user.isProfileComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please complete your profile before starting a harvest.')),
+      );
+      return;
+    }
     setState(() {
       _isHarvestActive = true;
     });
@@ -89,8 +98,8 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: context.colors.primary,
+                foregroundColor: context.colors.onPrimary,
               ),
               child: Text('Confirm & Save', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
             ),
@@ -173,7 +182,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
           child: ElevatedButton(
             onPressed: _beginHarvest,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primary,
+              backgroundColor: context.colors.primary,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
@@ -184,7 +193,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
               style: GoogleFonts.manrope(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: context.colors.onPrimary,
               ),
             ),
           ),
@@ -330,7 +339,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                 child: ElevatedButton(
                   onPressed: _showFinishConfirmation,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primary,
+                    backgroundColor: context.colors.primary,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
@@ -341,7 +350,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                     style: GoogleFonts.manrope(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: context.colors.onPrimary,
                     ),
                   ),
                 ),

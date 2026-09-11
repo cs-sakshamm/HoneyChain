@@ -143,7 +143,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primary,
+                    backgroundColor: context.colors.primary,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
@@ -153,14 +153,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onPrimary),
                         )
                       : Text(
                           'Save Changes',
                           style: GoogleFonts.manrope(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            color: context.colors.onPrimary,
                           ),
                         ),
                 ),

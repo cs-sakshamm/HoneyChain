@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
 
 enum FeedbackBannerType {
   error,
@@ -30,24 +31,21 @@ class FeedbackBanner extends StatelessWidget {
 
     switch (type) {
       case FeedbackBannerType.error:
-        bg = AppConstants.errorBackground;
-        border = const Color(0xFF374151); // Gray-700
-        iconColor = AppConstants.error;
+        iconColor = context.errorColor;
         icon = Icons.error_outline_rounded;
         break;
       case FeedbackBannerType.info:
-        bg = AppConstants.primarySoft;
-        border = const Color(0xFFD1D5DB); // Gray-300
-        iconColor = AppConstants.primaryDark;
+        iconColor = context.textPrimaryColor;
         icon = Icons.info_outline_rounded;
         break;
       case FeedbackBannerType.success:
-        bg = AppConstants.successBackground;
-        border = const Color(0xFFD1D5DB); // Gray-300
-        iconColor = AppConstants.success;
+        iconColor = context.successColor;
         icon = Icons.check_circle_outline_rounded;
         break;
     }
+
+    bg = iconColor.withValues(alpha: 0.1);
+    border = iconColor.withValues(alpha: 0.3);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppConstants.space16),

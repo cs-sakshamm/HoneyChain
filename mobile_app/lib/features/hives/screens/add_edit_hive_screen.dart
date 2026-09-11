@@ -180,7 +180,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppConstants.primaryDark,
+                  primary: context.textPrimaryColor,
                 ),
           ),
           child: child!,
@@ -560,7 +560,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                       ),
                       Switch(
                         value: _feedingRequired,
-                        activeTrackColor: AppConstants.primaryDark,
+                        activeTrackColor: context.textPrimaryColor,
                         onChanged: (val) => setState(() => _feedingRequired = val),
                       ),
                     ],
@@ -617,7 +617,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       padding: const EdgeInsets.only(bottom: AppConstants.space8),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppConstants.primaryDark),
+          Icon(icon, size: 18, color: context.textPrimaryColor),
           const SizedBox(width: 8),
           Text(
             title,

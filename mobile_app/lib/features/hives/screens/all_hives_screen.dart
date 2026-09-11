@@ -24,25 +24,35 @@ class AllHivesScreen extends StatelessWidget {
       appBar: GlobalAppBar(
         extraActions: [
           Padding(
-            padding: const EdgeInsets.only(right: AppConstants.space8),
-            child: TextButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AddEditHiveScreen(),
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Consumer<UserController>(
+              builder: (context, userCtrl, _) {
+                return TextButton.icon(
+                  onPressed: () {
+                    if (!userCtrl.user.isProfileComplete) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Please complete your profile (name, email, phone) before adding hives.')),
+                      );
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddEditHiveScreen(),
+                      ),
+                    );
+                  },
+                  icon: Icon(Icons.add_rounded, size: 18, color: context.textPrimaryColor),
+                  label: Text(
+                    context.tr('add_hive'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimaryColor,
+                    ),
                   ),
                 );
               },
-              icon: Icon(Icons.add_rounded, size: 18, color: context.primaryDarkColor),
-              label: Text(
-                context.tr('add_hive'),
-                style: GoogleFonts.manrope(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: context.primaryDarkColor,
-                ),
-              ),
             ),
           ),
         ],
@@ -179,7 +189,7 @@ class AllHivesScreen extends StatelessWidget {
                 value: 0.71,
                 minHeight: 5,
                 backgroundColor: context.borderColor,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppConstants.primary),
+                valueColor: const AlwaysStoppedAnimation<Color>(context.colors.primary),
               ),
             ),
           ],
@@ -220,8 +230,8 @@ class AllHivesScreen extends StatelessWidget {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primary,
-              foregroundColor: Colors.white,
+              backgroundColor: context.colors.primary,
+              foregroundColor: context.colors.onPrimary,
             ),
             child: Text(
               context.tr('add_first_hive'),

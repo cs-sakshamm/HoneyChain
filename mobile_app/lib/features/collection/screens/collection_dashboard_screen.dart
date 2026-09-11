@@ -7,10 +7,11 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
+import 'harvester_detail_screen.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/localization/localization_service.dart';
-
+import '../../profile/controllers/user_controller.dart';
 class CollectionDashboardScreen extends StatelessWidget {
   const CollectionDashboardScreen({super.key});
 
@@ -96,6 +97,12 @@ class CollectionDashboardScreen extends StatelessWidget {
 
   Widget _buildRequestCard(BuildContext context, WorkflowRequest req) {
     return AppCard(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => HarvesterDetailScreen(request: req)),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -190,6 +197,11 @@ class CollectionDashboardScreen extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
+                    final userCtrl = context.read<UserController>();
+                    if (!userCtrl.user.isProfileComplete) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please complete your profile first.')));
+                      return;
+                    }
                     context.read<WorkflowController>().denyRequest(req.id);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(context.tr('request_denied') == 'request_denied' ? 'Request denied' : context.tr('request_denied'))),
@@ -213,14 +225,19 @@ class CollectionDashboardScreen extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
+                    final userCtrl = context.read<UserController>();
+                    if (!userCtrl.user.isProfileComplete) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please complete your profile first.')));
+                      return;
+                    }
                     context.read<WorkflowController>().acceptRequest(req.id);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(context.tr('request_accepted') == 'request_accepted' ? 'Request accepted' : context.tr('request_accepted'))),
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: context.colors.primary,
+                    foregroundColor: context.colors.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     elevation: 0,
                     shape: RoundedRectangleBorder(

@@ -86,7 +86,7 @@ class AppTextField extends StatelessWidget {
             helperText: helperText,
             helperStyle: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
             errorText: errorText,
-            errorStyle: GoogleFonts.inter(fontSize: 12, color: AppConstants.error),
+            errorStyle: GoogleFonts.inter(fontSize: 12, color: context.errorColor),
             fillColor: context.surfaceColor,
             filled: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -96,15 +96,15 @@ class AppTextField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              borderSide: const BorderSide(color: AppConstants.primary, width: 1.5),
+              borderSide: BorderSide(color: context.colors.primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              borderSide: const BorderSide(color: AppConstants.error, width: 1.0),
+              borderSide: BorderSide(color: context.errorColor, width: 1.0),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              borderSide: const BorderSide(color: AppConstants.error, width: 1.5),
+              borderSide: BorderSide(color: context.errorColor, width: 1.5),
             ),
             prefixIcon: prefixIcon != null
                 ? Padding(

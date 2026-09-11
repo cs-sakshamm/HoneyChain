@@ -34,11 +34,19 @@ class AppCard extends StatelessWidget {
 
     if (onTap != null) {
       return Material(
-        color: Colors.transparent,
+        color: backgroundColor ?? context.surfaceColor,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+        shape: RoundedRectangleBorder(
+          side: border?.top ?? BorderSide(color: context.borderColor, width: 1.0),
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-          child: cardContent,
+          child: Padding(
+            padding: padding ?? const EdgeInsets.all(AppConstants.space16),
+            child: child,
+          ),
         ),
       );
     }

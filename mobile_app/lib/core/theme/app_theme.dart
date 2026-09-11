@@ -141,14 +141,14 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme {
-    const darkBackground = Color(0xFF000000); // Pure Black
-    const darkSurface = Color(0xFF111111); // Very Dark Grey
-    const darkTextPrimary = Color(0xFFFFFFFF); // Pure White
+    const darkBackground = Color(0xFF09090B); // Zinc-950
+    const darkSurface = Color(0xFF18181B); // Zinc-900 (Cards/Panels)
+    const darkTextPrimary = Color(0xFFFAFAFA); // Zinc-50
     const darkTextSecondary = Color(0xFFA1A1AA); // Zinc-400
     const darkTextMuted = Color(0xFF71717A); // Zinc-500
     const darkBorder = Color(0xFF27272A); // Zinc-800
-    const darkPrimaryContainer = Color(0xFF18181B); // Zinc-900
-    const darkOnPrimaryContainer = Color(0xFFFFFFFF); // White
+    const darkPrimaryContainer = Color(0xFF27272A); // Zinc-800
+    const darkOnPrimaryContainer = Color(0xFFFAFAFA); // Zinc-50
 
     final baseTextTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme);
 
@@ -159,10 +159,10 @@ class AppTheme {
       colorScheme: const ColorScheme.dark(
         surface: darkSurface,
         onSurface: darkTextPrimary,
-        primary: AppConstants.primary,
-        onPrimary: Colors.white,
+        primary: AppConstants.honeyAccent,
+        onPrimary: darkBackground,
         secondary: darkTextSecondary,
-        onSecondary: Colors.black,
+        onSecondary: darkTextPrimary,
         onSurfaceVariant: darkTextMuted,
         error: AppConstants.error,
         outline: darkBorder,
@@ -229,7 +229,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: darkSurface,
+        fillColor: darkBackground,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         hintStyle: const TextStyle(
           color: darkTextMuted,
@@ -246,15 +246,15 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-          borderSide: const BorderSide(color: AppConstants.primary, width: 1.5),
+          borderSide: const BorderSide(color: AppConstants.honeyAccent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-          borderSide: const BorderSide(color: darkTextPrimary, width: 1.0),
+          borderSide: const BorderSide(color: AppConstants.error, width: 1.0),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-          borderSide: const BorderSide(color: darkTextPrimary, width: 1.5),
+          borderSide: const BorderSide(color: AppConstants.error, width: 1.5),
         ),
       ),
       cardTheme: CardThemeData(
@@ -295,5 +295,12 @@ extension ThemeContextX on BuildContext {
   Color get borderColor => Theme.of(this).colorScheme.outline;
   Color get primarySoftColor => Theme.of(this).colorScheme.primaryContainer;
   Color get primaryDarkColor => Theme.of(this).colorScheme.onPrimaryContainer;
+  Color get honeyAccent => AppConstants.honeyAccent;
+  Color get errorColor => AppConstants.error;
+  Color get successColor => AppConstants.success;
+  Color get warningColor => AppConstants.warning;
+  Color get successBgColor => AppConstants.successBackground;
+  Color get errorBgColor => AppConstants.errorBackground;
+  Color get warningBgColor => AppConstants.warningBackground;
 }
 

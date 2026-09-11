@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
 import '../models/workflow_request.dart';
 
 /// Consistent status badge/chip used across all role dashboards
@@ -17,7 +18,7 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (Color bg, Color fg) = _statusColors(status);
+    final (Color bg, Color fg) = _statusColors(context, status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -36,27 +37,24 @@ class StatusBadge extends StatelessWidget {
     );
   }
 
-  static (Color, Color) _statusColors(RequestStatus status) {
+  static (Color, Color) _statusColors(BuildContext context, RequestStatus status) {
     switch (status) {
       case RequestStatus.pending:
-        return (const Color(0xFFF3F4F6), const Color(0xFF4B5563)); // Gray 100 / Gray 600
+      case RequestStatus.awaitingTest:
+        return (context.warningBgColor, context.warningColor);
       case RequestStatus.accepted:
       case RequestStatus.processing:
-        return (const Color(0xFFE5E7EB), const Color(0xFF374151)); // Gray 200 / Gray 700
+      case RequestStatus.testing:
+        return (context.primarySoftColor, context.textPrimaryColor);
       case RequestStatus.denied:
       case RequestStatus.labRejected:
-        return (const Color(0xFF111827), const Color(0xFFF9FAFB)); // Gray 900 / Gray 50
-      case RequestStatus.awaitingTest:
-      case RequestStatus.testing:
-        return (const Color(0xFFE5E7EB), const Color(0xFF111827)); // Gray 200 / Gray 900
+        return (context.errorBgColor, context.errorColor);
       case RequestStatus.labApproved:
       case RequestStatus.readyForPackaging:
-        return (const Color(0xFF000000), const Color(0xFFFFFFFF)); // Black / White
       case RequestStatus.packagingApproved:
-        return (const Color(0xFF000000), const Color(0xFFFFFFFF)); // Black / White
       case RequestStatus.qrGenerated:
       case RequestStatus.completed:
-        return (const Color(0xFF000000), const Color(0xFFFFFFFF)); // Black / White
+        return (context.successBgColor, context.successColor);
     }
   }
 }

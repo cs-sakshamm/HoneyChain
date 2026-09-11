@@ -111,13 +111,13 @@ class Hive {
   Color get statusColor {
     switch (overallHealth.trim().toLowerCase()) {
       case 'healthy':
-        return const Color(0xFF000000); // Black
+        return AppConstants.success;
       case 'needs attention':
-        return const Color(0xFF4B5563); // Gray 600
+        return AppConstants.warning;
       case 'critical':
-        return const Color(0xFF111827); // Gray 900
+        return AppConstants.error;
       default:
-        return const Color(0xFF9CA3AF); // Gray 400
+        return AppConstants.textMuted;
     }
   }
 

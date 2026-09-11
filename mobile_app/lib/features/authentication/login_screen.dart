@@ -193,8 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
     AuthController controller,
     BoxConstraints constraints,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final leftBg = isDark ? const Color(0xFF000000) : AppConstants.primarySoft.withValues(alpha: 0.35);
+    final leftBg = context.textPrimaryColor.withValues(alpha: 0.02);
 
     return Row(
       children: [
@@ -253,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: Border.all(color: context.borderColor),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                                  color: context.textPrimaryColor.withValues(alpha: 0.05),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -331,7 +330,7 @@ class _LoginScreenState extends State<LoginScreen> {
             color: context.primarySoftColor,
             borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
           ),
-          child: Icon(icon, size: 20, color: context.primaryDarkColor),
+          child: Icon(icon, size: 20, color: context.honeyAccent),
         ),
         const SizedBox(width: AppConstants.space16),
         Expanded(
@@ -562,7 +561,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: context.primaryDarkColor,
+                  color: context.honeyAccent,
                 ),
               ),
             ),
@@ -679,7 +678,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: GoogleFonts.manrope(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: context.primaryDarkColor,
+                    color: context.honeyAccent,
                   ),
                 ),
               ),
@@ -798,7 +797,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: GoogleFonts.manrope(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: context.primaryDarkColor,
+                  color: context.honeyAccent,
                 ),
               ),
             ),
@@ -869,7 +868,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: context.primaryDarkColor,
+                  color: context.honeyAccent,
                 ),
               ),
             ),
@@ -889,7 +888,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: context.primaryDarkColor,
+                    color: context.honeyAccent,
                   ),
                 ),
               ),
@@ -958,7 +957,7 @@ class _LoginScreenState extends State<LoginScreen> {
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: context.primaryDarkColor,
+                color: context.honeyAccent,
               ),
             ),
           ),
@@ -1019,8 +1018,8 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: context.colors.primary,
+                foregroundColor: context.colors.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                 ),
@@ -1083,7 +1082,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: AppConstants.space24),
                     child: Row(
                       children: [
-                        Icon(Icons.language_rounded, size: 20, color: context.primaryDarkColor),
+                        Icon(Icons.language_rounded, size: 20, color: context.honeyAccent),
                         const SizedBox(width: 8),
                         Text(
                           'Select language',
@@ -1142,7 +1141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: GoogleFonts.manrope(
                               fontSize: 14,
                               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? context.primaryDarkColor : context.textPrimaryColor,
+                              color: isSelected ? context.honeyAccent : context.textPrimaryColor,
                             ),
                           ),
                           subtitle: Text(
@@ -1154,7 +1153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           trailing: isSelected
-                              ? Icon(Icons.check_rounded, color: context.primaryDarkColor, size: 20)
+                              ? Icon(Icons.check_rounded, color: context.honeyAccent, size: 20)
                               : null,
                           onTap: () {
                             langController.setLanguage(lang.code);
