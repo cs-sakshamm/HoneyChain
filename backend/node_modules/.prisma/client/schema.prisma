@@ -1,0 +1,122 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  firebaseId String?  @unique
+  name      String
+  email     String   @unique
+  role      String   
+  createdAt DateTime @default(now())
+
+  harvests            Harvest[]
+  processingRecords   ProcessingRecord[]
+  labReports          LabReport[]
+  packagingRecords    PackagingRecord[]
+  provenanceEvents    ProvenanceEvent[]
+}
+
+model Harvest {
+  id             String   @id @default(uuid())
+  harvesterId    String
+  hiveId         String
+  quantity       Float
+  unit           String   @default("kg")
+  location       String?
+  status         String   @default("HARVESTED")
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  harvester      User     @relation(fields: [harvesterId], references: [id])
+  batches        Batch[]
+}
+
+model Batch {
+  id             String   @id @unique 
+  harvestId      String
+  status         String   @default("HARVESTED")
+  createdAt      DateTime @default(now())
+
+  harvest        Harvest  @relation(fields: [harvestId], references: [id])
+  
+  chainRequests     ChainRequest[]
+  processingRecords ProcessingRecord[]
+  labReports        LabReport[]
+  packagingRecords  PackagingRecord[]
+  provenanceEvents  ProvenanceEvent[]
+}
+
+model ChainRequest {
+  id             String   @id @default(uuid())
+  batchId        String
+  processorId    String?
+  status         String   @default("REQUESTED") 
+  createdAt      DateTime @default(now())
+
+  batch          Batch    @relation(fields: [batchId], references: [id])
+}
+
+model ProcessingRecord {
+  id             String   @id @default(uuid())
+  batchId        String
+  processorId    String
+  quantityReceived Float
+  quantityAfter  Float
+  method         String
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  batch          Batch    @relation(fields: [batchId], references: [id])
+  processor      User     @relation(fields: [processorId], references: [id])
+}
+
+model LabReport {
+  id             String   @id @default(uuid())
+  batchId        String
+  labId          String
+  testResults    String
+  qualityScore   Float?
+  status         String   @default("SUBMITTED") 
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  batch          Batch    @relation(fields: [batchId], references: [id])
+  lab            User     @relation(fields: [labId], references: [id])
+}
+
+model PackagingRecord {
+  id             String   @id @default(uuid())
+  batchId        String
+  packagerId     String
+  finalQuantity  Float
+  numberOfPackages Int
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  batch          Batch    @relation(fields: [batchId], references: [id])
+  packager       User     @relation(fields: [packagerId], references: [id])
+}
+
+model ProvenanceEvent {
+  id                 String   @id @default(uuid())
+  batchId            String
+  eventType          String   
+  actorId            String
+  dataHash           String
+  previousEventHash  String?
+  txHash             String?  
+  blockNumber        Int?
+  network            String?
+  contractAddress    String?
+  status             String   @default("PENDING") 
+  timestamp          DateTime @default(now())
+
+  batch              Batch    @relation(fields: [batchId], references: [id])
+  actor              User     @relation(fields: [actorId], references: [id])
+}
