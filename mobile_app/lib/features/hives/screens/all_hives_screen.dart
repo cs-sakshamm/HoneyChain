@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
+import '../../profile/controllers/user_controller.dart';
 import 'add_edit_hive_screen.dart';
 import 'hive_details_screen.dart';
 
@@ -155,7 +156,7 @@ class AllHivesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '$cropType · 12 acres',
+              '$cropType Â· 12 acres',
               style: GoogleFonts.inter(
                 fontSize: 13,
                 color: context.textSecondaryColor,
@@ -189,7 +190,7 @@ class AllHivesScreen extends StatelessWidget {
                 value: 0.71,
                 minHeight: 5,
                 backgroundColor: context.borderColor,
-                valueColor: const AlwaysStoppedAnimation<Color>(context.colors.primary),
+                valueColor: AlwaysStoppedAnimation<Color>(context.colors.primary),
               ),
             ),
           ],
@@ -243,3 +244,4 @@ class AllHivesScreen extends StatelessWidget {
     );
   }
 }
+

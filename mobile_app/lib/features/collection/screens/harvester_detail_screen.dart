@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -36,7 +36,7 @@ class HarvesterDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
-      appBar: const GlobalAppBar(title: 'Harvester Details'),
+      appBar: const GlobalAppBar(titleText: 'Harvester Details'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConstants.space20),
         child: Column(
@@ -91,7 +91,7 @@ class HarvesterDetailScreen extends StatelessWidget {
                             Icon(Icons.verified_rounded, size: 14, color: context.successColor),
                             const SizedBox(width: 4),
                             Text(
-                              'Verified • Profile Complete',
+                              'Verified â€¢ Profile Complete',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -303,3 +303,4 @@ class HarvesterDetailScreen extends StatelessWidget {
     );
   }
 }
+

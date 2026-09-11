@@ -59,18 +59,18 @@ class WorkflowRequest {
   factory WorkflowRequest.fromJson(Map<String, dynamic> json) {
     // Map backend response Batch to WorkflowRequest for UI compatibility
     return WorkflowRequest(
-      id: json['harvest']?.['id'] ?? 'N/A',
+      id: (json['harvest'] ?? {})['id'] ?? 'N/A',
       batchId: json['id'] ?? 'UNKNOWN',
-      harvesterName: json['harvest']?.['harvesterId'] ?? 'Unknown',
+      harvesterName: (json['harvest'] ?? {})['harvesterId'] ?? 'Unknown',
       collectionType: 'Standard Collection',
-      location: json['harvest']?.['location'] ?? 'Unknown',
-      description: 'Harvest from Hive ${json['harvest']?.['hiveId']}',
-      estimatedQuantityKg: (json['harvest']?.['quantity'] ?? 0).toDouble(),
-      notes: json['harvest']?.['notes'] ?? '',
+      location: (json['harvest'] ?? {})['location'] ?? 'Unknown',
+      description: 'Harvest from Hive ${(json['harvest'] ?? {})['hiveId']}',
+      estimatedQuantityKg: ((json['harvest'] ?? {})['quantity'] ?? 0).toDouble(),
+      notes: (json['harvest'] ?? {})['notes'] ?? '',
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
       status: _parseStatus(json['status']),
-      txHash: json['provenanceEvents']?.length > 0 ? json['provenanceEvents'].last['txHash'] : null,
-      dataHash: json['provenanceEvents']?.length > 0 ? json['provenanceEvents'].last['dataHash'] : null,
+      txHash: json['provenanceEvents'] != null && json['provenanceEvents'].length > 0 ? json['provenanceEvents'].last['txHash'] : null,
+      dataHash: json['provenanceEvents'] != null && json['provenanceEvents'].length > 0 ? json['provenanceEvents'].last['dataHash'] : null,
     );
   }
 }
@@ -107,3 +107,4 @@ extension RequestStatusLabel on RequestStatus {
     }
   }
 }
+

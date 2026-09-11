@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
@@ -126,7 +126,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                             color: AppConstants.primarySoft,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.add_shopping_cart_rounded, color: context.textPrimaryColor),
+                          child: Icon(Icons.add_shopping_cart_rounded, color: context.textPrimaryColor),
                         ),
                         const SizedBox(width: AppConstants.space16),
                         Expanded(
@@ -407,3 +407,4 @@ class _CreateRequestFormState extends State<_CreateRequestForm> {
     );
   }
 }
+

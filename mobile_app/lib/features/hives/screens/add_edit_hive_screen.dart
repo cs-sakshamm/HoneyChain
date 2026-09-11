@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/theme/app_theme.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import '../../../core/widgets/global_app_bar.dart';
@@ -761,3 +762,4 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     );
   }
 }
+

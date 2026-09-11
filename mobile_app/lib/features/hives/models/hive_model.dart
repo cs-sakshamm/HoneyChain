@@ -1,3 +1,4 @@
+﻿import '../../../core/constants/app_constants.dart';
 import 'package:flutter/material.dart';
 
 /// Hive Data Model for HoneyChain
@@ -245,3 +246,4 @@ class Hive {
     );
   }
 }
+

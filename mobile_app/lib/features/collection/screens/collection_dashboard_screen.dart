@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -152,7 +152,7 @@ class CollectionDashboardScreen extends StatelessWidget {
               const SizedBox(width: AppConstants.space4),
               Expanded(
                 child: Text(
-                  DateFormat('MMM d, yyyy • h:mm a').format(req.createdAt),
+                  DateFormat('MMM d, yyyy â€¢ h:mm a').format(req.createdAt),
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     color: context.textSecondaryColor,
@@ -202,7 +202,7 @@ class CollectionDashboardScreen extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please complete your profile first.')));
                       return;
                     }
-                    context.read<WorkflowController>().denyRequest(req.id);
+                    context.read<WorkflowController>().denyRequest(req.id, "Denied by Processor");
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(context.tr('request_denied') == 'request_denied' ? 'Request denied' : context.tr('request_denied'))),
                     );
@@ -257,3 +257,4 @@ class CollectionDashboardScreen extends StatelessWidget {
     );
   }
 }
+

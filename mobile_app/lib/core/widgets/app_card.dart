@@ -35,7 +35,6 @@ class AppCard extends StatelessWidget {
     if (onTap != null) {
       return Material(
         color: backgroundColor ?? context.surfaceColor,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
         shape: RoundedRectangleBorder(
           side: border?.top ?? BorderSide(color: context.borderColor, width: 1.0),
           borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),

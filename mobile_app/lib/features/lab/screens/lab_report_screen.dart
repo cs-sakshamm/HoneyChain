@@ -43,14 +43,14 @@ class _LabReportScreenState extends State<LabReportScreen> {
     final purity = double.tryParse(_purityController.text) ?? 0.0;
     final score = double.tryParse(_qualityScoreController.text) ?? 0.0;
 
+    final results = "Moisture: $moisture%, Purity: $purity%, Contaminants: ${_contaminantsController.text}";
     context.read<WorkflowController>().submitLabReport(
-          requestId: widget.request.id,
-          moistureContent: moisture,
-          purityGrade: purity,
-          contaminantsFound: _contaminantsController.text,
-          qualityScore: score,
-          labNotes: _notesController.text,
-        );
+      widget.request.batchId,
+      'Lab Technician',
+      results,
+      score,
+      _notesController.text,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

@@ -134,5 +134,19 @@ class WorkflowController extends ChangeNotifier {
   void denyRequest(String id, String reason) {}
   void updateStatus(String id, RequestStatus newStatus) {}
   void markLabRejected(String id, String reason) {}
-  void generateQR(String id) {}
+    // Restore aliases for UI compatibility
+  List<WorkflowRequest> get pendingCollectionRequests => _requests.where((r) => r.status == RequestStatus.pending).toList();
+  List<WorkflowRequest> get collectionHistory => _requests.where((r) => r.status != RequestStatus.pending && r.status != RequestStatus.accepted).toList();
+  List<WorkflowRequest> get labPendingRequests => _requests.where((r) => r.status == RequestStatus.awaitingTest).toList();
+  List<WorkflowRequest> get labHistory => _requests.where((r) => r.status == RequestStatus.labApproved || r.status == RequestStatus.labRejected).toList();
+  List<WorkflowRequest> get packagingPendingRequests => _requests.where((r) => r.status == RequestStatus.readyForPackaging).toList();
+  List<WorkflowRequest> get packagingHistory => _requests.where((r) => r.status == RequestStatus.packagingApproved || r.status == RequestStatus.qrGenerated || r.status == RequestStatus.completed).toList();
+
+  void generateQr(String id) {
+    updateStatus(id, RequestStatus.qrGenerated);
+  }
+  void allowPackaging(String id) {
+    updateStatus(id, RequestStatus.packagingApproved);
+  }
 }
+
