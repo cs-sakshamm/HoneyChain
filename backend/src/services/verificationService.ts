@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import { blockchainService } from './blockchainService';
 import { otpService } from './otpService';
+import { aadhaarKycService } from './kyc';
 
 const prisma = new PrismaClient();
 
@@ -66,68 +67,53 @@ export class VerificationService {
   }
 
   /**
-   * 1a. Send Aadhaar OTP for Step 1
+   * 1a. Send Aadhaar OTP via Configured KYC Provider (Signzy / HyperVerge / DigiO / Sandbox)
    */
   async sendAadhaarOtp(harvesterId: string, aadhaarNumberRaw: string) {
     if (!harvesterId || harvesterId.trim().length === 0) {
       throw new Error('harvesterId is required');
     }
     const cleanAadhaar = (aadhaarNumberRaw || '').replace(/\s+/g, '').trim();
-    if (!cleanAadhaar || cleanAadhaar.length !== 12 || !/^\d{12}$/.test(cleanAadhaar)) {
-      throw new Error('Please enter a valid 12-digit Aadhaar number.');
-    }
 
-    // Use Aadhaar virtual phone (+91 + 12 digits) for OTP service
-    const aadhaarPhone = `+91${cleanAadhaar}`;
-    const otpResult = await otpService.sendOtp(aadhaarPhone);
-    if (!otpResult.success) {
-      return otpResult;
-    }
+    const result = await aadhaarKycService.initiateOtp({
+      harvesterId,
+      aadhaarNumber: cleanAadhaar
+    });
 
-    return {
-      success: true,
-      message: 'OTP sent to your Aadhaar-linked mobile number.',
-      cooldownSeconds: otpResult.cooldownSeconds,
-      expiresInSeconds: otpResult.expiresInSeconds,
-      devOtp: otpResult.devOtp
-    };
+    return result;
   }
 
   /**
-   * 1b. Verify Aadhaar OTP for Step 1
+   * 1b. Verify Aadhaar OTP via Configured KYC Provider
    */
-  async verifyAadhaarOtp(harvesterId: string, aadhaarNumberRaw: string, otp: string) {
+  async verifyAadhaarOtp(harvesterId: string, aadhaarNumberRaw: string, otp: string, transactionId?: string) {
     if (!harvesterId || harvesterId.trim().length === 0) {
       throw new Error('harvesterId is required');
     }
     const cleanAadhaar = (aadhaarNumberRaw || '').replace(/\s+/g, '').trim();
-    if (!cleanAadhaar || cleanAadhaar.length !== 12 || !/^\d{12}$/.test(cleanAadhaar)) {
-      throw new Error('Please enter a valid 12-digit Aadhaar number.');
-    }
     const cleanOtp = (otp || '').trim();
-    if (!cleanOtp || cleanOtp.length !== 6 || !/^\d{6}$/.test(cleanOtp)) {
-      throw new Error('Please enter a valid 6-digit numeric OTP.');
-    }
 
-    const aadhaarPhone = `+91${cleanAadhaar}`;
-    const otpResult = await otpService.verifyOtp(aadhaarPhone, cleanOtp);
-    if (!otpResult.success) {
-      throw new Error(otpResult.message);
-    }
+    // Call KYC provider for authoritative OTP validation
+    const kycResult = await aadhaarKycService.verifyOtp({
+      harvesterId,
+      aadhaarNumber: cleanAadhaar,
+      transactionId,
+      otp: cleanOtp
+    });
 
-    // Mask Aadhaar: AADHAAR-***XXXX
-    const last4 = cleanAadhaar.slice(-4);
-    const maskedRef = `AADHAAR-***${last4}`;
-    const docHash = crypto.createHash('sha256').update(cleanAadhaar).digest('hex');
+    if (!kycResult.verified) {
+      throw new Error(kycResult.message || 'Aadhaar verification failed with KYC provider.');
+    }
 
     const existing = await this.getOrCreateVerification(harvesterId);
 
+    // Authoritative persistence: Update verification record only upon provider confirmation
     const updated = await prisma.harvesterVerification.update({
       where: { id: existing.id },
       data: {
         governmentIdType: 'AADHAAR',
-        governmentIdReference: maskedRef,
-        governmentIdDocHash: docHash,
+        governmentIdReference: kycResult.maskedAadhaar,
+        governmentIdDocHash: kycResult.docHash,
         governmentIdVerified: 'Verified',
         governmentIdSubmittedAt: new Date(),
         verificationStatus: existing.verificationStatus === 'Not Started' ? 'In Progress' : existing.verificationStatus

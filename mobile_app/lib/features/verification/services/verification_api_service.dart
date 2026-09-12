@@ -86,6 +86,7 @@ class VerificationApiService {
     required String harvesterId,
     required String aadhaarNumber,
     required String otp,
+    String? transactionId,
   }) async {
     final cleanId = harvesterId.trim();
     final cleanAadhaar = aadhaarNumber.replaceAll(' ', '').trim();
@@ -94,6 +95,7 @@ class VerificationApiService {
       'harvesterId': cleanId,
       'aadhaarNumber': cleanAadhaar,
       'otp': otp.trim(),
+      if (transactionId != null && transactionId.isNotEmpty) 'transactionId': transactionId,
     });
 
     final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));

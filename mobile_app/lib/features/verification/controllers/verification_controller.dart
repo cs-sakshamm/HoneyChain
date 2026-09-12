@@ -17,6 +17,7 @@ class VerificationController extends ChangeNotifier {
   int _aadhaarCooldown = 0;
   Timer? _aadhaarCooldownTimer;
   String _pendingAadhaarNumber = '';
+  String? _aadhaarTransactionId;
   String? _devAadhaarOtp;
 
   // Mobile OTP State
@@ -45,6 +46,7 @@ class VerificationController extends ChangeNotifier {
   int get aadhaarCooldown => _aadhaarCooldown;
   bool get canResendAadhaarOtp => _aadhaarCooldown == 0;
   String get pendingAadhaarNumber => _pendingAadhaarNumber;
+  String? get aadhaarTransactionId => _aadhaarTransactionId;
   String? get devAadhaarOtp => _devAadhaarOtp;
 
   // Mobile OTP Getters
@@ -62,6 +64,7 @@ class VerificationController extends ChangeNotifier {
   void resetAadhaarState() {
     _aadhaarOtpSent = false;
     _pendingAadhaarNumber = '';
+    _aadhaarTransactionId = null;
     _devAadhaarOtp = null;
     _aadhaarCooldown = 0;
     _aadhaarCooldownTimer?.cancel();
@@ -99,6 +102,7 @@ class VerificationController extends ChangeNotifier {
       );
       if (res['success'] == true) {
         _pendingAadhaarNumber = cleanAadhaar;
+        _aadhaarTransactionId = res['transactionId'];
         _aadhaarOtpSent = true;
         _aadhaarCooldown = res['cooldownSeconds'] ?? 60;
         _devAadhaarOtp = res['devOtp'];
@@ -145,10 +149,12 @@ class VerificationController extends ChangeNotifier {
       _verification = await _apiService.verifyAadhaarOtp(
         harvesterId: _verification.harvesterId,
         aadhaarNumber: _pendingAadhaarNumber,
+        transactionId: _aadhaarTransactionId,
         otp: otp,
       );
       _successMessage = 'Aadhaar Verified ✓';
       _aadhaarOtpSent = false;
+      _aadhaarTransactionId = null;
       _devAadhaarOtp = null;
       return true;
     } catch (e) {

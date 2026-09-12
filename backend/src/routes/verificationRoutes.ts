@@ -62,12 +62,12 @@ router.post('/harvester/aadhaar/send-otp', async (req: Request, res: Response) =
  */
 router.post('/harvester/aadhaar/verify-otp', async (req: Request, res: Response) => {
   try {
-    const { harvesterId, aadhaarNumber, otp } = req.body;
-    if (!harvesterId || !aadhaarNumber || !otp) {
-      return res.status(400).json({ success: false, error: 'harvesterId, aadhaarNumber, and otp are required' });
+    const { harvesterId, aadhaarNumber, otp, transactionId } = req.body;
+    if (!harvesterId || (!aadhaarNumber && !transactionId) || !otp) {
+      return res.status(400).json({ success: false, error: 'harvesterId, otp, and aadhaarNumber (or transactionId) are required' });
     }
 
-    const verification = await verificationService.verifyAadhaarOtp(harvesterId, aadhaarNumber, otp);
+    const verification = await verificationService.verifyAadhaarOtp(harvesterId, aadhaarNumber, otp, transactionId);
     res.json({ success: true, message: 'Aadhaar Verified ✓', verification });
   } catch (error: any) {
     res.status(400).json({ success: false, error: error?.message || String(error) });
