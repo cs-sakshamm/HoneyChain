@@ -125,18 +125,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
             child: Center(
               heightFactor: 1.0,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(32),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 280),
-                    height: 56,
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    constraints: const BoxConstraints(maxWidth: 290),
+                    height: 58,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xFF1E1E1E).withValues(alpha: 0.85)
-                          : context.surfaceColor.withValues(alpha: 0.88),
-                      borderRadius: BorderRadius.circular(30),
+                          ? const Color(0xFF18181B).withValues(alpha: 0.90)
+                          : context.surfaceColor.withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(32),
                       border: Border.all(
                         color: isDark
                             ? Colors.white.withValues(alpha: 0.12)
@@ -145,9 +145,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
+                          color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
@@ -214,14 +214,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
               _showNav();
             });
           },
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(26),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: pillBg,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(26),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
