@@ -26,6 +26,8 @@ class UserProfile {
   final String? bsid;
   final String? bspPass;
 
+  final String? authProvider; // 'google', 'password', etc.
+
   // Authoritative status from backend if available
   final bool? isBackendComplete;
 
@@ -43,6 +45,7 @@ class UserProfile {
     this.beekeeperId,
     this.bsid,
     this.bspPass,
+    this.authProvider,
     this.isBackendComplete,
   });
 
@@ -124,6 +127,7 @@ class UserController extends ChangeNotifier {
   static const String _beekeeperIdKey = 'user_profile_beekeeper_id';
   static const String _bsidKey = 'user_profile_bsid';
   static const String _bspKey = 'user_profile_bsp_pass';
+  static const String _authProviderKey = 'user_profile_auth_provider';
 
   final http.Client _client;
   final String _baseUrl;
@@ -161,6 +165,11 @@ class UserController extends ChangeNotifier {
         'Accept': 'application/json',
       };
 
+  /// Reload user profile from local cache & backend
+  Future<void> reloadProfile() async {
+    await _loadProfile();
+  }
+
   Future<void> _loadProfile([String? roleOverride]) async {
     // 1. First load from local SharedPreferences
     final prefs = await SharedPreferences.getInstance();
@@ -175,6 +184,7 @@ class UserController extends ChangeNotifier {
     final lic = prefs.getString(_licKey);
     final desig = prefs.getString(_desigKey);
     final beekeeperId = prefs.getString(_beekeeperIdKey);
+    final authProvider = prefs.getString(_authProviderKey);
 
     _user = UserProfile(
       id: id,
@@ -190,6 +200,7 @@ class UserController extends ChangeNotifier {
       beekeeperId: beekeeperId,
       bsid: prefs.getString(_bsidKey),
       bspPass: prefs.getString(_bspKey),
+      authProvider: authProvider,
     );
     notifyListeners();
 
@@ -210,6 +221,7 @@ class UserController extends ChangeNotifier {
     String? beekeeperId,
     String? bsid,
     String? bspPass,
+    String? authProvider,
   }) async {
     _user = UserProfile(
       id: id,
@@ -221,6 +233,7 @@ class UserController extends ChangeNotifier {
       beekeeperId: beekeeperId,
       bsid: bsid,
       bspPass: bspPass,
+      authProvider: authProvider ?? _user.authProvider,
     );
     notifyListeners();
 
@@ -234,6 +247,7 @@ class UserController extends ChangeNotifier {
     if (beekeeperId != null) await prefs.setString(_beekeeperIdKey, beekeeperId);
     if (bsid != null) await prefs.setString(_bsidKey, bsid);
     if (bspPass != null) await prefs.setString(_bspKey, bspPass);
+    if (authProvider != null) await prefs.setString(_authProviderKey, authProvider);
 
     await fetchProfile(userId: id);
   }
@@ -256,6 +270,7 @@ class UserController extends ChangeNotifier {
       beekeeperId: _user.beekeeperId,
       bsid: _user.bsid,
       bspPass: _user.bspPass,
+      authProvider: _user.authProvider,
     );
     notifyListeners();
     await fetchProfile(userId: _user.id, role: newRole);

@@ -289,20 +289,48 @@ class AuthController extends ChangeNotifier {
         _status = AuthStateStatus.authenticated;
         if (_currentUser != null) {
           final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_profile_auth_provider', 'google');
           if (_currentUser!.uid.isNotEmpty) {
             await prefs.setString('user_profile_id', _currentUser!.uid);
           }
-          if (_currentUser!.displayName != null) {
+          if (_currentUser!.displayName != null && _currentUser!.displayName!.isNotEmpty) {
             await prefs.setString('user_profile_name', _currentUser!.displayName!);
           }
-          if (_currentUser!.email != null) {
+          if (_currentUser!.email != null && _currentUser!.email!.isNotEmpty) {
             await prefs.setString('user_profile_email', _currentUser!.email!);
           }
-          if (_currentUser!.photoURL != null) {
+          if (_currentUser!.photoURL != null && _currentUser!.photoURL!.isNotEmpty) {
             await prefs.setString('user_profile_photo_url', _currentUser!.photoURL!);
           }
-          if (_currentUser!.phoneNumber != null) {
+          if (_currentUser!.phoneNumber != null && _currentUser!.phoneNumber!.isNotEmpty) {
             await prefs.setString('user_profile_phone', _currentUser!.phoneNumber!);
+          }
+
+          // Sync Google Account details to backend PostgreSQL
+          try {
+            final syncUrl = Uri.parse('$_baseUrl/api/auth/google');
+            final response = await _client.post(
+              syncUrl,
+              headers: _headers,
+              body: jsonEncode({
+                'name': _currentUser!.displayName,
+                'email': _currentUser!.email,
+                'phone': _currentUser!.phoneNumber,
+              }),
+            ).timeout(const Duration(seconds: 4));
+
+            if (response.statusCode == 200) {
+              final data = jsonDecode(response.body);
+              if (data['user'] != null) {
+                final u = data['user'];
+                if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
+                if (u['beekeeperId'] != null) await prefs.setString('user_profile_beekeeper_id', u['beekeeperId']);
+                if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
+                if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
+              }
+            }
+          } catch (e) {
+            debugPrint('[AuthController] Google backend sync warning: $e');
           }
         }
       }

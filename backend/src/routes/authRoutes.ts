@@ -144,6 +144,68 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/auth/google
+ * Authenticate or register a Google user in PostgreSQL and return their profile
+ */
+router.post('/google', async (req: Request, res: Response) => {
+  try {
+    const { name, email, phone } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required for Google authentication.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    let user = await prisma.user.findFirst({
+      where: { email: cleanEmail }
+    });
+
+    if (!user) {
+      const beekeeperId = await generateUniqueBeekeeperId();
+      user = await prisma.user.create({
+        data: {
+          name: (name || 'Google User').trim(),
+          email: cleanEmail,
+          phone: phone ? phone.trim() : null,
+          role: 'HARVESTER',
+          beekeeperId,
+        }
+      });
+    } else {
+      if (name && (!user.name || user.name.toLowerCase() === 'google user' || user.name.toLowerCase() === 'unknown')) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { name: name.trim() }
+        });
+      }
+      if (!user.beekeeperId) {
+        const beekeeperId = await generateUniqueBeekeeperId();
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { beekeeperId }
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Google authentication successful.',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        role: user.role,
+        beekeeperId: user.beekeeperId,
+        bsid: user.bsid,
+        bspPass: user.bspPass
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
 import { isUserProfileComplete, normalizeUserRole } from '../services/profileService';
 
 /**

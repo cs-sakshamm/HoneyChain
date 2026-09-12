@@ -7,6 +7,7 @@ import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../authentication/auth_controller.dart';
+import '../../authentication/widgets/google_logo_icon.dart';
 import '../../verification/controllers/verification_controller.dart';
 import '../../verification/screens/harvester_verification_screen.dart';
 import '../../verification/screens/verification_certificate_screen.dart';
@@ -128,6 +129,34 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
 
+                    // Google Account Connected Badge if authenticated with Google
+                    if (user.authProvider == 'google' || context.watch<AuthController>().currentUser != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: context.surfaceColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const GoogleLogoIcon(size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Google Connected Account',
+                              style: GoogleFonts.manrope(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
                     // Profile Completion Status Badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -167,11 +196,21 @@ class ProfileScreen extends StatelessWidget {
                     // Account info rows
                     _infoRow(context, Icons.alternate_email_rounded, user.email.isEmpty ? 'No email' : user.email),
                     const SizedBox(height: 10),
-                    _infoRow(context, Icons.call_rounded, user.phone.isEmpty ? 'No phone' : user.phone),
+                    _infoRow(
+                      context,
+                      Icons.call_rounded,
+                      user.phone.isEmpty
+                          ? (user.authProvider == 'google' ? 'Google Account (No phone linked)' : 'No phone')
+                          : user.phone,
+                    ),
 
                     if (user.beekeeperId != null && user.beekeeperId!.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       _infoRow(context, Icons.badge_outlined, 'Beekeeper ID: ${user.beekeeperId!}'),
+                    ],
+                    if (user.id != null && user.id!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.fingerprint_rounded, 'User ID: ${user.id!}'),
                     ],
                     if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
                       const SizedBox(height: 10),

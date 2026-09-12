@@ -12,6 +12,7 @@ import 'features/collection/collection_navigation_screen.dart';
 import 'features/lab/lab_navigation_screen.dart';
 import 'features/navigation/main_navigation_screen.dart';
 import 'features/packaging/packaging_navigation_screen.dart';
+import 'features/profile/controllers/user_controller.dart';
 
 /// Root HoneyChain Mobile Application
 class HoneyChainApp extends StatelessWidget {
@@ -34,12 +35,20 @@ class HoneyChainApp extends StatelessWidget {
 }
 
 /// Reactive router checking returning user authentication status
-class AuthRouter extends StatelessWidget {
+class AuthRouter extends StatefulWidget {
   const AuthRouter({super.key});
+
+  @override
+  State<AuthRouter> createState() => _AuthRouterState();
+}
+
+class _AuthRouterState extends State<AuthRouter> {
+  String? _lastLoadedUserId;
 
   @override
   Widget build(BuildContext context) {
     final authController = context.watch<AuthController>();
+    final userController = context.watch<UserController>();
     context.watch<LanguageController>();
 
     if (authController.selectedRole == null) {
@@ -48,6 +57,15 @@ class AuthRouter extends StatelessWidget {
 
     if (!authController.isAuthenticated) {
       return const LoginScreen();
+    }
+
+    // Automatically synchronize user profile on login
+    final currentUid = authController.currentUser?.uid ?? 'authenticated';
+    if (_lastLoadedUserId != currentUid) {
+      _lastLoadedUserId = currentUid;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        userController.reloadProfile();
+      });
     }
 
     switch (authController.selectedRole) {
