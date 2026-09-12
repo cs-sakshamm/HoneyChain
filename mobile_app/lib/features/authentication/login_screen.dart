@@ -23,16 +23,16 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _registerFormKey = GlobalKey<FormState>();
 
   final _loginEmailController = TextEditingController();
   final _loginPasswordController = TextEditingController();
 
-  final _regBusinessNameController = TextEditingController();
+  final _regNameController = TextEditingController();
   final _regEmailController = TextEditingController();
   final _regPasswordController = TextEditingController();
+  final _regConfirmPasswordController = TextEditingController();
 
-  final _phoneInputController = TextEditingController();
-  final _otpCodeController = TextEditingController();
   final _resetIdentifierController = TextEditingController();
   final _languageSearchController = TextEditingController();
 
@@ -41,16 +41,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _emailErrorText;
   String? _passwordErrorText;
+  String? _regNameErrorText;
+  String? _regEmailErrorText;
+  String? _regPasswordErrorText;
+  String? _regConfirmPasswordErrorText;
 
   @override
   void dispose() {
     _loginEmailController.dispose();
     _loginPasswordController.dispose();
-    _regBusinessNameController.dispose();
+    _regNameController.dispose();
     _regEmailController.dispose();
     _regPasswordController.dispose();
-    _phoneInputController.dispose();
-    _otpCodeController.dispose();
+    _regConfirmPasswordController.dispose();
     _resetIdentifierController.dispose();
     _languageSearchController.dispose();
     _emailFocusNode.dispose();
@@ -84,7 +87,59 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (!hasError) {
-      controller.loginWithEmailOrPhone(email, password);
+      controller.loginWithEmail(email, password);
+    }
+  }
+
+  void _handleRegister(AuthController controller) {
+    setState(() {
+      _regNameErrorText = null;
+      _regEmailErrorText = null;
+      _regPasswordErrorText = null;
+      _regConfirmPasswordErrorText = null;
+    });
+
+    final name = _regNameController.text.trim();
+    final email = _regEmailController.text.trim();
+    final password = _regPasswordController.text;
+    final confirmPassword = _regConfirmPasswordController.text;
+
+    bool hasError = false;
+
+    if (name.isEmpty) {
+      setState(() {
+        _regNameErrorText = 'Please enter your full name.';
+      });
+      hasError = true;
+    }
+
+    if (email.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() {
+        _regEmailErrorText = 'Please enter a valid email address.';
+      });
+      hasError = true;
+    }
+
+    if (password.length < 6) {
+      setState(() {
+        _regPasswordErrorText = 'Password must be at least 6 characters.';
+      });
+      hasError = true;
+    }
+
+    if (password != confirmPassword) {
+      setState(() {
+        _regConfirmPasswordErrorText = 'Passwords do not match.';
+      });
+      hasError = true;
+    }
+
+    if (!hasError) {
+      controller.registerAccount(
+        name: name,
+        email: email,
+        password: password,
+      );
     }
   }
 
@@ -421,7 +476,6 @@ class _LoginScreenState extends State<LoginScreen> {
         switch (controller.mode) {
           AuthMode.login => _buildLoginForm(context, controller),
           AuthMode.register => _buildRegisterForm(context, controller),
-          AuthMode.phoneOtp => _buildPhoneOtpForm(context, controller),
           AuthMode.forgotPassword => _buildForgotPasswordForm(context, controller),
         },
 
@@ -576,88 +630,7 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: () => _handleLogin(controller),
           ),
 
-          const SizedBox(height: AppConstants.space24),
-
-          // Clean OR Divider
-          Row(
-            children: [
-              Expanded(child: Divider(color: context.borderColor)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
-                child: Text(
-                  AppConstants.orDividerText,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: context.textMutedColor,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              Expanded(child: Divider(color: context.borderColor)),
-            ],
-          ),
-
-          const SizedBox(height: AppConstants.space24),
-
-          // Secondary Social Options
-          OutlinedButton(
-            onPressed: isLoading ? null : () => controller.signInWithGoogle(),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, AppConstants.buttonHeight),
-              side: BorderSide(color: context.borderColor),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              ),
-              backgroundColor: context.surfaceColor,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const GoogleLogoIcon(size: 18),
-                const SizedBox(width: AppConstants.space12),
-                Text(
-                  AppConstants.continueWithGoogleText,
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: context.textPrimaryColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppConstants.space12),
-
-          OutlinedButton(
-            onPressed: isLoading ? null : () => _showPhoneInputDialog(context, controller),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, AppConstants.buttonHeight),
-              side: BorderSide(color: context.borderColor),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              ),
-              backgroundColor: context.surfaceColor,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.phone_iphone_rounded, size: 18, color: context.textPrimaryColor),
-                const SizedBox(width: AppConstants.space12),
-                Text(
-                  AppConstants.continueWithPhoneText,
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: context.textPrimaryColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppConstants.space28),
+          const SizedBox(height: AppConstants.space20),
 
           // Registration Prompt Footer
           Wrap(
@@ -684,222 +657,310 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
           ),
+
+          const SizedBox(height: AppConstants.space24),
+
+          // Clean OR Divider
+          Row(
+            children: [
+              Expanded(child: Divider(color: context.borderColor)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
+                child: Text(
+                  AppConstants.orDividerText,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: context.textMutedColor,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: context.borderColor)),
+            ],
+          ),
+
+          const SizedBox(height: AppConstants.space16),
+
+          // Recommendation text above Google button
+          Center(
+            child: Text(
+              AppConstants.googleRecommendationText,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: context.textSecondaryColor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: AppConstants.space8),
+
+          // Secondary Google Option
+          OutlinedButton(
+            onPressed: isLoading ? null : () => controller.signInWithGoogle(),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, AppConstants.buttonHeight),
+              side: BorderSide(color: context.borderColor),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              ),
+              backgroundColor: context.surfaceColor,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const GoogleLogoIcon(size: 18),
+                const SizedBox(width: AppConstants.space12),
+                Text(
+                  AppConstants.continueWithGoogleText,
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Business Registration View
+  // 2. Account Registration View
   // ---------------------------------------------------------------------------
   Widget _buildRegisterForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Create account',
-          style: GoogleFonts.manrope(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: context.textPrimaryColor,
-            letterSpacing: -0.5,
+    return Form(
+      key: _registerFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Create account',
+            style: GoogleFonts.manrope(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: context.textPrimaryColor,
+              letterSpacing: -0.5,
+            ),
           ),
-        ),
-        const SizedBox(height: AppConstants.space6),
-        Text(
-          'Start managing your supply chain with HoneyChain.',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: context.textSecondaryColor,
-          ),
-        ),
-
-        const SizedBox(height: AppConstants.space24),
-
-        AppTextField(
-          controller: _regBusinessNameController,
-          labelText: 'Business Name',
-          hintText: 'Enter your business or farm name',
-          prefixIcon: Icon(
-            Icons.domain_rounded,
-            size: 18,
-            color: context.textSecondaryColor,
-          ),
-        ),
-        const SizedBox(height: AppConstants.space16),
-
-        AppTextField(
-          controller: _regEmailController,
-          labelText: AppConstants.emailLabel,
-          hintText: AppConstants.emailHint,
-          keyboardType: TextInputType.emailAddress,
-          prefixIcon: Icon(
-            Icons.mail_outline_rounded,
-            size: 18,
-            color: context.textSecondaryColor,
-          ),
-        ),
-        const SizedBox(height: AppConstants.space16),
-
-        AppTextField(
-          controller: _regPasswordController,
-          labelText: AppConstants.passwordLabel,
-          hintText: AppConstants.passwordHint,
-          obscureText: !controller.isPasswordVisible,
-          prefixIcon: Icon(
-            Icons.lock_outline_rounded,
-            size: 18,
-            color: context.textSecondaryColor,
-          ),
-          suffixIcon: IconButton(
-            icon: Icon(
-              controller.isPasswordVisible
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              size: 20,
+          const SizedBox(height: AppConstants.space6),
+          Text(
+            'Start managing your supply chain with HoneyChain.',
+            style: GoogleFonts.inter(
+              fontSize: 14,
               color: context.textSecondaryColor,
             ),
-            onPressed: () => controller.togglePasswordVisibility(),
           ),
-        ),
 
-        const SizedBox(height: AppConstants.space24),
+          const SizedBox(height: AppConstants.space24),
 
-        AppButton(
-          text: 'Create account',
-          isLoading: isLoading,
-          onPressed: () => controller.registerBusinessAccount(
-            businessName: _regBusinessNameController.text,
-            emailOrPhone: _regEmailController.text,
-            password: _regPasswordController.text,
+          // Full Name
+          AppTextField(
+            controller: _regNameController,
+            labelText: 'Full Name',
+            hintText: 'Enter your full name or business name',
+            textInputAction: TextInputAction.next,
+            errorText: _regNameErrorText,
+            prefixIcon: Icon(
+              Icons.person_outline_rounded,
+              size: 18,
+              color: context.textSecondaryColor,
+            ),
+            onChanged: (_) {
+              if (_regNameErrorText != null) {
+                setState(() => _regNameErrorText = null);
+              }
+            },
           ),
-        ),
+          const SizedBox(height: AppConstants.space16),
 
-        const SizedBox(height: AppConstants.space24),
+          // Email
+          AppTextField(
+            controller: _regEmailController,
+            labelText: AppConstants.emailLabel,
+            hintText: AppConstants.emailHint,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            errorText: _regEmailErrorText,
+            prefixIcon: Icon(
+              Icons.mail_outline_rounded,
+              size: 18,
+              color: context.textSecondaryColor,
+            ),
+            onChanged: (_) {
+              if (_regEmailErrorText != null) {
+                setState(() => _regEmailErrorText = null);
+              }
+            },
+          ),
+          const SizedBox(height: AppConstants.space16),
 
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              'Already have an account? ',
-              style: GoogleFonts.inter(
-                fontSize: 14,
+          // Password
+          AppTextField(
+            controller: _regPasswordController,
+            labelText: AppConstants.passwordLabel,
+            hintText: AppConstants.passwordHint,
+            obscureText: !controller.isPasswordVisible,
+            textInputAction: TextInputAction.next,
+            errorText: _regPasswordErrorText,
+            prefixIcon: Icon(
+              Icons.lock_outline_rounded,
+              size: 18,
+              color: context.textSecondaryColor,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                controller.isPasswordVisible
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                size: 20,
                 color: context.textSecondaryColor,
               ),
+              onPressed: () => controller.togglePasswordVisibility(),
             ),
-            GestureDetector(
-              onTap: () => controller.switchMode(AuthMode.login),
-              child: Text(
-                'Sign in',
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: context.honeyAccent,
-                ),
-              ),
+            onChanged: (_) {
+              if (_regPasswordErrorText != null) {
+                setState(() => _regPasswordErrorText = null);
+              }
+            },
+          ),
+          const SizedBox(height: AppConstants.space16),
+
+          // Confirm Password
+          AppTextField(
+            controller: _regConfirmPasswordController,
+            labelText: 'Confirm Password',
+            hintText: 'Re-enter your password',
+            obscureText: !controller.isPasswordVisible,
+            textInputAction: TextInputAction.done,
+            errorText: _regConfirmPasswordErrorText,
+            onFieldSubmitted: (_) => _handleRegister(controller),
+            prefixIcon: Icon(
+              Icons.lock_outline_rounded,
+              size: 18,
+              color: context.textSecondaryColor,
             ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 3. Phone Verification View (OTP)
-  // ---------------------------------------------------------------------------
-  Widget _buildPhoneOtpForm(BuildContext context, AuthController controller) {
-    final isLoading = controller.status == AuthStateStatus.authenticating;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Phone Verification',
-          style: GoogleFonts.manrope(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: context.textPrimaryColor,
-            letterSpacing: -0.5,
+            onChanged: (_) {
+              if (_regConfirmPasswordErrorText != null) {
+                setState(() => _regConfirmPasswordErrorText = null);
+              }
+            },
           ),
-        ),
-        const SizedBox(height: AppConstants.space6),
-        Text(
-          'Enter the code sent to ${controller.phoneNumberForOtp}',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: context.textSecondaryColor,
+
+          const SizedBox(height: AppConstants.space24),
+
+          // Create Account Button
+          AppButton(
+            text: 'Create account',
+            isLoading: isLoading,
+            onPressed: () => _handleRegister(controller),
           ),
-        ),
 
-        const SizedBox(height: AppConstants.space24),
+          const SizedBox(height: AppConstants.space20),
 
-        AppTextField(
-          controller: _otpCodeController,
-          labelText: 'Verification code',
-          hintText: 'Enter 6-digit code',
-          keyboardType: TextInputType.number,
-          prefixIcon: Icon(
-            Icons.pin_rounded,
-            size: 18,
-            color: context.textSecondaryColor,
-          ),
-        ),
-
-        const SizedBox(height: AppConstants.space24),
-
-        AppButton(
-          text: 'Verify & Sign in',
-          isLoading: isLoading,
-          onPressed: () => controller.verifyPhoneOtp(_otpCodeController.text),
-        ),
-
-        const SizedBox(height: AppConstants.space16),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            GestureDetector(
-              onTap: () => controller.switchMode(AuthMode.login),
-              child: Text(
-                'Back to sign in',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: context.honeyAccent,
-                ),
-              ),
-            ),
-            if (controller.otpCountdown > 0)
+          // Already have account Link
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
               Text(
-                'Resend in ${controller.otpCountdown}s',
+                'Already have an account? ',
                 style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: context.textMutedColor,
+                  fontSize: 14,
+                  color: context.textSecondaryColor,
                 ),
-              )
-            else
+              ),
               GestureDetector(
-                onTap: () => controller.startPhoneAuth(controller.phoneNumberForOtp),
+                onTap: () => controller.switchMode(AuthMode.login),
                 child: Text(
-                  'Resend code',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                  'Sign in',
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: context.honeyAccent,
                   ),
                 ),
               ),
-          ],
-        ),
-      ],
+            ],
+          ),
+
+          const SizedBox(height: AppConstants.space24),
+
+          // Clean OR Divider
+          Row(
+            children: [
+              Expanded(child: Divider(color: context.borderColor)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
+                child: Text(
+                  AppConstants.orDividerText,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: context.textMutedColor,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: context.borderColor)),
+            ],
+          ),
+
+          const SizedBox(height: AppConstants.space16),
+
+          // Recommendation text above Google button
+          Center(
+            child: Text(
+              AppConstants.googleRecommendationText,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: context.textSecondaryColor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: AppConstants.space8),
+
+          // Secondary Google Option
+          OutlinedButton(
+            onPressed: isLoading ? null : () => controller.signInWithGoogle(),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, AppConstants.buttonHeight),
+              side: BorderSide(color: context.borderColor),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              ),
+              backgroundColor: context.surfaceColor,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const GoogleLogoIcon(size: 18),
+                const SizedBox(width: AppConstants.space12),
+                Text(
+                  AppConstants.continueWithGoogleText,
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // 4. Forgot Password View
+  // 3. Forgot Password View
   // ---------------------------------------------------------------------------
   Widget _buildForgotPasswordForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
@@ -963,77 +1024,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Phone Input Modal Dialog
-  // ---------------------------------------------------------------------------
-  void _showPhoneInputDialog(BuildContext context, AuthController controller) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: context.surfaceColor,
-          title: Text(
-            'Continue with phone',
-            style: GoogleFonts.manrope(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: context.textPrimaryColor,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Enter your phone number to receive a verification code.',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: context.textSecondaryColor,
-                ),
-              ),
-              const SizedBox(height: AppConstants.space16),
-              AppTextField(
-                controller: _phoneInputController,
-                labelText: 'Phone number',
-                hintText: '+1 234 567 8900',
-                keyboardType: TextInputType.phone,
-                prefixIcon: Icon(
-                  Icons.phone_rounded,
-                  size: 18,
-                  color: context.textSecondaryColor,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.inter(color: context.textSecondaryColor),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.colors.primary,
-                foregroundColor: context.colors.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                ),
-              ),
-              onPressed: () {
-                final phone = _phoneInputController.text;
-                Navigator.pop(dialogContext);
-                controller.startPhoneAuth(phone);
-              },
-              child: const Text('Send code'),
-            ),
-          ],
-        );
-      },
     );
   }
 

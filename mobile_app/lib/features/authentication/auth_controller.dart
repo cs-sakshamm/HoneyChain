@@ -13,7 +13,6 @@ enum AuthStateStatus {
   idle,
   authenticating,
   authenticated,
-  otpSent,
   passwordResetSent,
   error,
 }
@@ -21,7 +20,6 @@ enum AuthStateStatus {
 enum AuthMode {
   login,
   register,
-  phoneOtp,
   forgotPassword,
 }
 
@@ -52,9 +50,6 @@ class AuthController extends ChangeNotifier {
 
   // Form & Security State
   bool _isPasswordVisible = false;
-  String _phoneNumberForOtp = '';
-  int _otpCountdown = 0;
-  Timer? _otpTimer;
 
   AuthController({AuthService? authService, http.Client? client, String? baseUrl})
       : _authService = authService ?? AuthService(),
@@ -85,11 +80,6 @@ class AuthController extends ChangeNotifier {
         'Accept': 'application/json',
       };
 
-  @override
-  void dispose() {
-    _otpTimer?.cancel();
-    super.dispose();
-  }
 
   // Getters
   AuthStateStatus get status => _status;
@@ -100,8 +90,6 @@ class AuthController extends ChangeNotifier {
   bool get isAuthenticated =>
       _currentUser != null || (_isDemoMode && _status == AuthStateStatus.authenticated);
   bool get isPasswordVisible => _isPasswordVisible;
-  String get phoneNumberForOtp => _phoneNumberForOtp;
-  int get otpCountdown => _otpCountdown;
   UserRole? get selectedRole => _selectedRole;
 
   void setRole(UserRole role) {
@@ -134,14 +122,14 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Single Sign In Handler with validation against PostgreSQL backend API
-  Future<void> loginWithEmailOrPhone(String emailOrPhone, String password) async {
-    final identifier = emailOrPhone.trim();
+  /// Email Sign In Handler with validation against PostgreSQL backend API
+  Future<void> loginWithEmail(String email, String password) async {
+    final identifier = email.trim();
     final pass = password.trim();
 
     if (identifier.isEmpty || pass.isEmpty) {
       _status = AuthStateStatus.error;
-      _errorMessage = 'Please provide both your business email/phone and password.';
+      _errorMessage = 'Please provide both your email address and password.';
       notifyListeners();
       return;
     }
@@ -196,15 +184,23 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Register Business Account against PostgreSQL backend API
-  Future<void> registerBusinessAccount({
-    required String businessName,
-    required String emailOrPhone,
+  /// Backward-compatible alias for loginWithEmail
+  Future<void> loginWithEmailOrPhone(String emailOrPhone, String password) =>
+      loginWithEmail(emailOrPhone, password);
+
+  /// Register User Account against PostgreSQL backend API
+  Future<void> registerAccount({
+    required String name,
+    required String email,
     required String password,
   }) async {
-    if (businessName.trim().isEmpty || emailOrPhone.trim().isEmpty || password.trim().isEmpty) {
+    final cleanName = name.trim();
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPassword = password.trim();
+
+    if (cleanName.isEmpty || cleanEmail.isEmpty || cleanPassword.isEmpty) {
       _status = AuthStateStatus.error;
-      _errorMessage = 'All business registration fields are required.';
+      _errorMessage = 'All registration fields are required.';
       notifyListeners();
       return;
     }
@@ -215,16 +211,14 @@ class AuthController extends ChangeNotifier {
 
     try {
       final url = Uri.parse('$_baseUrl/api/auth/register');
-      final isEmail = emailOrPhone.contains('@');
       final response = await _client
           .post(
             url,
             headers: _headers,
             body: jsonEncode({
-              'name': businessName.trim(),
-              'email': isEmail ? emailOrPhone.trim() : null,
-              'phone': !isEmail ? emailOrPhone.trim() : null,
-              'password': password.trim(),
+              'name': cleanName,
+              'email': cleanEmail,
+              'password': cleanPassword,
               'role': 'HARVESTER',
             }),
           )
@@ -262,6 +256,18 @@ class AuthController extends ChangeNotifier {
     _errorMessage = 'Unable to connect to server. Please try again.';
     notifyListeners();
   }
+
+  /// Backward-compatible alias for registerAccount
+  Future<void> registerBusinessAccount({
+    required String businessName,
+    required String emailOrPhone,
+    required String password,
+  }) =>
+      registerAccount(
+        name: businessName,
+        email: emailOrPhone,
+        password: password,
+      );
 
   /// Google Sign-In
   Future<void> signInWithGoogle() async {
@@ -324,72 +330,12 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Initiate Phone Verification (OTP)
-  Future<void> startPhoneAuth(String phoneNumber) async {
-    final phone = phoneNumber.trim();
-    if (phone.isEmpty || phone.length < 7) {
-      _status = AuthStateStatus.error;
-      _errorMessage = 'Please enter a valid business phone number.';
-      notifyListeners();
-      return;
-    }
-
-    _phoneNumberForOtp = phone;
-    _status = AuthStateStatus.authenticating;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final url = Uri.parse('$_baseUrl/api/verification/harvester/mobile/send-otp');
-      await _client
-          .post(url, headers: _headers, body: jsonEncode({'mobile': phone}))
-          .timeout(const Duration(seconds: 4));
-    } catch (_) {}
-
-    _status = AuthStateStatus.otpSent;
-    _mode = AuthMode.phoneOtp;
-    _startOtpTimer();
-    notifyListeners();
-  }
-
-  void _startOtpTimer() {
-    _otpTimer?.cancel();
-    _otpCountdown = 30;
-    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_otpCountdown > 0) {
-        _otpCountdown--;
-        notifyListeners();
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  /// Verify OTP Code
-  Future<void> verifyPhoneOtp(String otpCode) async {
-    final code = otpCode.trim();
-    if (code.length < 6) {
-      _status = AuthStateStatus.error;
-      _errorMessage = 'Please enter the 6-digit verification code.';
-      notifyListeners();
-      return;
-    }
-
-    _status = AuthStateStatus.authenticating;
-    _errorMessage = null;
-    notifyListeners();
-
-    _isDemoMode = true;
-    _status = AuthStateStatus.authenticated;
-    notifyListeners();
-  }
-
-  /// Send Password Reset Email/SMS
-  Future<void> sendPasswordReset(String identifier) async {
-    final target = identifier.trim();
+  /// Send Password Reset Email
+  Future<void> sendPasswordReset(String email) async {
+    final target = email.trim();
     if (target.isEmpty) {
       _status = AuthStateStatus.error;
-      _errorMessage = 'Please enter your registered email or phone.';
+      _errorMessage = 'Please enter your registered email address.';
       notifyListeners();
       return;
     }
