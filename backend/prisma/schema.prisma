@@ -17,6 +17,10 @@ model User {
   role         String   @default("HARVESTER")
   bsid         String?  @unique
   bspPass      String?
+  organizationName String?
+  facilityLocation String?
+  licenseNumber    String?
+  designation      String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

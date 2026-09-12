@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_theme.dart';
+import '../utils/profile_guard.dart';
 import 'app_logo.dart';
 import 'pill_back_button.dart';
 import '../../features/hives/screens/add_edit_hive_screen.dart';
@@ -123,6 +124,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
                       tooltip: 'Create / Add',
                       onTap: onAddTap ??
                           () {
+                            if (!ProfileGuard.checkOrPrompt(context)) return;
                             Navigator.push(
                               context,
                               MaterialPageRoute(

@@ -38,6 +38,7 @@ const crypto = __importStar(require("crypto"));
 const blockchainService_1 = require("../services/blockchainService");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
+const profileService_1 = require("../services/profileService");
 // Helper to generate unique Request ID
 function generateRequestId(stagePrefix) {
     const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -45,19 +46,11 @@ function generateRequestId(stagePrefix) {
 }
 // Role normalization helper
 function normalizeRole(role) {
-    if (!role)
-        return 'HARVESTER';
-    const r = role.toUpperCase().trim();
-    if (r === 'COLLECTION' || r === 'PROCESSOR' || r === 'COLLECTION_PROCESSING' || r === 'COLLECTOR_PROCESSOR') {
-        return 'COLLECTOR_PROCESSOR';
-    }
-    if (r === 'LAB' || r === 'LAB_TESTING')
-        return 'LAB';
-    if (r === 'PACKAGING' || r === 'PACKAGER')
-        return 'PACKAGING';
-    if (r === 'ADMIN')
-        return 'ADMIN';
-    return 'HARVESTER';
+    return (0, profileService_1.normalizeUserRole)(role);
+}
+// Check if user profile has required fields
+function isProfileComplete(user) {
+    return (0, profileService_1.isUserProfileComplete)(user);
 }
 // Ensure actor user exists in DB
 function ensureUser(userIdOrName_1) {
@@ -141,6 +134,13 @@ router.post('/requests', (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
         const senderIdentifier = fromUserId || harvesterId || batch.harvest.harvesterId;
         const sender = yield ensureUser(senderIdentifier, fromRole);
+        if (!isProfileComplete(sender)) {
+            return res.status(403).json({
+                success: false,
+                code: 'PROFILE_INCOMPLETE',
+                error: 'Please complete your profile and required verification details before continuing with this request.'
+            });
+        }
         const receiver = toUserId ? yield ensureUser(toUserId, toRole) : null;
         const prefix = toRole.includes('COLLECT') ? 'COL' : toRole.includes('LAB') ? 'LAB' : 'PKG';
         const requestId = generateRequestId(prefix);
@@ -350,6 +350,13 @@ router.patch('/requests/:id/accept', (req, res) => __awaiter(void 0, void 0, voi
             });
         }
         const actor = yield ensureUser(actorId || 'Role Officer', normalizedActorRole);
+        if (!isProfileComplete(actor)) {
+            return res.status(403).json({
+                success: false,
+                code: 'PROFILE_INCOMPLETE',
+                error: 'Please complete your profile and required verification details before continuing with this request.'
+            });
+        }
         let nextBatchStatus = 'ACCEPTED';
         let provEventType = 'REQUEST_ACCEPTED';
         if (request.requestType === 'HARVEST_TO_COLLECTION') {
@@ -432,6 +439,13 @@ router.patch('/requests/:id/reject', (req, res) => __awaiter(void 0, void 0, voi
         }
         const normalizedActorRole = normalizeRole(actorRole || request.toRole);
         const actor = yield ensureUser(actorId || 'Role Officer', normalizedActorRole);
+        if (!isProfileComplete(actor)) {
+            return res.status(403).json({
+                success: false,
+                code: 'PROFILE_INCOMPLETE',
+                error: 'Please complete your profile and required verification details before continuing with this request.'
+            });
+        }
         let nextBatchStatus = 'REJECTED';
         let provEventType = 'REQUEST_REJECTED';
         if (request.requestType === 'HARVEST_TO_COLLECTION') {
@@ -524,6 +538,13 @@ router.post('/requests/:id/send-next', (req, res) => __awaiter(void 0, void 0, v
                 });
             }
             const processor = yield ensureUser(actorId || 'Processor', 'COLLECTOR_PROCESSOR');
+            if (!isProfileComplete(processor)) {
+                return res.status(403).json({
+                    success: false,
+                    code: 'PROFILE_INCOMPLETE',
+                    error: 'Please complete your profile and required verification details before continuing with this request.'
+                });
+            }
             const nextRequestId = generateRequestId('LAB');
             const qtyIn = quantityReceived !== undefined ? Number(quantityReceived) : (currentRequest.quantity || 0);
             const qtyOut = quantityAfter !== undefined ? Number(quantityAfter) : qtyIn;
@@ -620,6 +641,13 @@ router.post('/requests/:id/send-next', (req, res) => __awaiter(void 0, void 0, v
                 });
             }
             const labOfficer = yield ensureUser(actorId || 'Lab Officer', 'LAB');
+            if (!isProfileComplete(labOfficer)) {
+                return res.status(403).json({
+                    success: false,
+                    code: 'PROFILE_INCOMPLETE',
+                    error: 'Please complete your profile and required verification details before continuing with this request.'
+                });
+            }
             const nextRequestId = generateRequestId('PKG');
             const result = yield prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
                 // 1. Complete Current Lab Request
@@ -722,6 +750,13 @@ router.post('/lab-reports', (req, res) => __awaiter(void 0, void 0, void 0, func
             });
         }
         const labUser = yield ensureUser(labId || 'Lab Officer', 'LAB');
+        if (!isProfileComplete(labUser)) {
+            return res.status(403).json({
+                success: false,
+                code: 'PROFILE_INCOMPLETE',
+                error: 'Please complete your profile and required verification details before continuing with this request.'
+            });
+        }
         const score = Number(qualityScore) || 0;
         const moisture = Number(moistureContent) || 0;
         // Strict validation: honey quality standards
@@ -840,6 +875,13 @@ router.post('/packaging', (req, res) => __awaiter(void 0, void 0, void 0, functi
                 }
             });
         const packagerUser = yield ensureUser(packagerId || 'Packager', 'PACKAGING');
+        if (!isProfileComplete(packagerUser)) {
+            return res.status(403).json({
+                success: false,
+                code: 'PROFILE_INCOMPLETE',
+                error: 'Please complete your profile and required verification details before continuing with this request.'
+            });
+        }
         const finalQty = finalQuantity !== undefined ? Number(finalQuantity) : ((request === null || request === void 0 ? void 0 : request.quantity) || 25.0);
         const numPkgs = numberOfPackages !== undefined ? Number(numberOfPackages) : 50;
         // Real verifiable QR link for provenance scanning

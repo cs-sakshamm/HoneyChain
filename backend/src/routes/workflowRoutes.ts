@@ -6,6 +6,8 @@ import { blockchainService } from '../services/blockchainService';
 const router = Router();
 const prisma = new PrismaClient();
 
+import { isUserProfileComplete, normalizeUserRole, PROFILE_INCOMPLETE_RESPONSE } from '../services/profileService';
+
 // Helper to generate unique Request ID
 function generateRequestId(stagePrefix: string): string {
   const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -14,15 +16,12 @@ function generateRequestId(stagePrefix: string): string {
 
 // Role normalization helper
 function normalizeRole(role?: string): string {
-  if (!role) return 'HARVESTER';
-  const r = role.toUpperCase().trim();
-  if (r === 'COLLECTION' || r === 'PROCESSOR' || r === 'COLLECTION_PROCESSING' || r === 'COLLECTOR_PROCESSOR') {
-    return 'COLLECTOR_PROCESSOR';
-  }
-  if (r === 'LAB' || r === 'LAB_TESTING') return 'LAB';
-  if (r === 'PACKAGING' || r === 'PACKAGER') return 'PACKAGING';
-  if (r === 'ADMIN') return 'ADMIN';
-  return 'HARVESTER';
+  return normalizeUserRole(role);
+}
+
+// Check if user profile has required fields
+function isProfileComplete(user: any): boolean {
+  return isUserProfileComplete(user);
 }
 
 // Ensure actor user exists in DB
@@ -137,6 +136,13 @@ router.post('/requests', async (req: Request, res: Response) => {
 
     const senderIdentifier = fromUserId || harvesterId || batch.harvest.harvesterId;
     const sender = await ensureUser(senderIdentifier, fromRole);
+    if (!isProfileComplete(sender)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PROFILE_INCOMPLETE',
+        error: 'Please complete your profile and required verification details before continuing with this request.'
+      });
+    }
     const receiver = toUserId ? await ensureUser(toUserId, toRole) : null;
 
     const prefix = toRole.includes('COLLECT') ? 'COL' : toRole.includes('LAB') ? 'LAB' : 'PKG';
@@ -377,6 +383,13 @@ router.patch('/requests/:id/accept', async (req: Request, res: Response) => {
     }
 
     const actor = await ensureUser(actorId || 'Role Officer', normalizedActorRole);
+    if (!isProfileComplete(actor)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PROFILE_INCOMPLETE',
+        error: 'Please complete your profile and required verification details before continuing with this request.'
+      });
+    }
 
     let nextBatchStatus = 'ACCEPTED';
     let provEventType = 'REQUEST_ACCEPTED';
@@ -475,6 +488,13 @@ router.patch('/requests/:id/reject', async (req: Request, res: Response) => {
 
     const normalizedActorRole = normalizeRole(actorRole || request.toRole);
     const actor = await ensureUser(actorId || 'Role Officer', normalizedActorRole);
+    if (!isProfileComplete(actor)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PROFILE_INCOMPLETE',
+        error: 'Please complete your profile and required verification details before continuing with this request.'
+      });
+    }
 
     let nextBatchStatus = 'REJECTED';
     let provEventType = 'REQUEST_REJECTED';
@@ -593,6 +613,13 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
       }
 
       const processor = await ensureUser(actorId || 'Processor', 'COLLECTOR_PROCESSOR');
+      if (!isProfileComplete(processor)) {
+        return res.status(403).json({
+          success: false,
+          code: 'PROFILE_INCOMPLETE',
+          error: 'Please complete your profile and required verification details before continuing with this request.'
+        });
+      }
       const nextRequestId = generateRequestId('LAB');
       const qtyIn = quantityReceived !== undefined ? Number(quantityReceived) : (currentRequest.quantity || 0);
       const qtyOut = quantityAfter !== undefined ? Number(quantityAfter) : qtyIn;
@@ -706,6 +733,13 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
       }
 
       const labOfficer = await ensureUser(actorId || 'Lab Officer', 'LAB');
+      if (!isProfileComplete(labOfficer)) {
+        return res.status(403).json({
+          success: false,
+          code: 'PROFILE_INCOMPLETE',
+          error: 'Please complete your profile and required verification details before continuing with this request.'
+        });
+      }
       const nextRequestId = generateRequestId('PKG');
 
       const result = await prisma.$transaction(async (tx) => {
@@ -836,6 +870,13 @@ router.post('/lab-reports', async (req: Request, res: Response) => {
     }
 
     const labUser = await ensureUser(labId || 'Lab Officer', 'LAB');
+    if (!isProfileComplete(labUser)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PROFILE_INCOMPLETE',
+        error: 'Please complete your profile and required verification details before continuing with this request.'
+      });
+    }
     const score = Number(qualityScore) || 0;
     const moisture = Number(moistureContent) || 0;
 
@@ -982,6 +1023,13 @@ router.post('/packaging', async (req: Request, res: Response) => {
         });
 
     const packagerUser = await ensureUser(packagerId || 'Packager', 'PACKAGING');
+    if (!isProfileComplete(packagerUser)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PROFILE_INCOMPLETE',
+        error: 'Please complete your profile and required verification details before continuing with this request.'
+      });
+    }
     const finalQty = finalQuantity !== undefined ? Number(finalQuantity) : (request?.quantity || 25.0);
     const numPkgs = numberOfPackages !== undefined ? Number(numberOfPackages) : 50;
 

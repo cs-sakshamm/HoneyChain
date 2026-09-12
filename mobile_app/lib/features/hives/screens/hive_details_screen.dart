@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
@@ -384,6 +385,7 @@ class HiveDetailsScreen extends StatelessWidget {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
+                  if (!ProfileGuard.checkOrPrompt(context)) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(

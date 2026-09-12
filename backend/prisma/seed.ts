@@ -31,37 +31,70 @@ async function main() {
   // 2. Seed default Processor, Lab, and Packager users for workflow testing
   const processorUser = await prisma.user.upsert({
     where: { email: 'processor@honeychain.io' },
-    update: {},
+    update: {
+      phone: '+1 (555) 345-6789',
+      organizationName: 'Cascade Honey Processing Ltd.',
+      facilityLocation: 'Bend Industrial Park, OR',
+      licenseNumber: 'FSSAI-PROC-2026-9812',
+      designation: 'Operations Director'
+    },
     create: {
       id: 'user-default-processor',
       name: 'Cascade Processing Facility',
       email: 'processor@honeychain.io',
-      role: 'COLLECTION_PROCESSING'
+      phone: '+1 (555) 345-6789',
+      role: 'COLLECTION_PROCESSING',
+      organizationName: 'Cascade Honey Processing Ltd.',
+      facilityLocation: 'Bend Industrial Park, OR',
+      licenseNumber: 'FSSAI-PROC-2026-9812',
+      designation: 'Operations Director'
     }
   });
 
   const labUser = await prisma.user.upsert({
     where: { email: 'lab@honeychain.io' },
-    update: {},
+    update: {
+      phone: '+1 (555) 456-7890',
+      organizationName: 'Pacific Pure Apiculture Labs',
+      facilityLocation: 'Corvallis Tech Campus, OR',
+      licenseNumber: 'LAB-ACCRED-2026-4402',
+      designation: 'Chief Analytical Chemist'
+    },
     create: {
       id: 'user-default-lab',
       name: 'Pacific Pure Apiculture Labs',
       email: 'lab@honeychain.io',
-      role: 'LAB_TESTING'
+      phone: '+1 (555) 456-7890',
+      role: 'LAB_TESTING',
+      organizationName: 'Pacific Pure Apiculture Labs',
+      facilityLocation: 'Corvallis Tech Campus, OR',
+      licenseNumber: 'LAB-ACCRED-2026-4402',
+      designation: 'Chief Analytical Chemist'
     }
   });
 
   const packagerUser = await prisma.user.upsert({
     where: { email: 'packaging@honeychain.io' },
-    update: {},
+    update: {
+      phone: '+1 (555) 567-8901',
+      organizationName: 'Artisan Honey Packaging Co.',
+      facilityLocation: 'Portland Logistics Hub, OR',
+      licenseNumber: 'FSSAI-PKG-2026-1184',
+      designation: 'Packaging Line Supervisor'
+    },
     create: {
       id: 'user-default-packager',
       name: 'Artisan Honey Packaging Co.',
       email: 'packaging@honeychain.io',
-      role: 'PACKAGING'
+      phone: '+1 (555) 567-8901',
+      role: 'PACKAGING',
+      organizationName: 'Artisan Honey Packaging Co.',
+      facilityLocation: 'Portland Logistics Hub, OR',
+      licenseNumber: 'FSSAI-PKG-2026-1184',
+      designation: 'Packaging Line Supervisor'
     }
   });
-  console.log(`✓ Seeded Supply Chain Partner Users (Processor, Lab, Packager)`);
+  console.log(`✓ Seeded Supply Chain Partner Users (Processor, Lab, Packager) with full profile details`);
 
   // 3. Seed Initial Hives into PostgreSQL
   const now = new Date();

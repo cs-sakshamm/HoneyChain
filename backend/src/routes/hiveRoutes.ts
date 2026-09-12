@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
+import { isUserProfileComplete, PROFILE_INCOMPLETE_RESPONSE } from '../services/profileService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -168,6 +169,19 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Hive name is required' });
     }
 
+    // Mandatory profile completion check for Harvester
+    const userId = data.userId || data.harvesterId;
+    let user;
+    if (userId) {
+      user = await prisma.user.findFirst({ where: { OR: [{ id: userId }, { name: userId }] } });
+    }
+    if (!user) {
+      user = await prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+    }
+    if (user && !isUserProfileComplete(user)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+
     let hiveCode = (data.hiveCode || '').trim();
     if (!hiveCode) {
       hiveCode = await generateUniqueHiveCode();
@@ -251,6 +265,18 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Hive not found' });
     }
 
+    const userId = data.userId || data.harvesterId;
+    let user;
+    if (userId) {
+      user = await prisma.user.findFirst({ where: { OR: [{ id: userId }, { name: userId }] } });
+    }
+    if (!user) {
+      user = await prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+    }
+    if (user && !isUserProfileComplete(user)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+
     if (data.hiveCode && data.hiveCode !== existing.hiveCode) {
       const codeCheck = await prisma.hive.findUnique({ where: { hiveCode: data.hiveCode } });
       if (codeCheck && codeCheck.id !== id) {
@@ -324,6 +350,11 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
+    const harvesterUser = await prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+    if (harvesterUser && !isUserProfileComplete(harvesterUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+
     await prisma.hive.delete({ where: { id } });
     res.json({ success: true, message: 'Hive deleted successfully' });
   } catch (error: any) {

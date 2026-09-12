@@ -7,6 +7,7 @@ import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -38,13 +39,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
   }
 
   void _openAddHive() {
-    final userCtrl = context.read<UserController>();
-    if (!userCtrl.user.isProfileComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.tr('complete_profile_first'))),
-      );
-      return;
-    }
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddEditHiveScreen()),

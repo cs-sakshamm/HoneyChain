@@ -13,14 +13,15 @@ export class VerificationService {
     // Check user exists or create placeholder user if needed
     let user = await prisma.user.findUnique({ where: { id: harvesterId } });
     if (!user) {
-      // Check by fallback / demo user
-      user = await prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+      if (!harvesterId || harvesterId === 'default' || harvesterId === 'demo') {
+        user = await prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+      }
       if (!user) {
         user = await prisma.user.create({
           data: {
             id: harvesterId,
             name: 'Licensed Harvester',
-            email: `harvester-${harvesterId.slice(0, 8)}@honeychain.io`,
+            email: `harvester-${harvesterId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)}@honeychain.io`,
             role: 'HARVESTER'
           }
         });

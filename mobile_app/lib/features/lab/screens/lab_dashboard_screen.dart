@@ -7,6 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -233,7 +234,10 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
                                     children: [
                                       Expanded(
                                         child: OutlinedButton(
-                                          onPressed: () => _showRejectSampleDialog(context, req),
+                                          onPressed: () {
+                                            if (!ProfileGuard.checkOrPrompt(context)) return;
+                                            _showRejectSampleDialog(context, req);
+                                          },
                                           style: OutlinedButton.styleFrom(
                                             foregroundColor: AppConstants.error,
                                             side: const BorderSide(color: AppConstants.error),
@@ -247,6 +251,7 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
                                       Expanded(
                                         child: ElevatedButton(
                                           onPressed: () {
+                                            if (!ProfileGuard.checkOrPrompt(context)) return;
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(

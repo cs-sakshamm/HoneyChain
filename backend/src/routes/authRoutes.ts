@@ -117,6 +117,8 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+import { isUserProfileComplete, normalizeUserRole } from '../services/profileService';
+
 /**
  * GET /api/profile
  * GET /api/profile/:userId
@@ -125,10 +127,27 @@ router.post('/login', async (req: Request, res: Response) => {
 router.get('/profile', async (req: Request, res: Response) => {
   try {
     const userId = (req.query.userId as string) || (req.query.id as string);
+    const roleParam = req.query.role as string;
     let user;
 
     if (userId) {
-      user = await prisma.user.findUnique({ where: { id: userId } });
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: userId },
+            { name: userId },
+            { email: userId }
+          ]
+        }
+      });
+    }
+
+    if (!user && roleParam) {
+      const normalizedRole = normalizeUserRole(roleParam);
+      user = await prisma.user.findFirst({
+        where: { role: normalizedRole },
+        orderBy: { createdAt: 'asc' }
+      });
     }
 
     if (!user) {
@@ -154,16 +173,23 @@ router.get('/profile', async (req: Request, res: Response) => {
       });
     }
 
+    const isComplete = isUserProfileComplete(user);
+
     res.json({
       success: true,
       profile: {
         id: user.id,
         name: user.name,
         email: user.email,
-        phone: user.phone || '+1 (555) 234-5678',
+        phone: user.phone || '',
         role: user.role,
+        organizationName: user.organizationName || null,
+        facilityLocation: user.facilityLocation || null,
+        licenseNumber: user.licenseNumber || null,
+        designation: user.designation || null,
         bsid: user.bsid,
-        bspPass: user.bspPass
+        bspPass: user.bspPass,
+        isProfileComplete: isComplete
       }
     });
   } catch (error: any) {
@@ -173,16 +199,43 @@ router.get('/profile', async (req: Request, res: Response) => {
 
 /**
  * PUT /api/profile
- * Update profile details (name, email, phone)
+ * Update profile details (name, email, phone, organization, location, license, role)
  */
 router.put('/profile', async (req: Request, res: Response) => {
   try {
-    const { userId, name, email, phone } = req.body;
+    const {
+      userId,
+      name,
+      email,
+      phone,
+      role,
+      organizationName,
+      facilityLocation,
+      licenseNumber,
+      designation
+    } = req.body;
 
     let user;
     if (userId) {
-      user = await prisma.user.findUnique({ where: { id: userId } });
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: userId },
+            { name: userId },
+            { email: userId }
+          ]
+        }
+      });
     }
+
+    if (!user && role) {
+      const normalizedRole = normalizeUserRole(role);
+      user = await prisma.user.findFirst({
+        where: { role: normalizedRole },
+        orderBy: { createdAt: 'asc' }
+      });
+    }
+
     if (!user) {
       user = await prisma.user.findFirst({
         where: { role: 'HARVESTER' },
@@ -194,14 +247,22 @@ router.put('/profile', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'User profile not found.' });
     }
 
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name.trim();
+    if (email !== undefined) updateData.email = email.trim().toLowerCase();
+    if (phone !== undefined) updateData.phone = phone.trim();
+    if (role !== undefined) updateData.role = normalizeUserRole(role);
+    if (organizationName !== undefined) updateData.organizationName = organizationName.trim();
+    if (facilityLocation !== undefined) updateData.facilityLocation = facilityLocation.trim();
+    if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber.trim();
+    if (designation !== undefined) updateData.designation = designation.trim();
+
     const updated = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        ...(name ? { name: name.trim() } : {}),
-        ...(email ? { email: email.trim().toLowerCase() } : {}),
-        ...(phone ? { phone: phone.trim() } : {})
-      }
+      data: updateData
     });
+
+    const isComplete = isUserProfileComplete(updated);
 
     res.json({
       success: true,
@@ -212,8 +273,13 @@ router.put('/profile', async (req: Request, res: Response) => {
         email: updated.email,
         phone: updated.phone,
         role: updated.role,
+        organizationName: updated.organizationName || null,
+        facilityLocation: updated.facilityLocation || null,
+        licenseNumber: updated.licenseNumber || null,
+        designation: updated.designation || null,
         bsid: updated.bsid,
-        bspPass: updated.bspPass
+        bspPass: updated.bspPass,
+        isProfileComplete: isComplete
       }
     });
   } catch (error: any) {

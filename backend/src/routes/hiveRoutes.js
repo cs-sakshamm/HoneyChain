@@ -35,6 +35,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const crypto = __importStar(require("crypto"));
+const profileService_1 = require("../services/profileService");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 // Helper to generate unique hive code
@@ -196,6 +197,18 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!data.name) {
             return res.status(400).json({ success: false, error: 'Hive name is required' });
         }
+        // Mandatory profile completion check for Harvester
+        const userId = data.userId || data.harvesterId;
+        let user;
+        if (userId) {
+            user = yield prisma.user.findFirst({ where: { OR: [{ id: userId }, { name: userId }] } });
+        }
+        if (!user) {
+            user = yield prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+        }
+        if (user && !(0, profileService_1.isUserProfileComplete)(user)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         let hiveCode = (data.hiveCode || '').trim();
         if (!hiveCode) {
             hiveCode = yield generateUniqueHiveCode();
@@ -276,6 +289,17 @@ router.put('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Hive not found' });
         }
+        const userId = data.userId || data.harvesterId;
+        let user;
+        if (userId) {
+            user = yield prisma.user.findFirst({ where: { OR: [{ id: userId }, { name: userId }] } });
+        }
+        if (!user) {
+            user = yield prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+        }
+        if (user && !(0, profileService_1.isUserProfileComplete)(user)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         if (data.hiveCode && data.hiveCode !== existing.hiveCode) {
             const codeCheck = yield prisma.hive.findUnique({ where: { hiveCode: data.hiveCode } });
             if (codeCheck && codeCheck.id !== id) {
@@ -324,6 +348,10 @@ router.put('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 router.delete('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = String(req.params.id);
+        const harvesterUser = yield prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+        if (harvesterUser && !(0, profileService_1.isUserProfileComplete)(harvesterUser)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         yield prisma.hive.delete({ where: { id } });
         res.json({ success: true, message: 'Hive deleted successfully' });
     }

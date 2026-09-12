@@ -47,6 +47,7 @@ const hiveRoutes_1 = __importDefault(require("./routes/hiveRoutes"));
 const verificationRoutes_1 = __importDefault(require("./routes/verificationRoutes"));
 const workflowRoutes_1 = __importDefault(require("./routes/workflowRoutes"));
 const verificationService_1 = require("./services/verificationService");
+const profileService_1 = require("./services/profileService");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -154,6 +155,9 @@ app.post('/api/harvests', (req, res) => __awaiter(void 0, void 0, void 0, functi
     const { harvesterId, hiveId, quantity, location, notes } = req.body;
     try {
         const actorUser = yield ensureUserExists(harvesterId || 'Harvester', 'HARVESTER');
+        if (!(0, profileService_1.isUserProfileComplete)(actorUser)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         const harvest = yield prisma.harvest.create({
             data: {
                 harvesterId: actorUser.id,
@@ -180,6 +184,9 @@ app.post('/api/chain-requests', (req, res) => __awaiter(void 0, void 0, void 0, 
     const { batchId, requesterId } = req.body;
     try {
         const actorUser = yield ensureUserExists(requesterId || 'Requester', 'COLLECTION_PROCESSING');
+        if (!(0, profileService_1.isUserProfileComplete)(actorUser)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         const request = yield prisma.chainRequest.create({
             data: { batchId, status: "REQUESTED" }
         });
@@ -199,6 +206,9 @@ app.post('/api/processing', (req, res) => __awaiter(void 0, void 0, void 0, func
             return res.status(400).json({ error: "Invalid state transition. Batch must be HARVESTED." });
         }
         const actorUser = yield ensureUserExists(processorId || 'Processor', 'COLLECTION_PROCESSING');
+        if (!(0, profileService_1.isUserProfileComplete)(actorUser)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         const record = yield prisma.processingRecord.create({
             data: {
                 batchId,
@@ -222,6 +232,9 @@ app.post('/api/lab-reports', (req, res) => __awaiter(void 0, void 0, void 0, fun
     const { batchId, labId, testResults, qualityScore, moistureContent, purityGrade, notes } = req.body;
     try {
         const actorUser = yield ensureUserExists(labId || 'Lab Officer', 'LAB_TESTING');
+        if (!(0, profileService_1.isUserProfileComplete)(actorUser)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         const report = yield prisma.labReport.create({
             data: {
                 batchId,
@@ -252,6 +265,9 @@ app.post('/api/packaging', (req, res) => __awaiter(void 0, void 0, void 0, funct
             return res.status(400).json({ error: "Invalid state. Packaging requires LAB_APPROVED." });
         }
         const actorUser = yield ensureUserExists(packagerId || 'Packager', 'PACKAGING');
+        if (!(0, profileService_1.isUserProfileComplete)(actorUser)) {
+            return res.status(403).json(profileService_1.PROFILE_INCOMPLETE_RESPONSE);
+        }
         const record = yield prisma.packagingRecord.create({
             data: {
                 batchId,

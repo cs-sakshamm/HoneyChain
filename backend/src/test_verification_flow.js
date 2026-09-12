@@ -51,7 +51,7 @@ function runTests() {
             assert(govResult.governmentIdDocHash !== undefined && govResult.governmentIdDocHash.length === 64, 'SHA-256 document checksum generated');
             // 4. Step 2: Mobile Number & OTP Verification
             console.log('\n--- 4. Step 2: Mobile OTP System ---');
-            const testPhone = '+15552345678';
+            const testPhone = `+1555${Date.now().toString().slice(-7)}`;
             const otpSent = yield otpService_1.otpService.sendOtp(testPhone);
             assert(otpSent.success === true, 'OTP generated successfully');
             assert(otpSent.cooldownSeconds === 60, '60-second cooldown returned');

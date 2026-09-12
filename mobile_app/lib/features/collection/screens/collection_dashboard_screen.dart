@@ -13,6 +13,7 @@ import 'harvester_detail_screen.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/localization/localization_service.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../profile/controllers/user_controller.dart';
 
 class CollectionDashboardScreen extends StatefulWidget {
@@ -409,15 +410,11 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      final userCtrl = context.read<UserController>();
-                      if (!userCtrl.user.isProfileComplete) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please complete your profile first.')));
-                        return;
-                      }
+                      if (!ProfileGuard.checkOrPrompt(context)) return;
                       _showRejectDialog(context, req);
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppConstants.error,
+                       foregroundColor: AppConstants.error,
                       side: const BorderSide(color: AppConstants.error),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -434,11 +431,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      final userCtrl = context.read<UserController>();
-                      if (!userCtrl.user.isProfileComplete) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please complete your profile first.')));
-                        return;
-                      }
+                      if (!ProfileGuard.checkOrPrompt(context)) return;
                       await context.read<WorkflowController>().acceptRequest(req.id);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -467,7 +460,10 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => _showSendToLabDialog(context, req),
+                onPressed: () {
+                  if (!ProfileGuard.checkOrPrompt(context)) return;
+                  _showSendToLabDialog(context, req);
+                },
                 icon: const Icon(Icons.science_outlined, size: 18),
                 label: const Text('Extract & Send to Lab'),
                 style: ElevatedButton.styleFrom(

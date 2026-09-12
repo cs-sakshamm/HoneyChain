@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/theme/app_theme.dart';
 import '../controllers/hive_controller.dart';
@@ -204,6 +205,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
   }
 
   Future<void> _saveHive() async {
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     if (!_formKey.currentState!.validate()) return;
     if (_isSaving) return;
 

@@ -12,6 +12,7 @@ import hiveRoutes from './routes/hiveRoutes';
 import verificationRoutes from './routes/verificationRoutes';
 import workflowRoutes from './routes/workflowRoutes';
 import { verificationService } from './services/verificationService';
+import { isUserProfileComplete, PROFILE_INCOMPLETE_RESPONSE } from './services/profileService';
 
 const app = express();
 app.use(cors());
@@ -127,6 +128,9 @@ app.post('/api/harvests', async (req, res) => {
   const { harvesterId, hiveId, quantity, location, notes } = req.body;
   try {
     const actorUser = await ensureUserExists(harvesterId || 'Harvester', 'HARVESTER');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const harvest = await prisma.harvest.create({
       data: {
@@ -156,6 +160,9 @@ app.post('/api/chain-requests', async (req, res) => {
   const { batchId, requesterId } = req.body;
   try {
     const actorUser = await ensureUserExists(requesterId || 'Requester', 'COLLECTION_PROCESSING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const request = await prisma.chainRequest.create({
       data: { batchId, status: "REQUESTED" }
@@ -177,6 +184,9 @@ app.post('/api/processing', async (req, res) => {
     }
 
     const actorUser = await ensureUserExists(processorId || 'Processor', 'COLLECTION_PROCESSING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const record = await prisma.processingRecord.create({
       data: {
@@ -203,6 +213,9 @@ app.post('/api/lab-reports', async (req, res) => {
   const { batchId, labId, testResults, qualityScore, moistureContent, purityGrade, notes } = req.body;
   try {
     const actorUser = await ensureUserExists(labId || 'Lab Officer', 'LAB_TESTING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const report = await prisma.labReport.create({
       data: {
@@ -237,6 +250,9 @@ app.post('/api/packaging', async (req, res) => {
     }
 
     const actorUser = await ensureUserExists(packagerId || 'Packager', 'PACKAGING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const record = await prisma.packagingRecord.create({
       data: {

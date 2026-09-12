@@ -47,14 +47,15 @@ class VerificationService {
             // Check user exists or create placeholder user if needed
             let user = yield prisma.user.findUnique({ where: { id: harvesterId } });
             if (!user) {
-                // Check by fallback / demo user
-                user = yield prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+                if (!harvesterId || harvesterId === 'default' || harvesterId === 'demo') {
+                    user = yield prisma.user.findFirst({ where: { role: 'HARVESTER' } });
+                }
                 if (!user) {
                     user = yield prisma.user.create({
                         data: {
                             id: harvesterId,
                             name: 'Licensed Harvester',
-                            email: `harvester-${harvesterId.slice(0, 8)}@honeychain.io`,
+                            email: `harvester-${harvesterId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)}@honeychain.io`,
                             role: 'HARVESTER'
                         }
                     });

@@ -121,6 +121,7 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
+                    // Role badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                       decoration: BoxDecoration(
@@ -129,7 +130,7 @@ class ProfileScreen extends StatelessWidget {
                         border: Border.all(color: context.borderColor),
                       ),
                       child: Text(
-                        context.tr('role_operator'),
+                        user.role.replaceAll('_', ' ').toUpperCase(),
                         style: GoogleFonts.manrope(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -137,11 +138,62 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+
+                    // Profile Completion Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: complete
+                            ? context.successBgColor
+                            : context.warningBgColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: complete
+                              ? context.successColor.withValues(alpha: 0.3)
+                              : context.warningColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            complete ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                            size: 14,
+                            color: complete ? context.successColor : context.warningColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            complete ? 'Profile Complete ✓' : 'Profile Incomplete ⚠️',
+                            style: GoogleFonts.manrope(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: complete ? context.successColor : context.warningColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: AppConstants.space20),
                     // Account info rows
                     _infoRow(context, Icons.alternate_email_rounded, user.email.isEmpty ? 'No email' : user.email),
                     const SizedBox(height: 10),
                     _infoRow(context, Icons.call_rounded, user.phone.isEmpty ? 'No phone' : user.phone),
+
+                    if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.business_rounded, user.organizationName!),
+                    ],
+                    if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.location_on_outlined, user.facilityLocation!),
+                    ],
+                    if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.verified_outlined, user.licenseNumber!),
+                    ],
+
                     const SizedBox(height: AppConstants.space20),
                     _PillAction(
                       label: context.tr('edit_profile'),
@@ -176,7 +228,9 @@ class ProfileScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              context.tr('profile_incomplete_title'),
+                              context.tr('profile_incomplete_title') != 'profile_incomplete_title'
+                                  ? context.tr('profile_incomplete_title')
+                                  : 'Please Complete Your Profile First',
                               style: GoogleFonts.manrope(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -185,7 +239,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Complete your profile to grant permissions and participate in workflows.',
+                              'Complete your profile and required verification details before you can continue with this request.',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 color: context.textPrimaryColor,

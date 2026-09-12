@@ -7,6 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -344,7 +345,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => _showRejectDialog(context, req),
+                  onPressed: () {
+                    if (!ProfileGuard.checkOrPrompt(context)) return;
+                    _showRejectDialog(context, req);
+                  },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppConstants.error,
                     side: const BorderSide(color: AppConstants.error),
@@ -357,7 +361,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _showFinalizePackagingDialog(context, req),
+                  onPressed: () {
+                    if (!ProfileGuard.checkOrPrompt(context)) return;
+                    _showFinalizePackagingDialog(context, req);
+                  },
                   icon: const Icon(Icons.qr_code_2_rounded, size: 18),
                   label: const Text('Package & QR'),
                   style: ElevatedButton.styleFrom(

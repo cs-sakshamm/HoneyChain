@@ -7,6 +7,7 @@ import '../constants/app_constants.dart';
 import '../controllers/workflow_controller.dart';
 import '../models/workflow_request.dart';
 import '../theme/app_theme.dart';
+import '../utils/profile_guard.dart';
 import 'app_card.dart';
 import 'status_badge.dart';
 import '../../features/collection/screens/batch_timeline_screen.dart';
@@ -594,22 +595,30 @@ class _MyRequestsViewState extends State<MyRequestsView> {
     return const SizedBox.shrink();
   }
 
-  void _acceptRequest(BuildContext context, WorkflowRequest req) {
+  void _acceptRequest(BuildContext context, WorkflowRequest req) async {
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     final userCtrl = context.read<UserController>();
-    context.read<WorkflowController>().acceptRequest(
+    final wfCtrl = context.read<WorkflowController>();
+    final success = await wfCtrl.acceptRequest(
           req.id,
           actorId: userCtrl.user.name,
           actorRole: widget.userRole,
         );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Request ${req.requestId} accepted'),
-        backgroundColor: AppConstants.success,
-      ),
-    );
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Request ${req.requestId} accepted'),
+          backgroundColor: AppConstants.success,
+        ),
+      );
+    } else if (wfCtrl.isProfileIncompleteError) {
+      ProfileGuard.showIncompleteProfileDialog(context);
+    }
   }
 
   void _showRejectDialog(BuildContext context, WorkflowRequest req) {
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     final reasonController = TextEditingController();
 
     showDialog(
@@ -639,18 +648,24 @@ class _MyRequestsViewState extends State<MyRequestsView> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final reason = reasonController.text.trim();
               if (reason.isEmpty) return;
               Navigator.pop(dialogCtx);
-              context.read<WorkflowController>().rejectRequest(
+              final wfCtrl = context.read<WorkflowController>();
+              final success = await wfCtrl.rejectRequest(
                     req.id,
                     actorRole: widget.userRole,
                     reason: reason,
                   );
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Request ${req.requestId} rejected'), backgroundColor: AppConstants.error),
-              );
+              if (!context.mounted) return;
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Request ${req.requestId} rejected'), backgroundColor: AppConstants.error),
+                );
+              } else if (wfCtrl.isProfileIncompleteError) {
+                ProfileGuard.showIncompleteProfileDialog(context);
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error),
             child: const Text('Confirm Reject'),
@@ -661,6 +676,7 @@ class _MyRequestsViewState extends State<MyRequestsView> {
   }
 
   void _showProcessAndSendToLabDialog(BuildContext context, WorkflowRequest req) {
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     final qtyController = TextEditingController(text: req.estimatedQuantityKg.toString());
     final methodController = TextEditingController(text: 'Standard Cold Extraction');
 
@@ -693,19 +709,25 @@ class _MyRequestsViewState extends State<MyRequestsView> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final qty = double.tryParse(qtyController.text) ?? req.estimatedQuantityKg;
               Navigator.pop(dialogCtx);
-              context.read<WorkflowController>().sendToLab(
+              final wfCtrl = context.read<WorkflowController>();
+              final success = await wfCtrl.sendToLab(
                     requestId: req.id,
                     batchId: req.batchId,
                     qtyReceived: req.estimatedQuantityKg,
                     qtyAfter: qty,
                     method: methodController.text.trim(),
                   );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Batch processed and forwarded to Lab Testing'), backgroundColor: AppConstants.success),
-              );
+              if (!context.mounted) return;
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Batch processed and forwarded to Lab Testing'), backgroundColor: AppConstants.success),
+                );
+              } else if (wfCtrl.isProfileIncompleteError) {
+                ProfileGuard.showIncompleteProfileDialog(context);
+              }
             },
             child: const Text('Send to Lab'),
           ),
@@ -714,17 +736,25 @@ class _MyRequestsViewState extends State<MyRequestsView> {
     );
   }
 
-  void _sendToPackaging(BuildContext context, WorkflowRequest req) {
-    context.read<WorkflowController>().sendToPackaging(
+  void _sendToPackaging(BuildContext context, WorkflowRequest req) async {
+    if (!ProfileGuard.checkOrPrompt(context)) return;
+    final wfCtrl = context.read<WorkflowController>();
+    final success = await wfCtrl.sendToPackaging(
           requestId: req.id,
           batchId: req.batchId,
         );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Batch approved and forwarded to Packaging'), backgroundColor: AppConstants.success),
-    );
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Batch approved and forwarded to Packaging'), backgroundColor: AppConstants.success),
+      );
+    } else if (wfCtrl.isProfileIncompleteError) {
+      ProfileGuard.showIncompleteProfileDialog(context);
+    }
   }
 
   void _showFinalizePackagingDialog(BuildContext context, WorkflowRequest req) {
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     final qtyController = TextEditingController(text: req.estimatedQuantityKg.toString());
     final pkgsController = TextEditingController(text: '50');
 
@@ -758,19 +788,25 @@ class _MyRequestsViewState extends State<MyRequestsView> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final qty = double.tryParse(qtyController.text) ?? req.estimatedQuantityKg;
               final pkgs = int.tryParse(pkgsController.text) ?? 50;
               Navigator.pop(dialogCtx);
-              context.read<WorkflowController>().finalizePackaging(
+              final wfCtrl = context.read<WorkflowController>();
+              final success = await wfCtrl.finalizePackaging(
                     requestId: req.id,
                     batchId: req.batchId,
                     finalQuantity: qty,
                     numberOfPackages: pkgs,
                   );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Packaging completed! QR Code generated.'), backgroundColor: AppConstants.success),
-              );
+              if (!context.mounted) return;
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Packaging completed! QR Code generated.'), backgroundColor: AppConstants.success),
+                );
+              } else if (wfCtrl.isProfileIncompleteError) {
+                ProfileGuard.showIncompleteProfileDialog(context);
+              }
             },
             child: const Text('Finalize & Generate QR'),
           ),
