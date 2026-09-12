@@ -669,21 +669,25 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                               ],
                             ),
                             const SizedBox(height: 12),
-                            _ActionButton(
-                              label: 'Verify OTP',
-                              icon: Icons.verified_user_outlined,
-                              isLoading: verCtrl.isLoading,
-                              onTap: () {
-                                final code = _otpController.text.trim();
-                                if (code.length != 6) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter 6-digit OTP.')),
-                                  );
-                                  return;
-                                }
-                                verCtrl.verifyMobileOtp(code);
-                              },
-                            ),
+                              _ActionButton(
+                                label: 'Verify OTP',
+                                icon: Icons.verified_user_outlined,
+                                isLoading: verCtrl.isLoading,
+                                onTap: () async {
+                                  final code = _otpController.text.trim();
+                                  if (code.length != 6) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Please enter 6-digit OTP.')),
+                                    );
+                                    return;
+                                  }
+                                  final ok = await verCtrl.verifyMobileOtp(code);
+                                  if (ok && context.mounted) {
+                                    final userCtrl = context.read<UserController>();
+                                    userCtrl.reloadProfile();
+                                  }
+                                },
+                              ),
                           ],
                         ],
                       ),
