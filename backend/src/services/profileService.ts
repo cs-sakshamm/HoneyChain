@@ -89,3 +89,33 @@ export const PROFILE_INCOMPLETE_RESPONSE = {
   message: 'Please complete your profile and required verification details before continuing with this request.',
   error: 'Please complete your profile and required verification details before continuing with this request.'
 };
+
+export const BEEKEEPER_PROFILE_INCOMPLETE_RESPONSE = {
+  success: false,
+  code: 'PROFILE_INCOMPLETE',
+  message: 'Please complete your beekeeper profile before adding a hive.',
+  error: 'Please complete your beekeeper profile before adding a hive.'
+};
+
+export const HARVESTER_VERIFICATION_REQUIRED_RESPONSE = {
+  success: false,
+  code: 'VERIFICATION_REQUIRED',
+  message: 'Harvester verification is incomplete. All 5 verification parameters (Government ID, Mobile OTP, Beekeeper Registration, Apiary Location, and Blockchain Verification) must be completed before performing this action.',
+  error: 'Harvester verification is incomplete. Please complete harvester verification first.'
+};
+
+/**
+ * Validates whether a harvester has completed all verification parameters and is recorded on-chain.
+ */
+export function isHarvesterFullyVerified(verification: any): boolean {
+  if (!verification) return false;
+  return (
+    verification.governmentIdVerified === 'Verified' &&
+    verification.mobileVerified === 'Verified' &&
+    verification.registrationVerified === 'Verified' &&
+    verification.locationVerified === 'Verified' &&
+    verification.verificationStatus === 'Verified' &&
+    Boolean(verification.verificationId)
+  );
+}
+

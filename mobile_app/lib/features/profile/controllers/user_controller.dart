@@ -8,14 +8,19 @@ import '../../../core/constants/app_constants.dart';
 
 /// User Profile Model with full role-based profile support
 class UserProfile {
+  final String? id;
   final String name;
   final String email;
   final String phone;
   final String role; // 'HARVESTER', 'COLLECTOR_PROCESSOR', 'LAB', 'PACKAGING', 'ADMIN'
+  final String? photoUrl;
   final String? organizationName;
   final String? facilityLocation;
   final String? licenseNumber;
   final String? designation;
+
+  // Beekeeper identity (permanent collision-resistant ID e.g. BKR-XXXXXX)
+  final String? beekeeperId;
 
   // Harvester identity (issued once, persisted in PostgreSQL, never regenerated casually)
   final String? bsid;
@@ -25,14 +30,17 @@ class UserProfile {
   final bool? isBackendComplete;
 
   const UserProfile({
+    this.id,
     required this.name,
     required this.email,
     required this.phone,
     this.role = 'HARVESTER',
+    this.photoUrl,
     this.organizationName,
     this.facilityLocation,
     this.licenseNumber,
     this.designation,
+    this.beekeeperId,
     this.bsid,
     this.bspPass,
     this.isBackendComplete,
@@ -79,8 +87,19 @@ class UserProfile {
     return nameOk && phoneOk;
   }
 
+  /// Initial letter of name or email, capitalized
+  String get initial {
+    if (name.trim().isNotEmpty) {
+      return name.trim()[0].toUpperCase();
+    }
+    if (email.trim().isNotEmpty) {
+      return email.trim()[0].toUpperCase();
+    }
+    return 'H';
+  }
+
   String get initials {
-    if (name.trim().isEmpty) return 'U';
+    if (name.trim().isEmpty) return initial;
     final parts = name.trim().split(' ');
     if (parts.length > 1 && parts[1].isNotEmpty) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
@@ -92,14 +111,17 @@ class UserProfile {
 /// Controller managing user profile details, password updating, and the
 /// persistent harvester identity (BSID + BSP Pass) backed by PostgreSQL.
 class UserController extends ChangeNotifier {
+  static const String _idKey = 'user_profile_id';
   static const String _nameKey = 'user_profile_name';
   static const String _emailKey = 'user_profile_email';
   static const String _phoneKey = 'user_profile_phone';
   static const String _roleKey = 'user_profile_role';
+  static const String _photoUrlKey = 'user_profile_photo_url';
   static const String _orgKey = 'user_profile_organization';
   static const String _locKey = 'user_profile_location';
   static const String _licKey = 'user_profile_license';
   static const String _desigKey = 'user_profile_designation';
+  static const String _beekeeperIdKey = 'user_profile_beekeeper_id';
   static const String _bsidKey = 'user_profile_bsid';
   static const String _bspKey = 'user_profile_bsp_pass';
 
@@ -107,9 +129,10 @@ class UserController extends ChangeNotifier {
   final String _baseUrl;
 
   UserProfile _user = const UserProfile(
-    name: 'HoneyChain Apiary Manager',
-    email: 'operations@honeychain.io',
-    phone: '+1 (555) 234-5678',
+    id: null,
+    name: '',
+    email: '',
+    phone: '',
     role: 'HARVESTER',
   );
 
@@ -139,33 +162,80 @@ class UserController extends ChangeNotifier {
       };
 
   Future<void> _loadProfile([String? roleOverride]) async {
-    // 1. First load from local SharedPreferences for immediate UI responsiveness
+    // 1. First load from local SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString(_nameKey) ?? 'HoneyChain Apiary Manager';
-    final email = prefs.getString(_emailKey) ?? 'operations@honeychain.io';
-    final phone = prefs.getString(_phoneKey) ?? '+1 (555) 234-5678';
+    final id = prefs.getString(_idKey);
+    final name = prefs.getString(_nameKey) ?? '';
+    final email = prefs.getString(_emailKey) ?? '';
+    final phone = prefs.getString(_phoneKey) ?? '';
     final role = roleOverride ?? prefs.getString(_roleKey) ?? 'HARVESTER';
+    final photoUrl = prefs.getString(_photoUrlKey);
     final org = prefs.getString(_orgKey);
     final loc = prefs.getString(_locKey);
     final lic = prefs.getString(_licKey);
     final desig = prefs.getString(_desigKey);
+    final beekeeperId = prefs.getString(_beekeeperIdKey);
 
     _user = UserProfile(
+      id: id,
       name: name,
       email: email,
       phone: phone,
       role: role,
+      photoUrl: photoUrl,
       organizationName: org,
       facilityLocation: loc,
       licenseNumber: lic,
       designation: desig,
+      beekeeperId: beekeeperId,
       bsid: prefs.getString(_bsidKey),
       bspPass: prefs.getString(_bspKey),
     );
     notifyListeners();
 
-    // 2. Fetch authoritative profile from PostgreSQL backend
-    await fetchProfile(role: role);
+    // 2. Fetch authoritative profile from PostgreSQL backend if identifier exists
+    if (id != null || email.isNotEmpty) {
+      await fetchProfile(userId: id ?? email, role: role);
+    }
+  }
+
+  /// Sets the active user directly upon login/registration
+  Future<void> setUser({
+    required String id,
+    required String name,
+    required String email,
+    String? phone,
+    String? role,
+    String? photoUrl,
+    String? beekeeperId,
+    String? bsid,
+    String? bspPass,
+  }) async {
+    _user = UserProfile(
+      id: id,
+      name: name,
+      email: email,
+      phone: phone ?? '',
+      role: role ?? 'HARVESTER',
+      photoUrl: photoUrl ?? _user.photoUrl,
+      beekeeperId: beekeeperId,
+      bsid: bsid,
+      bspPass: bspPass,
+    );
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_idKey, id);
+    await prefs.setString(_nameKey, name);
+    await prefs.setString(_emailKey, email);
+    if (phone != null) await prefs.setString(_phoneKey, phone);
+    if (role != null) await prefs.setString(_roleKey, role);
+    if (photoUrl != null) await prefs.setString(_photoUrlKey, photoUrl);
+    if (beekeeperId != null) await prefs.setString(_beekeeperIdKey, beekeeperId);
+    if (bsid != null) await prefs.setString(_bsidKey, bsid);
+    if (bspPass != null) await prefs.setString(_bspKey, bspPass);
+
+    await fetchProfile(userId: id);
   }
 
   /// Switch the active role context and sync authoritative role profile
@@ -173,27 +243,34 @@ class UserController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_roleKey, newRole);
     _user = UserProfile(
+      id: _user.id,
       name: _user.name,
       email: _user.email,
       phone: _user.phone,
       role: newRole,
+      photoUrl: _user.photoUrl,
       organizationName: _user.organizationName,
       facilityLocation: _user.facilityLocation,
       licenseNumber: _user.licenseNumber,
       designation: _user.designation,
+      beekeeperId: _user.beekeeperId,
       bsid: _user.bsid,
       bspPass: _user.bspPass,
     );
     notifyListeners();
-    await fetchProfile(role: newRole);
+    await fetchProfile(userId: _user.id, role: newRole);
   }
 
   /// Fetch authoritative profile from backend
-  Future<void> fetchProfile({String? role}) async {
+  Future<void> fetchProfile({String? userId, String? role}) async {
     try {
+      final activeUserId = userId ?? _user.id ?? _user.email;
       final activeRole = role ?? _user.role;
       final uri = Uri.parse('$_baseUrl/api/profile').replace(
-        queryParameters: {'role': activeRole},
+        queryParameters: {
+          if (activeUserId.isNotEmpty) 'userId': activeUserId,
+          'role': activeRole,
+        },
       );
       final response = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
 
@@ -202,14 +279,17 @@ class UserController extends ChangeNotifier {
         if (data['success'] == true && data['profile'] != null) {
           final p = data['profile'];
           _user = UserProfile(
+            id: p['id'] ?? _user.id,
             name: p['name'] ?? _user.name,
             email: p['email'] ?? _user.email,
             phone: p['phone'] ?? _user.phone,
             role: p['role'] ?? _user.role,
+            photoUrl: p['photoUrl'] ?? _user.photoUrl,
             organizationName: p['organizationName'] ?? _user.organizationName,
             facilityLocation: p['facilityLocation'] ?? _user.facilityLocation,
             licenseNumber: p['licenseNumber'] ?? _user.licenseNumber,
             designation: p['designation'] ?? _user.designation,
+            beekeeperId: p['beekeeperId'] ?? _user.beekeeperId,
             bsid: p['bsid'] ?? _user.bsid,
             bspPass: p['bspPass'] ?? _user.bspPass,
             isBackendComplete: p['isProfileComplete'] as bool?,
@@ -218,6 +298,7 @@ class UserController extends ChangeNotifier {
 
           // Save to local cache
           final prefs = await SharedPreferences.getInstance();
+          if (_user.id != null) await prefs.setString(_idKey, _user.id!);
           await prefs.setString(_nameKey, _user.name);
           await prefs.setString(_emailKey, _user.email);
           await prefs.setString(_phoneKey, _user.phone);
@@ -226,6 +307,7 @@ class UserController extends ChangeNotifier {
           if (_user.facilityLocation != null) await prefs.setString(_locKey, _user.facilityLocation!);
           if (_user.licenseNumber != null) await prefs.setString(_licKey, _user.licenseNumber!);
           if (_user.designation != null) await prefs.setString(_desigKey, _user.designation!);
+          if (_user.beekeeperId != null) await prefs.setString(_beekeeperIdKey, _user.beekeeperId!);
           if (_user.bsid != null) await prefs.setString(_bsidKey, _user.bsid!);
           if (_user.bspPass != null) await prefs.setString(_bspKey, _user.bspPass!);
         }
@@ -249,6 +331,7 @@ class UserController extends ChangeNotifier {
     final effectiveRole = role ?? _user.role;
 
     _user = UserProfile(
+      id: _user.id,
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
@@ -263,6 +346,7 @@ class UserController extends ChangeNotifier {
     notifyListeners();
 
     final prefs = await SharedPreferences.getInstance();
+    if (_user.id != null) await prefs.setString(_idKey, _user.id!);
     await prefs.setString(_nameKey, _user.name);
     await prefs.setString(_emailKey, _user.email);
     await prefs.setString(_phoneKey, _user.phone);
@@ -296,6 +380,7 @@ class UserController extends ChangeNotifier {
             url,
             headers: _headers,
             body: jsonEncode({
+              'userId': _user.id,
               'name': _user.name,
               'email': _user.email,
               'phone': _user.phone,
@@ -313,6 +398,7 @@ class UserController extends ChangeNotifier {
         if (data['success'] == true && data['profile'] != null) {
           final p = data['profile'];
           _user = UserProfile(
+            id: p['id'] ?? _user.id,
             name: p['name'] ?? _user.name,
             email: p['email'] ?? _user.email,
             phone: p['phone'] ?? _user.phone,
@@ -321,11 +407,14 @@ class UserController extends ChangeNotifier {
             facilityLocation: p['facilityLocation'] ?? _user.facilityLocation,
             licenseNumber: p['licenseNumber'] ?? _user.licenseNumber,
             designation: p['designation'] ?? _user.designation,
+            beekeeperId: p['beekeeperId'] ?? _user.beekeeperId,
             bsid: p['bsid'] ?? _user.bsid,
             bspPass: p['bspPass'] ?? _user.bspPass,
             isBackendComplete: p['isProfileComplete'] as bool?,
           );
           notifyListeners();
+          final prefs = await SharedPreferences.getInstance();
+          if (_user.beekeeperId != null) await prefs.setString(_beekeeperIdKey, _user.beekeeperId!);
         }
       }
     } catch (e) {
@@ -346,13 +435,19 @@ class UserController extends ChangeNotifier {
   /// Whether this account already holds a harvester identity.
   bool get hasIdentity => _user.bsid != null && _user.bspPass != null;
 
-  /// Issue the harvester identity (BSID + BSP Pass) exactly once.
+  /// Issue the harvester identity (BSID + BSP Pass) exactly once from backend.
   Future<bool> generateIdentity() async {
     if (!hasIdentity && _user.isProfileComplete) {
       try {
         final url = Uri.parse('$_baseUrl/api/profile/identity');
         final response = await _client
-            .post(url, headers: _headers, body: jsonEncode({}))
+            .post(
+              url,
+              headers: _headers,
+              body: jsonEncode({
+                'userId': _user.id,
+              }),
+            )
             .timeout(const Duration(seconds: 5));
 
         if (response.statusCode == 200) {
@@ -362,6 +457,7 @@ class UserController extends ChangeNotifier {
 
           if (bsid != null && bsp != null) {
             _user = UserProfile(
+              id: _user.id,
               name: _user.name,
               email: _user.email,
               phone: _user.phone,
@@ -370,6 +466,7 @@ class UserController extends ChangeNotifier {
               facilityLocation: _user.facilityLocation,
               licenseNumber: _user.licenseNumber,
               designation: _user.designation,
+              beekeeperId: _user.beekeeperId,
               bsid: bsid,
               bspPass: bsp,
             );
@@ -384,35 +481,8 @@ class UserController extends ChangeNotifier {
       } catch (e) {
         debugPrint('[UserController] Backend identity generation error: $e');
       }
-
-      // Offline fallback: Issue cryptographically random identity locally
-      final bsid = _issueLocalId(AppConstants.bsidPrefix, 4);
-      final bsp = _issueLocalId(AppConstants.bspPassPrefix, 3);
-      _user = UserProfile(
-        name: _user.name,
-        email: _user.email,
-        phone: _user.phone,
-        role: _user.role,
-        organizationName: _user.organizationName,
-        facilityLocation: _user.facilityLocation,
-        licenseNumber: _user.licenseNumber,
-        designation: _user.designation,
-        bsid: bsid,
-        bspPass: bsp,
-      );
-      notifyListeners();
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_bsidKey, bsid);
-      await prefs.setString(_bspKey, bsp);
-      return true;
     }
     return false;
   }
-
-  String _issueLocalId(String prefix, int bytes) {
-    final now = DateTime.now().millisecondsSinceEpoch.toRadixString(16).toUpperCase();
-    final suffix = now.length > bytes * 2 ? now.substring(now.length - bytes * 2) : now;
-    return '$prefix-2026-$suffix';
-  }
 }
+

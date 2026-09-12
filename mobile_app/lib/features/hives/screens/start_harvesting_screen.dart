@@ -34,7 +34,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
   }
 
   void _beginHarvest() {
-    if (!ProfileGuard.checkOrPrompt(context)) return;
+    if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
     setState(() {
       _isHarvestActive = true;
       _secondsElapsed = 0;
@@ -141,9 +141,9 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
 
                 final success = await workflowCtrl.createHarvestAndRequest(
                   harvesterName: userCtrl.user.name.isNotEmpty ? userCtrl.user.name : 'Harvester Operator',
-                  location: widget.hive?.apiaryLocation ?? widget.hive?.location ?? 'Apiary Alpha',
+                  location: widget.hive?.apiaryLocation ?? widget.hive?.location ?? 'Apiary',
                   quantity: qty,
-                  hiveId: widget.hive?.id ?? 'HC-HIVE-01',
+                  hiveId: widget.hive?.id,
                   notes: notesCtrl.text.trim(),
                 );
 

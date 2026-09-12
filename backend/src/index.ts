@@ -12,7 +12,7 @@ import hiveRoutes from './routes/hiveRoutes';
 import verificationRoutes from './routes/verificationRoutes';
 import workflowRoutes from './routes/workflowRoutes';
 import { verificationService } from './services/verificationService';
-import { isUserProfileComplete, PROFILE_INCOMPLETE_RESPONSE } from './services/profileService';
+import { isUserProfileComplete, PROFILE_INCOMPLETE_RESPONSE, HARVESTER_VERIFICATION_REQUIRED_RESPONSE, isHarvesterFullyVerified } from './services/profileService';
 
 const app = express();
 app.use(cors());
@@ -82,6 +82,9 @@ async function ensureUserExists(userIdOrName: string, defaultRole: string = 'HAR
         { name: userIdOrName },
         { email: userIdOrName }
       ]
+    },
+    include: {
+      harvesterVerification: true
     }
   });
 
@@ -92,6 +95,9 @@ async function ensureUserExists(userIdOrName: string, defaultRole: string = 'HAR
         name: userIdOrName,
         email: `${safeId}@honeychain.io`,
         role: defaultRole
+      },
+      include: {
+        harvesterVerification: true
       }
     });
   }
@@ -121,6 +127,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', authRoutes); // Exposes /api/profile and /api/profile/identity
 app.use('/api/hives', hiveRoutes);
 app.use('/api/verification', verificationRoutes);
+app.use('/api', verificationRoutes); // Exposes /api/verify/harvester/:verificationId directly
 app.use('/api', workflowRoutes); // Exposes /api/requests, /api/batches, /api/lab-reports, /api/packaging
 
 // ── 1. Create Harvest & Batch ──
@@ -130,6 +137,9 @@ app.post('/api/harvests', async (req, res) => {
     const actorUser = await ensureUserExists(harvesterId || 'Harvester', 'HARVESTER');
     if (!isUserProfileComplete(actorUser)) {
       return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+    if (actorUser.role === 'HARVESTER' && !isHarvesterFullyVerified(actorUser.harvesterVerification)) {
+      return res.status(403).json(HARVESTER_VERIFICATION_REQUIRED_RESPONSE);
     }
 
     const harvest = await prisma.harvest.create({
@@ -373,7 +383,7 @@ app.get('/api/verify', async (req, res) => {
         bsid: batch.harvest?.harvester?.bsid || null,
         verificationStatus: batch.harvest?.harvester?.harvesterVerification?.verificationStatus || 'Verified',
         location: batch.harvest?.location || 'Cascade Valley, OR',
-        hiveCode: batch.harvest?.hive?.hiveCode || 'HC-HIVE-01',
+        hiveCode: batch.harvest?.hive?.hiveCode || 'N/A',
         honeyType: batch.harvest?.hive?.honeyType || 'Wildflower',
         quantityKg: batch.harvest?.quantity || 0,
         harvestDate: batch.harvest?.createdAt || batch.createdAt

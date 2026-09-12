@@ -213,7 +213,7 @@ class WorkflowController extends ChangeNotifier {
             headers: _headers,
             body: json.encode({
               'harvesterId': harvesterName,
-              'hiveId': hiveId ?? 'HC-HIVE-01',
+              if (hiveId != null) 'hiveId': hiveId,
               'quantity': quantity,
               'location': location,
               'notes': notes,

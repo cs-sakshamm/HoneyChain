@@ -15,11 +15,54 @@ import 'start_harvesting_screen.dart';
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
 
-  String _greeting(BuildContext context) {
+  String _timeBasedGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return context.tr('greeting_morning');
-    if (hour < 17) return context.tr('greeting_afternoon');
-    return context.tr('greeting_evening');
+    if (hour >= 5 && hour < 12) {
+      return 'Good Morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good Afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      return 'Good Evening';
+    } else {
+      return 'Good Night';
+    }
+  }
+
+  Widget _buildHeroImage(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      height: 165,
+      margin: const EdgeInsets.only(bottom: AppConstants.space20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.12) : context.borderColor,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.asset(
+          'assets/images/beekeeping_hero.jpg',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: context.primarySoftColor,
+              alignment: Alignment.center,
+              child: Icon(Icons.hive_rounded, size: 48, color: context.colors.primary),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -28,8 +71,9 @@ class HomeDashboardScreen extends StatelessWidget {
     final user = authController.currentUser;
     final hiveController = context.watch<HiveController>();
 
-    final userDisplayName = user?.displayName ?? 'Harvester';
-    final userFirstName = userDisplayName.split(' ').first;
+    final userDisplayName = user?.displayName?.trim() ?? '';
+    final greeting = _timeBasedGreeting();
+    final greetingDisplay = userDisplayName.isNotEmpty ? '$greeting, $userDisplayName 👋' : '$greeting 👋';
     
     // Sort hives to show most recently updated first
     final List<Hive> sortedHives = List.from(hiveController.hives);
@@ -52,25 +96,28 @@ class HomeDashboardScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header
+                      // 1. Natural Professional Beekeeping Hero Image
+                      _buildHeroImage(context),
+
+                      // 2. Dynamic Time-Based Greeting
                       Text(
-                        '${_greeting(context)}, $userFirstName',
+                        greetingDisplay,
                         style: GoogleFonts.manrope(
-                          fontSize: 26,
+                          fontSize: 22,
                           fontWeight: FontWeight.w800,
                           color: context.textPrimaryColor,
-                          letterSpacing: -0.5,
+                          letterSpacing: -0.4,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Overview of your apiaries and honey collection.',
                         style: GoogleFonts.inter(
-                          fontSize: 14,
+                          fontSize: 13,
                           color: context.textSecondaryColor,
                         ),
                       ),
-                      const SizedBox(height: AppConstants.space32),
+                      const SizedBox(height: AppConstants.space24),
 
                       // Quick Stats / Overview
                       Row(

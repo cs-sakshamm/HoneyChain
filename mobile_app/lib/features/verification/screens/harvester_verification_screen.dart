@@ -30,19 +30,27 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
   String _regType = 'STATE_REGISTRY';
 
   // Step 4 Form
-  final TextEditingController _apiaryNameController = TextEditingController(text: 'Cascade High Mountain Apiary');
-  final TextEditingController _apiaryLocationController = TextEditingController(text: 'Cascade Valley, OR');
-  final TextEditingController _coordinatesController = TextEditingController(text: '44.0521° N, 121.3153° W');
+  final TextEditingController _apiaryNameController = TextEditingController();
+  final TextEditingController _apiaryLocationController = TextEditingController();
+  final TextEditingController _coordinatesController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserController>().user;
-      final harvesterId = user.bsid ?? 'HARV-2026-PRIMARY';
+      final harvesterId = (user.id != null && user.id!.isNotEmpty)
+          ? user.id!
+          : (user.beekeeperId ?? 'harvester');
       context.read<VerificationController>().loadVerification(harvesterId);
       if (user.phone.isNotEmpty) {
         _phoneController.text = user.phone;
+      }
+      if (user.organizationName != null && user.organizationName!.isNotEmpty) {
+        _apiaryNameController.text = user.organizationName!;
+      }
+      if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) {
+        _apiaryLocationController.text = user.facilityLocation!;
       }
     });
   }
@@ -284,7 +292,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                 content: ver.isStep2Complete
                     ? _buildVerifiedStepInfo(
                         label: 'Verified Phone',
-                        value: ver.mobileNumber ?? '+1 (555) 234-5678',
+                        value: ver.mobileNumber ?? 'Verified',
                         subtext: 'Mobile identity confirmed with 2FA OTP',
                       )
                     : Column(
@@ -302,7 +310,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
                                   decoration: InputDecoration(
-                                    hintText: '+1 (555) 234-5678',
+                                    hintText: '+1234567890',
                                     hintStyle: GoogleFonts.inter(color: context.textMutedColor),
                                     filled: true,
                                     fillColor: context.scaffoldBg,
@@ -393,7 +401,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                 content: ver.isStep3Complete
                     ? _buildVerifiedStepInfo(
                         label: 'Accreditation ID',
-                        value: ver.registrationId ?? 'BK-OR-8921',
+                        value: ver.registrationId ?? 'Verified',
                         subtext: 'Registry Type: ${ver.registrationType ?? 'State Registry'}',
                       )
                     : Column(
@@ -478,7 +486,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                 content: ver.isStep4Complete
                     ? _buildVerifiedStepInfo(
                         label: 'Public Apiary Region',
-                        value: ver.apiaryLocation ?? 'Cascade Valley, OR',
+                        value: ver.apiaryLocation ?? 'Registered Apiary',
                         subtext: 'Private GPS coordinates encrypted off-chain',
                       )
                     : Column(
@@ -511,7 +519,26 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           TextField(
                             controller: _apiaryLocationController,
                             decoration: InputDecoration(
-                              hintText: 'e.g. Cascade Valley, Oregon',
+                              hintText: 'e.g. Greater Noida, Uttar Pradesh',
+                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              filled: true,
+                              fillColor: context.scaffoldBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Private GPS Coordinates (Encrypted off-chain)',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _coordinatesController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 28.4744, 77.5040 (lat, lng)',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
@@ -560,7 +587,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                         children: [
                           _buildVerifiedStepInfo(
                             label: 'Harvester Verification ID',
-                            value: ver.verificationId ?? 'HV-2026-PRIMARY',
+                            value: ver.verificationId ?? 'Pending Sync',
                             subtext: 'Network: ${ver.blockchainNetwork ?? 'HoneyChain Provenance Ledger'}',
                           ),
                           const SizedBox(height: 14),

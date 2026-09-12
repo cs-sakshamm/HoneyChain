@@ -31,18 +31,61 @@ class HarvesterDashboardScreen extends StatefulWidget {
 }
 
 class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
-  String _greeting(BuildContext context) {
+  String _timeBasedGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return context.tr('greeting_morning');
-    if (hour < 17) return context.tr('greeting_afternoon');
-    return context.tr('greeting_evening');
+    if (hour >= 5 && hour < 12) {
+      return 'Good Morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good Afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      return 'Good Evening';
+    } else {
+      return 'Good Night';
+    }
   }
 
   void _openAddHive() {
-    if (!ProfileGuard.checkOrPrompt(context)) return;
+    if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddEditHiveScreen()),
+    );
+  }
+
+  Widget _buildHeroImage(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      height: 165,
+      margin: const EdgeInsets.only(bottom: AppConstants.space20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.12) : context.borderColor,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.asset(
+          'assets/images/beekeeping_hero.jpg',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: context.primarySoftColor,
+              alignment: Alignment.center,
+              child: Icon(Icons.hive_rounded, size: 48, color: context.colors.primary),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -53,7 +96,10 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
     final hiveController = context.watch<HiveController>();
 
     final user = userController.user;
-    final harvesterName = user.name.isEmpty ? 'Harvester' : user.name;
+    final beekeeperName = user.name.trim();
+    final greeting = _timeBasedGreeting();
+    final greetingDisplay = beekeeperName.isNotEmpty ? '$greeting, $beekeeperName 👋' : '$greeting 👋';
+    
     final activeRequests = workflowController.pendingCollectionRequests.length;
     final hives = hiveController.hives;
 
@@ -67,25 +113,39 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Greeting — localized time-of-day text (fixes hardcoded label)
-                  Text(
-                    _greeting(context),
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: context.textSecondaryColor,
-                    ),
-                  ),
-                  Text(
-                    harvesterName,
-                    style: GoogleFonts.manrope(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: context.textPrimaryColor,
-                      letterSpacing: -0.4,
-                    ),
+                  // 1. Natural Professional Beekeeping Hero Image directly below Top Navbar
+                  _buildHeroImage(context),
+
+                  // 2. Dynamic Time-Based Greeting
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        greetingDisplay,
+                        style: GoogleFonts.manrope(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimaryColor,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Overview of your apiary, identity, and honey collection.',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: context.textSecondaryColor,
+                        ),
+                      ),
+                    ],
                   ),
 
-                  const SizedBox(height: AppConstants.space24),
+                  const SizedBox(height: AppConstants.space20),
+
+                  // 3. Real Beekeeper Information & Identity
+                  _IdentityCard(),
+
+                  const SizedBox(height: AppConstants.space16),
 
                   // Stats Row
                   Row(
@@ -108,19 +168,9 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: AppConstants.space16),
-
-                  // Add Hive CTA — functional, navigates to the dedicated page
-                  _AddHiveCard(onTap: _openAddHive),
-
-                  const SizedBox(height: AppConstants.space16),
-
-                  // Harvester identity (issued once, persisted)
-                  _IdentityCard(),
-
                   const SizedBox(height: AppConstants.space24),
 
-                  // My Hives
+                  // 4. Real Beehive Data / Empty State
                   Text(
                     context.tr('recent_hives'),
                     style: GoogleFonts.manrope(
@@ -136,9 +186,14 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                   else
                     ...hives.take(3).map((hive) => _HiveInfoCard(hive: hive)),
 
+                  const SizedBox(height: AppConstants.space20),
+
+                  // 5. Add Hive Action (Only when profile is complete)
+                  _AddHiveCard(onTap: _openAddHive),
+
                   const SizedBox(height: AppConstants.space24),
 
-                  // Recent requests header with View All button
+                  // 6. Recent Requests Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -472,7 +527,7 @@ class _IdentityCard extends StatelessWidget {
                     ),
                   ),
                   child: Icon(
-                    isVerified ? Icons.verified_rounded : Icons.shield_outlined,
+                    isVerified ? Icons.verified_rounded : Icons.hive_rounded,
                     size: 20,
                     color: isVerified ? context.successColor : context.textPrimaryColor,
                   ),
@@ -511,16 +566,33 @@ class _IdentityCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        isVerified
-                            ? '${ver.verificationId} · Blockchain Recorded'
-                            : '5 Parameters · Complete to unlock blockchain badge',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: context.textSecondaryColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Builder(
+                        builder: (context) {
+                          final user = context.watch<UserController>().user;
+                          final bkrText = user.beekeeperId != null ? 'ID: ${user.beekeeperId}' : null;
+                          if (isVerified) {
+                            return Text(
+                              '${bkrText != null ? "$bkrText · " : ""}${ver.verificationId} · Blockchain Recorded',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: context.textSecondaryColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            );
+                          }
+                          return Text(
+                            bkrText != null
+                                ? '$bkrText · 5 Steps Verification'
+                                : '5 Parameters · Complete to unlock blockchain badge',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: context.textSecondaryColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
                       ),
                     ],
                   ),

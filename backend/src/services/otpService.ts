@@ -16,10 +16,23 @@ export class OtpService {
   }
 
   /**
-   * Sanitize mobile number format
+   * Sanitize and normalize mobile number to E.164 format (+[country][number])
    */
-  public sanitizeMobile(mobile: string): string {
-    return mobile.replace(/[^0-9+]/g, '').trim();
+  public sanitizeMobile(mobileRaw: string): string {
+    if (!mobileRaw) return '';
+    let cleaned = mobileRaw.replace(/[^\d+]/g, '').trim();
+    if (!cleaned.startsWith('+')) {
+      // Default to + if not provided
+      cleaned = `+${cleaned}`;
+    }
+    return cleaned;
+  }
+
+  /**
+   * Validate E.164 compliance
+   */
+  public isValidE164(mobile: string): boolean {
+    return /^\+[1-9]\d{7,14}$/.test(mobile);
   }
 
   /**
@@ -33,10 +46,10 @@ export class OtpService {
     devOtp?: string;
   }> {
     const mobile = this.sanitizeMobile(mobileRaw);
-    if (!mobile || mobile.length < 8) {
+    if (!mobile || !this.isValidE164(mobile)) {
       return {
         success: false,
-        message: 'Invalid mobile number format. Please provide a valid phone number.',
+        message: 'Invalid mobile number format. Please provide a valid phone number in E.164 format (e.g. +1234567890).',
         cooldownSeconds: 0,
         expiresInSeconds: 0
       };
@@ -81,7 +94,7 @@ export class OtpService {
       }
     });
 
-    // Store new hashed OTP
+    // Store new hashed OTP only (never plaintext)
     await prisma.mobileOtp.create({
       data: {
         mobile,
@@ -93,14 +106,17 @@ export class OtpService {
       }
     });
 
-    console.log(`[OTP Service] OTP generated for ${mobile}: [${rawOtp}] (Expires in ${OTP_EXPIRY_MINUTES}m)`);
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (isDev) {
+      console.log(`[OTP Service] Dev OTP generated for ${mobile.slice(0, 4)}***${mobile.slice(-2)}: [${rawOtp}] (Expires in ${OTP_EXPIRY_MINUTES}m)`);
+    }
 
     return {
       success: true,
       message: `Verification code sent to ${mobile}. Valid for ${OTP_EXPIRY_MINUTES} minutes.`,
       cooldownSeconds: OTP_COOLDOWN_SECONDS,
       expiresInSeconds: OTP_EXPIRY_MINUTES * 60,
-      devOtp: rawOtp // Useful for developer / demo verification environment
+      ...(isDev ? { devOtp: rawOtp } : {})
     };
   }
 
@@ -114,10 +130,10 @@ export class OtpService {
     const mobile = this.sanitizeMobile(mobileRaw);
     const cleanOtp = (enteredOtp || '').trim();
 
-    if (!mobile || cleanOtp.length !== 6) {
+    if (!mobile || cleanOtp.length !== 6 || !/^\d{6}$/.test(cleanOtp)) {
       return {
         success: false,
-        message: 'Please enter a valid 6-digit verification code.'
+        message: 'Please enter a valid 6-digit numeric verification code.'
       };
     }
 
@@ -148,21 +164,22 @@ export class OtpService {
     if (otpRecord.attempts >= MAX_ATTEMPTS) {
       return {
         success: false,
-        message: 'Too many incorrect attempts. This code is invalidated. Please request a new code.'
+        message: 'Too many incorrect attempts. This code has been invalidated. Please request a new code.'
       };
     }
 
     const hashedInput = this.hashOtp(cleanOtp);
     if (hashedInput !== otpRecord.otpHash) {
-      const remaining = MAX_ATTEMPTS - (otpRecord.attempts + 1);
+      const attemptsCount = otpRecord.attempts + 1;
+      const remaining = MAX_ATTEMPTS - attemptsCount;
       await prisma.mobileOtp.update({
         where: { id: otpRecord.id },
-        data: { attempts: { increment: 1 } }
+        data: { attempts: attemptsCount }
       });
 
       return {
         success: false,
-        message: `Incorrect verification code. ${remaining > 0 ? `${remaining} attempt(s) remaining.` : 'Code invalidated.'}`
+        message: `Incorrect verification code. ${remaining > 0 ? `${remaining} attempt(s) remaining.` : 'Code invalidated due to too many attempts.'}`
       };
     }
 

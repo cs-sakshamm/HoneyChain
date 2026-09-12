@@ -360,7 +360,7 @@ class _MyRequestsViewState extends State<MyRequestsView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isConfirmedBlockchain ? Icons.shield_rounded : Icons.hourglass_top_rounded,
+                  isConfirmedBlockchain ? Icons.hive_rounded : Icons.hourglass_top_rounded,
                   size: 13,
                   color: isConfirmedBlockchain ? context.successColor : context.warningColor,
                 ),

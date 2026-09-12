@@ -1,9 +1,10 @@
-﻿import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/app_constants.dart';
 import 'package:flutter/material.dart';
 
 /// Hive Data Model for HoneyChain
 class Hive {
   final String id;
+  final String? userId;
   final String name;
   final String hiveCode;
   final String apiaryLocation;
@@ -40,6 +41,7 @@ class Hive {
 
   const Hive({
     required this.id,
+    this.userId,
     required this.name,
     required this.hiveCode,
     required this.apiaryLocation,
@@ -126,6 +128,7 @@ class Hive {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      if (userId != null) 'userId': userId,
       'name': name,
       'hiveCode': hiveCode,
       'apiaryLocation': apiaryLocation,
@@ -156,32 +159,33 @@ class Hive {
   factory Hive.fromJson(Map<String, dynamic> json) {
     return Hive(
       id: json['id'] as String,
+      userId: json['userId'] as String?,
       name: json['name'] as String? ?? 'Unnamed Hive',
-      hiveCode: json['hiveCode'] as String? ?? 'H-000',
+      hiveCode: json['hiveCode'] as String? ?? '',
       apiaryLocation: json['apiaryLocation'] as String? ?? 'Main Apiary',
       hiveType: json['hiveType'] as String? ?? 'Langstroth',
       dateAdded: DateTime.tryParse(json['dateAdded'] as String? ?? '') ??
           DateTime.now(),
       queenStatus: json['queenStatus'] as String? ?? 'Mated',
       totalFrames: (json['totalFrames'] as num?)?.toInt() ?? 10,
-      broodFrames: (json['broodFrames'] as num?)?.toInt() ?? 6,
+      broodFrames: (json['broodFrames'] as num?)?.toInt() ?? 0,
       colonyStrength: json['colonyStrength'] as String? ?? 'Strong',
-      queenAgeMonths: (json['queenAgeMonths'] as num?)?.toInt() ?? 12,
+      queenAgeMonths: (json['queenAgeMonths'] as num?)?.toInt() ?? 0,
       beeBreed: json['beeBreed'] as String? ?? 'Italian',
       expectedProductionKg:
-          (json['expectedProductionKg'] as num?)?.toDouble() ?? 35.0,
+          (json['expectedProductionKg'] as num?)?.toDouble() ?? 0.0,
       previousYearProductionKg:
-          (json['previousYearProductionKg'] as num?)?.toDouble() ?? 25.0,
+          (json['previousYearProductionKg'] as num?)?.toDouble() ?? 0.0,
       currentYearProductionKg:
-          (json['currentYearProductionKg'] as num?)?.toDouble() ?? 28.0,
+          (json['currentYearProductionKg'] as num?)?.toDouble() ?? 0.0,
       honeyType: json['honeyType'] as String? ?? 'Wildflower',
       lastInspectionDate:
           DateTime.tryParse(json['lastInspectionDate'] as String? ?? '') ??
-              DateTime.now().subtract(const Duration(days: 7)),
-      miteStatus: json['miteStatus'] as String? ?? 'Low',
+              DateTime.now(),
+      miteStatus: json['miteStatus'] as String? ?? 'None',
       diseaseStatus: json['diseaseStatus'] as String? ?? 'None',
       feedingRequired: json['feedingRequired'] as bool? ?? false,
-      queenCondition: json['queenCondition'] as String? ?? 'Excellent',
+      queenCondition: json['queenCondition'] as String? ?? 'Good',
       overallHealth: json['overallHealth'] as String? ?? 'Healthy',
       notes: json['notes'] as String? ?? '',
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
@@ -192,6 +196,7 @@ class Hive {
   /// Copy with modifications
   Hive copyWith({
     String? id,
+    String? userId,
     String? name,
     String? hiveCode,
     String? apiaryLocation,
@@ -218,6 +223,7 @@ class Hive {
   }) {
     return Hive(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       name: name ?? this.name,
       hiveCode: hiveCode ?? this.hiveCode,
       apiaryLocation: apiaryLocation ?? this.apiaryLocation,

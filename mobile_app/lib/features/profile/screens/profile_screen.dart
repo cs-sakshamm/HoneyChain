@@ -5,16 +5,15 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../authentication/auth_controller.dart';
 import '../../verification/controllers/verification_controller.dart';
 import '../../verification/screens/harvester_verification_screen.dart';
-import '../../verification/screens/public_verification_lookup_screen.dart';
 import '../../verification/screens/verification_certificate_screen.dart';
 import '../controllers/user_controller.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'language_setting_screen.dart';
-import 'notifications_screen.dart';
 import 'theme_setting_screen.dart';
 
 /// Profile page — polished card-based layout, pill actions, both themes.
@@ -99,18 +98,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: context.primarySoftColor,
-                      child: Text(
-                        user.initials,
-                        style: GoogleFonts.manrope(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: context.textPrimaryColor,
-                        ),
-                      ),
-                    ),
+                    const UserAvatar(size: 80),
                     const SizedBox(height: AppConstants.space16),
                     Text(
                       user.name.isEmpty ? 'Unknown User' : user.name,
@@ -181,6 +169,10 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 10),
                     _infoRow(context, Icons.call_rounded, user.phone.isEmpty ? 'No phone' : user.phone),
 
+                    if (user.beekeeperId != null && user.beekeeperId!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.badge_outlined, 'Beekeeper ID: ${user.beekeeperId!}'),
+                    ],
                     if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       _infoRow(context, Icons.business_rounded, user.organizationName!),
@@ -298,30 +290,6 @@ class ProfileScreen extends StatelessWidget {
                             MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
                           );
                         }
-                      },
-                    ),
-                    Divider(height: 1, indent: 56, color: context.borderColor),
-                    _buildSettingsTile(
-                      context,
-                      title: 'Public QR Verifier',
-                      icon: Icons.qr_code_scanner_rounded,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const PublicVerificationLookupScreen()),
-                        );
-                      },
-                    ),
-                    Divider(height: 1, indent: 56, color: context.borderColor),
-                    _buildSettingsTile(
-                      context,
-                      title: context.tr('notifications'),
-                      icon: Icons.notifications_none_rounded,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                        );
                       },
                     ),
                     Divider(height: 1, indent: 56, color: context.borderColor),

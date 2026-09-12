@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_constants.dart';
 import 'auth_service.dart';
@@ -163,19 +164,35 @@ class AuthController extends ChangeNotifier {
           .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['user'] != null) {
+          final u = data['user'];
+          final prefs = await SharedPreferences.getInstance();
+          if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
+          if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
+          if (u['email'] != null) await prefs.setString('user_profile_email', u['email']);
+          if (u['phone'] != null) await prefs.setString('user_profile_phone', u['phone']);
+          if (u['role'] != null) await prefs.setString('user_profile_role', u['role']);
+          if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
+          if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
+        }
         _isDemoMode = true;
         _status = AuthStateStatus.authenticated;
         notifyListeners();
         return;
+      } else {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.error;
+        _errorMessage = data['error'] ?? data['message'] ?? 'Authentication failed.';
+        notifyListeners();
+        return;
       }
     } catch (e) {
-      debugPrint('[AuthController] Backend login skipped/failed: $e');
+      debugPrint('[AuthController] Backend login error: $e');
     }
 
-    // Fallback for development / offline demo mode
-    await Future.delayed(const Duration(milliseconds: 500));
-    _isDemoMode = true;
-    _status = AuthStateStatus.authenticated;
+    _status = AuthStateStatus.error;
+    _errorMessage = 'Unable to connect to server. Please verify your connection.';
     notifyListeners();
   }
 
@@ -199,7 +216,7 @@ class AuthController extends ChangeNotifier {
     try {
       final url = Uri.parse('$_baseUrl/api/auth/register');
       final isEmail = emailOrPhone.contains('@');
-      await _client
+      final response = await _client
           .post(
             url,
             headers: _headers,
@@ -212,12 +229,37 @@ class AuthController extends ChangeNotifier {
             }),
           )
           .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        if (data['user'] != null) {
+          final u = data['user'];
+          final prefs = await SharedPreferences.getInstance();
+          if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
+          if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
+          if (u['email'] != null) await prefs.setString('user_profile_email', u['email']);
+          if (u['phone'] != null) await prefs.setString('user_profile_phone', u['phone']);
+          if (u['role'] != null) await prefs.setString('user_profile_role', u['role']);
+          if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
+          if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
+        }
+        _isDemoMode = true;
+        _status = AuthStateStatus.authenticated;
+        notifyListeners();
+        return;
+      } else {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.error;
+        _errorMessage = data['error'] ?? data['message'] ?? 'Registration failed.';
+        notifyListeners();
+        return;
+      }
     } catch (e) {
-      debugPrint('[AuthController] Backend registration skipped/failed: $e');
+      debugPrint('[AuthController] Backend registration error: $e');
     }
 
-    _isDemoMode = true;
-    _status = AuthStateStatus.authenticated;
+    _status = AuthStateStatus.error;
+    _errorMessage = 'Unable to connect to server. Please try again.';
     notifyListeners();
   }
 
@@ -239,6 +281,24 @@ class AuthController extends ChangeNotifier {
       } else {
         _currentUser = credential.user;
         _status = AuthStateStatus.authenticated;
+        if (_currentUser != null) {
+          final prefs = await SharedPreferences.getInstance();
+          if (_currentUser!.uid.isNotEmpty) {
+            await prefs.setString('user_profile_id', _currentUser!.uid);
+          }
+          if (_currentUser!.displayName != null) {
+            await prefs.setString('user_profile_name', _currentUser!.displayName!);
+          }
+          if (_currentUser!.email != null) {
+            await prefs.setString('user_profile_email', _currentUser!.email!);
+          }
+          if (_currentUser!.photoURL != null) {
+            await prefs.setString('user_profile_photo_url', _currentUser!.photoURL!);
+          }
+          if (_currentUser!.phoneNumber != null) {
+            await prefs.setString('user_profile_phone', _currentUser!.phoneNumber!);
+          }
+        }
       }
     } catch (e) {
       if (kIsWeb) {

@@ -8,9 +8,9 @@ import '../../../core/constants/app_constants.dart';
 import '../models/hive_model.dart';
 
 /// Service managing Hive data communication with PostgreSQL backend API
-/// with graceful local cache fallback.
+/// with genuine database persistence and local cache fallback.
 class HiveStorageService {
-  static const String _storageKey = 'honeychain_hives_data_v1';
+  static const String _storageKey = 'honeychain_hives_data_v2';
   final http.Client _client;
   final String _baseUrl;
 
@@ -30,16 +30,23 @@ class HiveStorageService {
     return AppConstants.backendBaseUrl;
   }
 
-  Map<String, String> get _headers => {
+  Map<String, String> _headers([String? userId]) => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        if (userId != null && userId.trim().isNotEmpty) 'x-user-id': userId.trim(),
       };
 
-  /// Load hives from PostgreSQL backend API. Fallback to SharedPreferences cache if offline.
-  Future<List<Hive>> loadHives() async {
+  /// Load hives from PostgreSQL backend API for the specified beekeeper.
+  Future<List<Hive>> loadHives({String? userId}) async {
     try {
-      final url = Uri.parse('$_baseUrl/api/hives');
-      final response = await _client.get(url, headers: _headers).timeout(const Duration(seconds: 4));
+      final uri = Uri.parse('$_baseUrl/api/hives').replace(
+        queryParameters: {
+          if (userId != null && userId.trim().isNotEmpty) 'userId': userId.trim(),
+        },
+      );
+      final response = await _client
+          .get(uri, headers: _headers(userId))
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body) as List<dynamic>;
@@ -55,31 +62,46 @@ class HiveStorageService {
       debugPrint('[HiveStorageService] Backend fetch failed: $e. Loading from local cache.');
     }
 
-    // Fallback: load cached hives from SharedPreferences
+    // Fallback: load cached hives from SharedPreferences (empty list if nothing saved)
     return _loadCachedHives();
   }
 
-  /// Create a new Hive in PostgreSQL backend
-  Future<bool> createHive(Hive hive) async {
+  /// Create a new Hive in PostgreSQL backend. Returns created Hive with server ID.
+  Future<Hive?> createHive(Hive hive, {String? userId}) async {
     try {
       final url = Uri.parse('$_baseUrl/api/hives');
+      final payload = hive.toJson();
+      if (userId != null && userId.trim().isNotEmpty) {
+        payload['userId'] = userId.trim();
+      }
+
       final response = await _client
-          .post(url, headers: _headers, body: jsonEncode(hive.toJson()))
+          .post(url, headers: _headers(userId), body: jsonEncode(payload))
           .timeout(const Duration(seconds: 5));
 
-      return response.statusCode == 200 || response.statusCode == 201;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return Hive.fromJson(data);
+      } else {
+        debugPrint('[HiveStorageService] Backend create rejected: ${response.statusCode} - ${response.body}');
+      }
     } catch (e) {
       debugPrint('[HiveStorageService] Backend create failed: $e');
-      return false;
     }
+    return null;
   }
 
   /// Update an existing Hive in PostgreSQL backend
-  Future<bool> updateHiveInBackend(Hive hive) async {
+  Future<bool> updateHiveInBackend(Hive hive, {String? userId}) async {
     try {
       final url = Uri.parse('$_baseUrl/api/hives/${hive.id}');
+      final payload = hive.toJson();
+      if (userId != null && userId.trim().isNotEmpty) {
+        payload['userId'] = userId.trim();
+      }
+
       final response = await _client
-          .put(url, headers: _headers, body: jsonEncode(hive.toJson()))
+          .put(url, headers: _headers(userId), body: jsonEncode(payload))
           .timeout(const Duration(seconds: 5));
 
       return response.statusCode == 200;
@@ -90,11 +112,11 @@ class HiveStorageService {
   }
 
   /// Delete a Hive in PostgreSQL backend
-  Future<bool> deleteHiveFromBackend(String id) async {
+  Future<bool> deleteHiveFromBackend(String id, {String? userId}) async {
     try {
       final url = Uri.parse('$_baseUrl/api/hives/$id');
       final response = await _client
-          .delete(url, headers: _headers)
+          .delete(url, headers: _headers(userId))
           .timeout(const Duration(seconds: 5));
 
       return response.statusCode == 200;
@@ -108,7 +130,9 @@ class HiveStorageService {
   Future<String?> fetchUniqueHiveCode() async {
     try {
       final url = Uri.parse('$_baseUrl/api/hives/code/generate');
-      final response = await _client.get(url, headers: _headers).timeout(const Duration(seconds: 3));
+      final response = await _client
+          .get(url, headers: _headers())
+          .timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['code'] != null) {
@@ -131,16 +155,14 @@ class HiveStorageService {
     }
   }
 
-  /// Load cached hives from SharedPreferences
+  /// Load cached hives from SharedPreferences (returns [] if none)
   Future<List<Hive>> _loadCachedHives() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? jsonString = prefs.getString(_storageKey);
 
       if (jsonString == null || jsonString.trim().isEmpty) {
-        final initialHives = _getSampleHives();
-        await saveHives(initialHives);
-        return initialHives;
+        return [];
       }
 
       final List<dynamic> jsonList = jsonDecode(jsonString) as List<dynamic>;
@@ -148,95 +170,8 @@ class HiveStorageService {
           .map((item) => Hive.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      return _getSampleHives();
+      return [];
     }
   }
-
-  /// Default baseline hives if cache is uninitialized
-  List<Hive> _getSampleHives() {
-    final now = DateTime.now();
-    return [
-      Hive(
-        id: 'hive_sample_1',
-        name: 'Hive Alpha',
-        hiveCode: 'H-001',
-        apiaryLocation: 'Main Apiary',
-        hiveType: 'Langstroth',
-        dateAdded: now.subtract(const Duration(days: 120)),
-        queenStatus: 'Mated',
-        totalFrames: 10,
-        broodFrames: 6,
-        colonyStrength: 'Strong',
-        queenAgeMonths: 12,
-        beeBreed: 'Italian',
-        expectedProductionKg: 35.0,
-        previousYearProductionKg: 25.0,
-        currentYearProductionKg: 28.0,
-        honeyType: 'Wildflower',
-        lastInspectionDate: DateTime(2026, 9, 8),
-        miteStatus: 'Low',
-        diseaseStatus: 'None',
-        feedingRequired: false,
-        queenCondition: 'Excellent',
-        overallHealth: 'Healthy',
-        notes:
-            'Strong brood pattern observed across 6 frames. Honey supers filled consistently. Regular inspection logged clean.',
-        updatedAt: now.subtract(const Duration(hours: 4)),
-      ),
-      Hive(
-        id: 'hive_sample_2',
-        name: 'Hive Beta',
-        hiveCode: 'H-002',
-        apiaryLocation: 'North Meadow Apiary',
-        hiveType: 'Langstroth',
-        dateAdded: now.subtract(const Duration(days: 90)),
-        queenStatus: 'Mated',
-        totalFrames: 10,
-        broodFrames: 4,
-        colonyStrength: 'Moderate',
-        queenAgeMonths: 18,
-        beeBreed: 'Carniolan',
-        expectedProductionKg: 30.0,
-        previousYearProductionKg: 22.0,
-        currentYearProductionKg: 18.0,
-        honeyType: 'Clover',
-        lastInspectionDate: DateTime(2026, 9, 4),
-        miteStatus: 'Medium',
-        diseaseStatus: 'None',
-        feedingRequired: true,
-        queenCondition: 'Good',
-        overallHealth: 'Needs Attention',
-        notes:
-            'Slightly lower brood density. Mite count slightly elevated; organic oxalic acid treatment scheduled.',
-        updatedAt: now.subtract(const Duration(days: 1)),
-      ),
-      Hive(
-        id: 'hive_sample_3',
-        name: 'Hive Gamma',
-        hiveCode: 'H-003',
-        apiaryLocation: 'Riverbank Apiary',
-        hiveType: 'Flow Hive',
-        dateAdded: now.subtract(const Duration(days: 60)),
-        queenStatus: 'Re-queened',
-        totalFrames: 8,
-        broodFrames: 5,
-        colonyStrength: 'Strong',
-        queenAgeMonths: 6,
-        beeBreed: 'Buckfast',
-        expectedProductionKg: 40.0,
-        previousYearProductionKg: 32.0,
-        currentYearProductionKg: 36.0,
-        honeyType: 'Acacia',
-        lastInspectionDate: DateTime(2026, 9, 2),
-        miteStatus: 'Low',
-        diseaseStatus: 'None',
-        feedingRequired: false,
-        queenCondition: 'Excellent',
-        overallHealth: 'Healthy',
-        notes:
-            'Recently re-queened with pure Buckfast stock. High foraging activity and calm temperament.',
-        updatedAt: now.subtract(const Duration(days: 2)),
-      ),
-    ];
-  }
 }
+

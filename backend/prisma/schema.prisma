@@ -15,6 +15,7 @@ model User {
   passwordHash String?
   phone        String?
   role         String   @default("HARVESTER")
+  beekeeperId  String?  @unique
   bsid         String?  @unique
   bspPass      String?
   organizationName String?
@@ -39,7 +40,7 @@ model User {
 
 model Hive {
   id                       String   @id @default(uuid())
-  userId                   String?
+  userId                   String
   name                     String
   hiveCode                 String   @unique
   apiaryLocation           String
@@ -47,26 +48,28 @@ model Hive {
   dateAdded                DateTime @default(now())
   queenStatus              String   @default("Mated")
   totalFrames              Int      @default(10)
-  broodFrames              Int      @default(6)
+  broodFrames              Int      @default(0)
   colonyStrength           String   @default("Strong")
-  queenAgeMonths           Int      @default(12)
+  queenAgeMonths           Int      @default(0)
   beeBreed                 String   @default("Italian")
-  expectedProductionKg     Float    @default(35.0)
-  previousYearProductionKg Float    @default(25.0)
-  currentYearProductionKg  Float    @default(28.0)
+  expectedProductionKg     Float    @default(0.0)
+  previousYearProductionKg Float    @default(0.0)
+  currentYearProductionKg  Float    @default(0.0)
   honeyType                String   @default("Wildflower")
   lastInspectionDate       DateTime @default(now())
-  miteStatus               String   @default("Low")
+  miteStatus               String   @default("None")
   diseaseStatus            String   @default("None")
   feedingRequired          Boolean  @default(false)
-  queenCondition           String   @default("Excellent")
+  queenCondition           String   @default("Good")
   overallHealth            String   @default("Healthy")
   notes                    String?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  user     User?     @relation(fields: [userId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   harvests Harvest[]
+
+  @@index([userId])
 }
 
 model Harvest {

@@ -271,7 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const SizedBox(height: AppConstants.space16),
                                 _buildOperationalBadge(
                                   context,
-                                  Icons.shield_outlined,
+                                  Icons.lock_outline_rounded,
                                   'Enterprise-Grade Security',
                                   'Encrypted session verification & auditing',
                                 ),

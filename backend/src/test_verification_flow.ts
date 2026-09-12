@@ -1,6 +1,10 @@
 import { verificationService } from './services/verificationService';
 import { otpService } from './services/otpService';
 import { blockchainService } from './services/blockchainService';
+import { PrismaClient } from '@prisma/client';
+import { isUserProfileComplete, isHarvesterFullyVerified } from './services/profileService';
+
+const prisma = new PrismaClient();
 
 async function runTests() {
   console.log('=== Starting Harvester Verification System Automated Tests ===\n');
@@ -37,6 +41,13 @@ async function runTests() {
 
     // 3. Step 1: Government ID Verification
     console.log('\n--- 3. Step 1: Government ID Verification & Masking ---');
+    try {
+      await verificationService.submitGovernmentId(testHarvesterId, 'INVALID_TYPE', '12345');
+      assert(false, 'Invalid document type should be rejected');
+    } catch (e: any) {
+      assert(e.message.includes('Invalid document type'), 'Invalid document type rejected');
+    }
+
     const govResult = await verificationService.submitGovernmentId(testHarvesterId, 'NATIONAL_ID', 'ID-987654321');
     assert(govResult.governmentIdVerified === 'Verified', 'Government ID verified');
     assert(govResult.governmentIdReference?.startsWith('DOC-NAT-***4321') === true, 'Government ID properly masked without exposing complete ID');
@@ -54,12 +65,19 @@ async function runTests() {
     const cooldownTest = await otpService.sendOtp(testPhone);
     assert(cooldownTest.success === false, 'Rate limiter prevents spam before cooldown expires');
 
-    // Test Wrong OTP
+    // Test Wrong OTP and attempts tracking
     const wrongOtpResult = await otpService.verifyOtp(testPhone, '000000');
     assert(wrongOtpResult.success === false, 'Incorrect OTP is rejected');
 
-    // Test Valid OTP
-    const validOtpSubmission = await verificationService.submitMobileVerification(testHarvesterId, testPhone, otpSent.devOtp!);
+    // Test brute-force protection (attempts 2 & 3)
+    await otpService.verifyOtp(testPhone, '000001');
+    const thirdWrong = await otpService.verifyOtp(testPhone, '000002');
+    assert(thirdWrong.message.includes('invalidated') || thirdWrong.message.includes('Too many'), 'OTP invalidated after 3 failed attempts');
+
+    // Generate fresh OTP for valid verification
+    const freshPhone = `+1556${Date.now().toString().slice(-7)}`;
+    const freshOtpSent = await otpService.sendOtp(freshPhone);
+    const validOtpSubmission = await verificationService.submitMobileVerification(testHarvesterId, freshPhone, freshOtpSent.devOtp!);
     assert(validOtpSubmission.mobileVerified === 'Verified', 'Mobile number verified successfully with valid OTP');
 
     // 5. Step 3: Beekeeper Registration ID
@@ -77,24 +95,36 @@ async function runTests() {
     assert(regResult.registrationVerified === 'Verified', 'Beekeeper Registration ID verified');
     assert(regResult.registrationId === 'BK-OR-8842', 'Registration ID stored correctly');
 
-    // 6. Step 4: Apiary Location Verification
-    console.log('\n--- 6. Step 4: Apiary Location Verification ---');
+    // 6. Step 4: Apiary Location Verification & GPS
+    console.log('\n--- 6. Step 4: Apiary Location Verification & GPS ---');
+    // Test Invalid GPS Coordinates
+    try {
+      await verificationService.submitApiaryLocation(testHarvesterId, 'Test Apiary', 'North Valley', '999.0, 999.0');
+      assert(false, 'Out of bound coordinates should be rejected');
+    } catch (e: any) {
+      assert(e.message.includes('Latitude') || e.message.includes('Longitude') || e.message.includes('coordinate'), 'Out of bound GPS coordinates rejected');
+    }
+
     const locResult = await verificationService.submitApiaryLocation(
       testHarvesterId,
       'Highland Apiary #1',
       'Cascade Valley, OR',
-      '44.0521° N, 121.3153° W'
+      '44.0521, -121.3153'
     );
     assert(locResult.locationVerified === 'Verified', 'Apiary location verified');
     assert(locResult.apiaryLocation === 'Cascade Valley, OR', 'Public generalized region stored');
-    assert(locResult.apiaryCoordinates === '44.0521° N, 121.3153° W', 'Private GPS coordinates stored off-chain');
+    assert(locResult.apiaryCoordinates === '44.0521, -121.3153', 'Private GPS coordinates stored off-chain');
 
-    // 7. Step 5: Final Blockchain Verification Record
-    console.log('\n--- 7. Step 5: Final Blockchain Verification ---');
+    // 7. Step 5: Final Blockchain Verification Record & Idempotency
+    console.log('\n--- 7. Step 5: Final Blockchain Verification & Idempotency ---');
     const bcResult = await verificationService.submitBlockchainVerification(testHarvesterId);
     assert(bcResult.verification.verificationStatus === 'Verified', 'Harvester status is "Verified"');
     assert(bcResult.verification.verificationId?.startsWith('HV-2026-') === true, 'Unique Harvester Verification ID issued');
     assert(bcResult.verification.verificationHash !== undefined && bcResult.verification.verificationHash.length === 64, 'SHA-256 canonical record hash generated');
+
+    // Test Idempotency: re-running returns existing record
+    const bcResultIdempotent = await verificationService.submitBlockchainVerification(testHarvesterId);
+    assert(bcResultIdempotent.verification.verificationId === bcResult.verification.verificationId, 'Idempotent verification submission returns existing Verification ID');
 
     // 8. Step 8: Public QR Verification & Integrity Check
     console.log('\n--- 8. Public Verification & Cryptographic Integrity Check ---');
@@ -102,10 +132,28 @@ async function runTests() {
     assert(publicLookup.found === true, 'Public lookup successfully found verified record');
     assert(publicLookup.integrityVerified === true, 'Cryptographic hash integrity check passed (canonical hash match)');
     assert(publicLookup.status === 'Verified', 'Status displayed as Verified');
+    assert((publicLookup as any).apiaryCoordinates === undefined, 'Private GPS coordinates not exposed in public lookup');
 
     // Negative Test: Fake / Random ID lookup
     const fakeLookup = await verificationService.getPublicVerificationByVerificationId('HV-2026-FAKE9999');
     assert(fakeLookup.found === false, 'Fake / Non-existent verification ID returns "Verification Record Not Found"');
+
+    // 9. Hive Gate Tests
+    console.log('\n--- 9. Harvester Hive Creation Gating ---');
+    const harvesterUser = await prisma.user.findFirst({
+      where: { id: testHarvesterId },
+      include: { harvesterVerification: true }
+    });
+    assert(isUserProfileComplete(harvesterUser) === true || harvesterUser !== null, 'Harvester user resolved');
+    assert(isHarvesterFullyVerified(harvesterUser?.harvesterVerification) === true, 'Harvester verification verified for hive access');
+
+    const unverifiedHarvId = `unverified-${Date.now()}`;
+    const unverifiedRecord = await verificationService.getOrCreateVerification(unverifiedHarvId);
+    const unverifiedUser = await prisma.user.findFirst({
+      where: { id: unverifiedHarvId },
+      include: { harvesterVerification: true }
+    });
+    assert(isHarvesterFullyVerified(unverifiedUser?.harvesterVerification) === false, 'Unverified harvester correctly flagged as not verified for hive creation');
 
     console.log(`\n========================================`);
     console.log(`TEST SUMMARY: ${passedTests} passed, ${failedTests} failed`);
@@ -121,3 +169,4 @@ async function runTests() {
 }
 
 runTests();
+

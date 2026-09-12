@@ -11,6 +11,21 @@ function issueUniqueCode(prefix: string, bytes: number = 4): string {
   return `${prefix}-2026-${hex}`;
 }
 
+// Helper to generate unique collision-resistant Beekeeper ID (BKR-XXXXXX)
+export async function generateUniqueBeekeeperId(): Promise<string> {
+  let isTaken = true;
+  let code = '';
+  while (isTaken) {
+    const hex = crypto.randomBytes(3).toString('hex').toUpperCase();
+    code = `BKR-${hex}`;
+    const found = await prisma.user.findUnique({ where: { beekeeperId: code } });
+    if (!found) {
+      isTaken = false;
+    }
+  }
+  return code;
+}
+
 /**
  * POST /api/auth/register
  * Register a new user account in PostgreSQL
@@ -37,6 +52,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const passwordHash = password ? crypto.createHash('sha256').update(password).digest('hex') : null;
+    const beekeeperId = await generateUniqueBeekeeperId();
 
     const user = await prisma.user.create({
       data: {
@@ -44,7 +60,8 @@ router.post('/register', async (req: Request, res: Response) => {
         email: cleanEmail,
         phone: phone ? phone.trim() : null,
         passwordHash,
-        role: role || 'HARVESTER'
+        role: role || 'HARVESTER',
+        beekeeperId,
       }
     });
 
@@ -57,6 +74,7 @@ router.post('/register', async (req: Request, res: Response) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        beekeeperId: user.beekeeperId,
         bsid: user.bsid,
         bspPass: user.bspPass
       }
@@ -99,6 +117,14 @@ router.post('/login', async (req: Request, res: Response) => {
       }
     }
 
+    if (!user.beekeeperId) {
+      const beekeeperId = await generateUniqueBeekeeperId();
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { beekeeperId }
+      });
+    }
+
     res.json({
       success: true,
       message: 'Authentication successful.',
@@ -108,6 +134,7 @@ router.post('/login', async (req: Request, res: Response) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        beekeeperId: user.beekeeperId,
         bsid: user.bsid,
         bspPass: user.bspPass
       }
@@ -151,25 +178,18 @@ router.get('/profile', async (req: Request, res: Response) => {
     }
 
     if (!user) {
-      // Find primary harvester user or default
-      user = await prisma.user.findFirst({
-        where: { role: 'HARVESTER' },
-        orderBy: { createdAt: 'asc' }
+      return res.status(404).json({
+        success: false,
+        error: 'USER_NOT_FOUND',
+        message: 'User profile not found.'
       });
     }
 
-    if (!user) {
-      // Auto-create default initial harvester
-      user = await prisma.user.create({
-        data: {
-          id: 'user-default-harvester',
-          name: 'HoneyChain Apiary Manager',
-          email: 'operations@honeychain.io',
-          phone: '+1 (555) 234-5678',
-          role: 'HARVESTER',
-          bsid: 'BSID-2026-A1B2C3D4',
-          bspPass: 'BSP-2026-E5F6'
-        }
+    if (!user.beekeeperId) {
+      const beekeeperId = await generateUniqueBeekeeperId();
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { beekeeperId }
       });
     }
 
@@ -187,6 +207,7 @@ router.get('/profile', async (req: Request, res: Response) => {
         facilityLocation: user.facilityLocation || null,
         licenseNumber: user.licenseNumber || null,
         designation: user.designation || null,
+        beekeeperId: user.beekeeperId,
         bsid: user.bsid,
         bspPass: user.bspPass,
         isProfileComplete: isComplete
@@ -257,6 +278,10 @@ router.put('/profile', async (req: Request, res: Response) => {
     if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber.trim();
     if (designation !== undefined) updateData.designation = designation.trim();
 
+    if (!user.beekeeperId) {
+      updateData.beekeeperId = await generateUniqueBeekeeperId();
+    }
+
     const updated = await prisma.user.update({
       where: { id: user.id },
       data: updateData
@@ -277,6 +302,7 @@ router.put('/profile', async (req: Request, res: Response) => {
         facilityLocation: updated.facilityLocation || null,
         licenseNumber: updated.licenseNumber || null,
         designation: updated.designation || null,
+        beekeeperId: updated.beekeeperId,
         bsid: updated.bsid,
         bspPass: updated.bspPass,
         isProfileComplete: isComplete
