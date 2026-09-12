@@ -13,9 +13,7 @@ class AuthService {
     FirebaseAuth? firebaseAuth,
     GoogleSignIn? googleSignIn,
   })  : _customFirebaseAuth = firebaseAuth,
-        _googleSignIn = googleSignIn ?? GoogleSignIn(
-          clientId: kIsWeb ? 'dummy-client-id.apps.googleusercontent.com' : null,
-        );
+        _googleSignIn = googleSignIn ?? GoogleSignIn();
 
   bool get isFirebaseInitialized => Firebase.apps.isNotEmpty;
 
@@ -48,6 +46,14 @@ class AuthService {
     }
 
     try {
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({'prompt': 'select_account'});
+        return await auth.signInWithPopup(googleProvider);
+      }
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         return null;
