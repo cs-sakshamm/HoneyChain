@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/localization/localization_service.dart';
@@ -119,7 +118,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
         child: SafeArea(
           top: false,
           bottom: true,
-          minimum: const EdgeInsets.only(bottom: 16),
+          minimum: const EdgeInsets.only(bottom: 14),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Center(
@@ -129,12 +128,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 290),
+                    constraints: const BoxConstraints(maxWidth: 248),
                     height: 58,
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xFF18181B).withValues(alpha: 0.90)
+                          ? const Color(0xFF18181B).withValues(alpha: 0.92)
                           : context.surfaceColor.withValues(alpha: 0.94),
                       borderRadius: BorderRadius.circular(32),
                       border: Border.all(
@@ -198,67 +197,51 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     final activeColor = context.textPrimaryColor;
     final inactiveColor = context.textMutedColor;
     final pillBg = isSelected
-        ? (isDark ? Colors.white.withValues(alpha: 0.15) : context.primarySoftColor)
+        ? (isDark ? Colors.white.withValues(alpha: 0.16) : context.primarySoftColor)
         : Colors.transparent;
 
     return Semantics(
       label: label,
       selected: isSelected,
       button: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              _currentIndex = index;
-              _showNav();
-            });
-          },
-          borderRadius: BorderRadius.circular(26),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: pillBg,
-              borderRadius: BorderRadius.circular(26),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedScale(
-                  scale: isSelected ? 1.05 : 1.0,
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutBack,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-                    child: Icon(
-                      isSelected ? activeIcon : icon,
-                      key: ValueKey<bool>(isSelected),
-                      size: 22,
-                      color: isSelected ? activeColor : inactiveColor,
-                    ),
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _currentIndex = index;
+                _showNav();
+              });
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              width: 56,
+              height: 44,
+              decoration: BoxDecoration(
+                color: pillBg,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              alignment: Alignment.center,
+              child: AnimatedScale(
+                scale: isSelected ? 1.06 : 1.0,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutBack,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (child, animation) =>
+                      FadeTransition(opacity: animation, child: child),
+                  child: Icon(
+                    isSelected ? activeIcon : icon,
+                    key: ValueKey<bool>(isSelected),
+                    size: 24,
+                    color: isSelected ? activeColor : inactiveColor,
                   ),
                 ),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
-                  child: isSelected
-                      ? Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Text(
-                            label,
-                            style: GoogleFonts.manrope(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: activeColor,
-                            ),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
+              ),
             ),
           ),
         ),
