@@ -1,11 +1,11 @@
 {
-    "name": "mobile_app",
-    "short_name": "mobile_app",
+    "name": "HoneyChain",
+    "short_name": "HoneyChain",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F9FAFB",
+    "theme_color": "#EAB308",
+    "description": "Supply chain management simplified for business owners.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
