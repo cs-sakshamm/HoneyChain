@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { blockchainService } from './blockchainService';
 import { otpService } from './otpService';
 import { aadhaarKycService } from './kyc';
+import { RegistrationProviderFactory } from './registration';
 
 const prisma = new PrismaClient();
 
@@ -223,6 +224,7 @@ export class VerificationService {
 
   /**
    * 3. Submit Beekeeper Registration ID
+   * Validates against authority-specific rules (State Agriculture, National Honey Producers, Organic Board, Other Local)
    */
   async submitRegistrationId(
     harvesterId: string,
@@ -230,21 +232,11 @@ export class VerificationService {
     registrationTypeRaw?: string
   ) {
     const regId = (registrationIdRaw || '').trim().toUpperCase();
-    const regType = (registrationTypeRaw || 'STATE_REGISTRY').toUpperCase().trim();
-    const validRegTypes = ['STATE_REGISTRY', 'COOPERATIVE', 'APICULTURE_BOARD', 'NATIONAL_REGISTRY'];
+    const regType = (registrationTypeRaw || 'STATE_AGRICULTURE').trim();
 
-    if (!validRegTypes.includes(regType)) {
-      throw new Error(`Invalid registration type. Supported types: ${validRegTypes.join(', ')}.`);
-    }
-
-    if (!regId || regId.length < 5) {
-      throw new Error('Registration ID must be at least 5 alphanumeric characters.');
-    }
-
-    // Format validation: Alphanumeric and dashes (e.g. BK-OR-8842, BEE-2026-991, COOP-USA-41)
-    const validFormat = /^[A-Z0-9-]{5,24}$/.test(regId);
-    if (!validFormat) {
-      throw new Error('Invalid Beekeeper Registration ID format. Use format like BK-OR-8842 or COOP-4921 (5-24 alphanumeric and dashes).');
+    const verifyResult = await RegistrationProviderFactory.verifyRegistration(regId, regType);
+    if (!verifyResult.success) {
+      throw new Error(verifyResult.message);
     }
 
     const verification = await this.getOrCreateVerification(harvesterId);
@@ -252,9 +244,9 @@ export class VerificationService {
     const updated = await prisma.harvesterVerification.update({
       where: { id: verification.id },
       data: {
-        registrationId: regId,
-        registrationType: regType,
-        registrationVerified: 'Verified',
+        registrationId: verifyResult.registrationId,
+        registrationType: verifyResult.authority,
+        registrationVerified: verifyResult.status,
         registrationSubmittedAt: new Date(),
         verificationStatus: verification.verificationStatus === 'Not Started' ? 'In Progress' : verification.verificationStatus
       },
@@ -353,6 +345,17 @@ export class VerificationService {
       },
       include: { harvester: true }
     });
+
+    // Synchronize facilityLocation and organizationName with User record
+    if (verification.harvesterId) {
+      await prisma.user.update({
+        where: { id: verification.harvesterId },
+        data: {
+          facilityLocation: apiaryLocation,
+          organizationName: apiaryName || undefined
+        }
+      }).catch(() => {});
+    }
 
     return updated;
   }

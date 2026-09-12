@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import { isUserProfileComplete, PROFILE_INCOMPLETE_RESPONSE, BEEKEEPER_PROFILE_INCOMPLETE_RESPONSE } from './services/profileService';
+import { generateUniqueBeekeeperId } from './routes/authRoutes';
 
 const prisma = new PrismaClient();
 
@@ -178,8 +179,7 @@ async function runProfileGateTests() {
     }
   });
 
-  const bkrHexA = crypto.randomBytes(3).toString('hex').toUpperCase();
-  const beekeeperIdA = `BKR-${bkrHexA}`;
+  const beekeeperIdA = await generateUniqueBeekeeperId();
   const beekeeperA = await prisma.user.create({
     data: {
       name: 'Beekeeper Alice',
@@ -190,10 +190,9 @@ async function runProfileGateTests() {
     }
   });
   assert(Boolean(beekeeperA.id), 'Beekeeper Alice created with unique database ID');
-  assert(/^BKR-[0-9A-F]{6}$/.test(beekeeperA.beekeeperId || ''), 'Beekeeper Alice has valid BKR-XXXXXX formatted ID');
+  assert(/^HC-BK-[0-9A-F]{8}$/.test(beekeeperA.beekeeperId || ''), 'Beekeeper Alice has valid HC-BK-XXXXXXXX formatted ID');
 
-  const bkrHexB = crypto.randomBytes(3).toString('hex').toUpperCase();
-  const beekeeperIdB = `BKR-${bkrHexB}`;
+  const beekeeperIdB = await generateUniqueBeekeeperId();
   const beekeeperB = await prisma.user.create({
     data: {
       name: 'Beekeeper Bob',

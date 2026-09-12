@@ -75,7 +75,20 @@ class HarvesterVerificationModel {
   bool get isStep1Complete => governmentIdVerified == 'Verified';
   bool get isStep2Complete => mobileVerified == 'Verified';
   bool get isStep3Complete => registrationVerified == 'Verified';
+  bool get isStep3ManualReview =>
+      registrationVerified == 'Manual Verification Required' ||
+      registrationVerified == 'Pending Review';
   bool get isStep4Complete => locationVerified == 'Verified';
+
+  String get step3DisplayStatus {
+    if (registrationVerified == 'Verified') return 'Registration Verified ✓';
+    if (isStep3ManualReview) return 'Manual verification required';
+    if (registrationVerified == 'Failed' || registrationVerified == 'Rejected') {
+      return 'Registration ID could not be verified';
+    }
+    if (registrationVerified == 'Pending') return 'Registration verification pending';
+    return registrationVerified;
+  }
 
   bool get canSubmitBlockchain =>
       isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete;

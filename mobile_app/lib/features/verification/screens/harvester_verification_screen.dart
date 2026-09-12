@@ -25,14 +25,58 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
 
-  // Step 3 Form
+  // Step 3 Form (4 Exact Registration Authorities)
   final TextEditingController _registrationIdController = TextEditingController();
-  String _regType = 'STATE_REGISTRY';
+  String _selectedAuthority = 'STATE_AGRICULTURE';
 
-  // Step 4 Form
+  static const Map<String, String> _registrationAuthorities = {
+    'STATE_AGRICULTURE': 'State Department of Agriculture',
+    'NATIONAL_HONEY_PRODUCERS': 'National Honey Producers',
+    'ORGANIC_CERTIFICATION_BOARD': 'Organic Certification Board',
+    'OTHER_LOCAL': 'Other / Local Registration',
+  };
+
+  // Step 4 Form (Simple State, District, Village/City Location)
+  String _selectedState = 'Uttar Pradesh';
+  final TextEditingController _districtController = TextEditingController(text: 'Gautam Buddh Nagar');
+  final TextEditingController _villageCityController = TextEditingController(text: 'Greater Noida');
   final TextEditingController _apiaryNameController = TextEditingController();
-  final TextEditingController _apiaryLocationController = TextEditingController();
   final TextEditingController _coordinatesController = TextEditingController();
+
+  static const List<String> _indianStates = [
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chhattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+    'Delhi',
+    'Jammu & Kashmir',
+    'Ladakh',
+    'Other / Outside India',
+  ];
 
   @override
   void initState() {
@@ -58,7 +102,23 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
         _apiaryNameController.text = user.organizationName!;
       }
       if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) {
-        _apiaryLocationController.text = user.facilityLocation!;
+        final parts = user.facilityLocation!.split(',').map((p) => p.trim()).toList();
+        if (parts.length >= 3) {
+          _villageCityController.text = parts[0];
+          _districtController.text = parts[1];
+          if (_indianStates.contains(parts[2])) {
+            _selectedState = parts[2];
+          }
+        } else if (parts.length == 2) {
+          _villageCityController.text = parts[0];
+          if (_indianStates.contains(parts[1])) {
+            _selectedState = parts[1];
+          } else {
+            _districtController.text = parts[1];
+          }
+        } else {
+          _villageCityController.text = user.facilityLocation!;
+        }
       }
     });
   }
@@ -70,8 +130,9 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
     _phoneController.dispose();
     _otpController.dispose();
     _registrationIdController.dispose();
+    _districtController.dispose();
+    _villageCityController.dispose();
     _apiaryNameController.dispose();
-    _apiaryLocationController.dispose();
     _coordinatesController.dispose();
     super.dispose();
   }
@@ -630,25 +691,130 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 3: Beekeeper Registration ID ──
+              // ── STEP 3: Beekeeper Registration ──
               _buildStepCard(
                 stepNumber: 3,
-                title: 'Beekeeper Registration ID',
-                subtitle: 'Apiculture Association / Cooperative Accreditation',
+                title: 'Beekeeper Registration',
+                subtitle: 'Authority Accreditation & HoneyChain Beekeeper ID',
                 icon: Icons.workspace_premium_outlined,
                 isCompleted: ver.isStep3Complete,
-                statusText: ver.registrationVerified,
+                statusText: ver.step3DisplayStatus,
                 content: ver.isStep3Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Accreditation ID',
+                        label: 'Registration ID',
                         value: ver.registrationId ?? 'Verified',
-                        subtext: 'Registry Type: ${ver.registrationType ?? 'State Registry'}',
+                        subtext: 'Authority: ${_registrationAuthorities[ver.registrationType] ?? ver.registrationType ?? 'State Agriculture'}',
+                        verifiedBadgeText: 'Beekeeper Registration — Verified ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Unique HoneyChain Beekeeper ID Card
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: context.primarySoftColor.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: context.primaryColor.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(Icons.badge_outlined, size: 20, color: context.primaryDarkColor),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'HoneyChain Beekeeper ID',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: context.textSecondaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        context.watch<UserController>().user.beekeeperId ?? 'HC-BK-PENDING',
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          color: context.textPrimaryColor,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'HoneyChain internal ID (distinct from external authority ID)',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          color: context.textMutedColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Manual Verification Alert if previously submitted with manual authority
+                          if (ver.isStep3ManualReview) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Verification unavailable — manual verification required.',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.amber.shade900,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Registration ID "${ver.registrationId}" with ${_registrationAuthorities[ver.registrationType] ?? ver.registrationType} has been submitted for manual authority review.',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: context.textSecondaryColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+
+                          // Registration Authority Selection (Exactly 4 Options)
                           Text(
-                            'Accreditation Type',
+                            'Registration Authority',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
@@ -661,32 +827,39 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: _regType,
+                                value: _selectedAuthority,
                                 isExpanded: true,
                                 icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
                                 dropdownColor: context.surfaceColor,
-                                items: const [
-                                  DropdownMenuItem(value: 'STATE_REGISTRY', child: Text('State Department of Agriculture')),
-                                  DropdownMenuItem(value: 'COOPERATIVE', child: Text('National Honey Producers Cooperative')),
-                                  DropdownMenuItem(value: 'APICULTURE_BOARD', child: Text('Organic Apiary Certification Board')),
-                                ],
+                                items: _registrationAuthorities.entries.map((entry) {
+                                  return DropdownMenuItem<String>(
+                                    value: entry.key,
+                                    child: Text(
+                                      entry.value,
+                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  );
+                                }).toList(),
                                 onChanged: (val) {
-                                  if (val != null) setState(() => _regType = val);
+                                  if (val != null) setState(() => _selectedAuthority = val);
                                 },
                               ),
                             ),
                           ),
                           const SizedBox(height: 12),
+
+                          // Registration ID input
                           Text(
-                            'Registration / License ID',
+                            'Registration ID',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
                           TextField(
                             controller: _registrationIdController,
                             decoration: InputDecoration(
-                              hintText: 'e.g. BK-OR-8842',
+                              hintText: 'Enter your registration ID',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.badge_outlined, size: 20, color: context.textSecondaryColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
@@ -697,7 +870,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           ),
                           const SizedBox(height: 12),
                           _ActionButton(
-                            label: 'Verify Registration ID',
+                            label: 'Verify Registration',
                             icon: Icons.verified_outlined,
                             isLoading: verCtrl.isLoading,
                             onTap: () {
@@ -706,7 +879,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter registration ID.')));
                                 return;
                               }
-                              verCtrl.submitRegistrationId(registrationId: id, registrationType: _regType);
+                              verCtrl.submitRegistrationId(registrationId: id, registrationType: _selectedAuthority);
                             },
                           ),
                         ],
@@ -715,33 +888,116 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 4: Apiary Location Verification ──
+              // ── STEP 4: Location (State, District, Village/City) ──
               _buildStepCard(
                 stepNumber: 4,
-                title: 'Apiary Location Verification',
-                subtitle: 'Generalized Public Region & Secure GPS Registry',
+                title: 'Location',
+                subtitle: 'State, District & Village / City Registry',
                 icon: Icons.pin_drop_outlined,
                 isCompleted: ver.isStep4Complete,
-                statusText: ver.locationVerified,
+                statusText: ver.locationVerified == 'Verified' ? 'Location — Completed ✓' : ver.locationVerified,
                 content: ver.isStep4Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Public Apiary Region',
+                        label: 'Location',
                         value: ver.apiaryLocation ?? 'Registered Apiary',
-                        subtext: 'Private GPS coordinates encrypted off-chain',
+                        subtext: 'State, District & Village registry confirmed',
+                        verifiedBadgeText: 'Location — Completed ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // State Dropdown
                           Text(
-                            'Apiary Name',
+                            'State',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: context.scaffoldBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: context.borderColor),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _indianStates.contains(_selectedState) ? _selectedState : _indianStates.first,
+                                isExpanded: true,
+                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
+                                dropdownColor: context.surfaceColor,
+                                items: _indianStates.map((state) {
+                                  return DropdownMenuItem<String>(
+                                    value: state,
+                                    child: Text(
+                                      state,
+                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _selectedState = val);
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // District Input
+                          Text(
+                            'District',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _districtController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Gautam Buddh Nagar',
+                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.location_city_outlined, size: 20, color: context.textSecondaryColor),
+                              filled: true,
+                              fillColor: context.scaffoldBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Village / City Input
+                          Text(
+                            'Village / City',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _villageCityController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Greater Noida',
+                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.home_work_outlined, size: 20, color: context.textSecondaryColor),
+                              filled: true,
+                              fillColor: context.scaffoldBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Apiary / Farm Name (Optional)
+                          Text(
+                            'Apiary / Farm Name (Optional)',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
                           TextField(
                             controller: _apiaryNameController,
                             decoration: InputDecoration(
-                              hintText: 'e.g. Highland Valley Apiary #1',
+                              hintText: 'e.g. Primary Apiary',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.hive_outlined, size: 20, color: context.textSecondaryColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
@@ -751,35 +1007,19 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                             ),
                           ),
                           const SizedBox(height: 12),
+
+                          // Optional GPS Coordinates
                           Text(
-                            'Public Region (Displayed publicly)',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                          ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _apiaryLocationController,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. Greater Noida, Uttar Pradesh',
-                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
-                              filled: true,
-                              fillColor: context.scaffoldBg,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Private GPS Coordinates (Encrypted off-chain)',
+                            'Private GPS Coordinates (Optional)',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
                           TextField(
                             controller: _coordinatesController,
                             decoration: InputDecoration(
-                              hintText: 'e.g. 28.4744, 77.5040 (lat, lng)',
+                              hintText: 'e.g. 28.4744, 77.5040 (Optional)',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.gps_fixed_rounded, size: 20, color: context.textSecondaryColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
@@ -790,19 +1030,26 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           ),
                           const SizedBox(height: 12),
                           _ActionButton(
-                            label: 'Register & Verify Location',
+                            label: 'Save & Complete Location',
                             icon: Icons.location_on_outlined,
                             isLoading: verCtrl.isLoading,
                             onTap: () {
-                              final name = _apiaryNameController.text.trim();
-                              final loc = _apiaryLocationController.text.trim();
-                              if (loc.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter public region.')));
+                              final village = _villageCityController.text.trim();
+                              final district = _districtController.text.trim();
+                              final state = _selectedState;
+                              if (village.isEmpty && district.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter village/city or district.')));
                                 return;
                               }
+                              final formattedLoc = [village, district, state]
+                                  .where((s) => s.isNotEmpty)
+                                  .join(', ');
+                              final name = _apiaryNameController.text.trim().isNotEmpty
+                                  ? _apiaryNameController.text.trim()
+                                  : 'Primary Apiary';
                               verCtrl.submitApiaryLocation(
                                 apiaryName: name,
-                                apiaryLocation: loc,
+                                apiaryLocation: formattedLoc,
                                 apiaryCoordinates: _coordinatesController.text.trim(),
                               );
                             },

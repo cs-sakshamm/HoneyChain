@@ -11,13 +11,13 @@ function issueUniqueCode(prefix: string, bytes: number = 4): string {
   return `${prefix}-2026-${hex}`;
 }
 
-// Helper to generate unique collision-resistant Beekeeper ID (BKR-XXXXXX)
+// Helper to generate unique collision-resistant HoneyChain Beekeeper ID (HC-BK-XXXXXXXX)
 export async function generateUniqueBeekeeperId(): Promise<string> {
   let isTaken = true;
   let code = '';
   while (isTaken) {
-    const hex = crypto.randomBytes(3).toString('hex').toUpperCase();
-    code = `BKR-${hex}`;
+    const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
+    code = `HC-BK-${hex}`;
     const found = await prisma.user.findUnique({ where: { beekeeperId: code } });
     if (!found) {
       isTaken = false;
