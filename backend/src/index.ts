@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import authRoutes from './routes/authRoutes';
 import hiveRoutes from './routes/hiveRoutes';
 import verificationRoutes from './routes/verificationRoutes';
+import workflowRoutes from './routes/workflowRoutes';
 import { verificationService } from './services/verificationService';
 
 const app = express();
@@ -119,6 +120,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', authRoutes); // Exposes /api/profile and /api/profile/identity
 app.use('/api/hives', hiveRoutes);
 app.use('/api/verification', verificationRoutes);
+app.use('/api', workflowRoutes); // Exposes /api/requests, /api/batches, /api/lab-reports, /api/packaging
 
 // ── 1. Create Harvest & Batch ──
 app.post('/api/harvests', async (req, res) => {
@@ -314,7 +316,14 @@ app.get('/api/verify', async (req, res) => {
       where: { id: batchId },
       include: {
         harvest: {
-          include: { harvester: true, hive: true }
+          include: {
+            harvester: { include: { harvesterVerification: true } },
+            hive: true
+          }
+        },
+        workflowRequests: {
+          include: { fromUser: true, toUser: true },
+          orderBy: { createdAt: 'asc' }
         },
         processingRecords: { include: { processor: true } },
         labReports: { include: { lab: true } },
@@ -331,18 +340,60 @@ app.get('/api/verify', async (req, res) => {
       });
     }
 
+    const verifiedLab = batch.labReports.find((r) => r.status === 'APPROVED') || batch.labReports[0] || null;
+    const latestPackaging = batch.packagingRecords[0] || null;
+    const latestProcessing = batch.processingRecords[0] || null;
+
     res.json({
       success: true,
       found: true,
       batchId: batch.id,
       status: batch.status,
-      harvester: batch.harvest?.harvester?.name || 'Verified Harvester',
-      location: batch.harvest?.location || 'Cascade Valley, OR',
-      quantityKg: batch.harvest?.quantity,
+      currentStage: batch.currentStage,
       createdAt: batch.createdAt,
-      labReport: batch.labReports[0] || null,
-      packaging: batch.packagingRecords[0] || null,
-      events: batch.provenanceEvents
+      harvester: {
+        name: batch.harvest?.harvester?.name || 'Verified Harvester',
+        email: batch.harvest?.harvester?.email,
+        bsid: batch.harvest?.harvester?.bsid || null,
+        verificationStatus: batch.harvest?.harvester?.harvesterVerification?.verificationStatus || 'Verified',
+        location: batch.harvest?.location || 'Cascade Valley, OR',
+        hiveCode: batch.harvest?.hive?.hiveCode || 'HC-HIVE-01',
+        honeyType: batch.harvest?.hive?.honeyType || 'Wildflower',
+        quantityKg: batch.harvest?.quantity || 0,
+        harvestDate: batch.harvest?.createdAt || batch.createdAt
+      },
+      collectionProcessing: latestProcessing ? {
+        processor: latestProcessing.processor?.name || 'Authorized Processing Center',
+        method: latestProcessing.method,
+        quantityReceived: latestProcessing.quantityReceived,
+        quantityAfter: latestProcessing.quantityAfter,
+        notes: latestProcessing.notes,
+        processedAt: latestProcessing.createdAt
+      } : null,
+      labVerification: verifiedLab ? {
+        labName: verifiedLab.lab?.name || 'Certified Honey Quality Testing Lab',
+        qualityScore: verifiedLab.qualityScore,
+        moistureContent: verifiedLab.moistureContent,
+        purityGrade: verifiedLab.purityGrade,
+        contaminantsFound: verifiedLab.contaminantsFound,
+        status: verifiedLab.status,
+        verifiedAt: verifiedLab.createdAt
+      } : null,
+      packaging: latestPackaging ? {
+        packager: latestPackaging.packager?.name || 'HoneyChain Packaging Facility',
+        finalQuantityKg: latestPackaging.finalQuantity,
+        numberOfPackages: latestPackaging.numberOfPackages,
+        packageSize: latestPackaging.packageSize,
+        qrCodeUrl: latestPackaging.qrCodeUrl,
+        packagedAt: latestPackaging.createdAt
+      } : null,
+      provenanceEvents: batch.provenanceEvents,
+      blockchainVerification: {
+        totalConfirmedEvents: batch.provenanceEvents.filter((e) => e.status === 'CONFIRMED').length,
+        network: 'Hardhat Localhost (Chain ID: 31337)',
+        ledgerStatus: batch.provenanceEvents.some((e) => e.status === 'CONFIRMED') ? 'LEDGER_VERIFIED' : 'PENDING_CONFIRMATION',
+        latestTxHash: batch.provenanceEvents.find((e) => e.txHash)?.txHash || null
+      }
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error?.message || String(error) });

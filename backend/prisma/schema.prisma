@@ -1,6 +1,6 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 generator client {
@@ -27,6 +27,10 @@ model User {
   packagingRecords      PackagingRecord[]
   provenanceEvents      ProvenanceEvent[]
   harvesterVerification HarvesterVerification?
+
+  sentWorkflowRequests     WorkflowRequest[] @relation("SentWorkflowRequests")
+  receivedWorkflowRequests WorkflowRequest[] @relation("ReceivedWorkflowRequests")
+  requestHistory           RequestHistory[]
 }
 
 model Hive {
@@ -78,14 +82,18 @@ model Harvest {
 }
 
 model Batch {
-  id        String   @id @unique
-  harvestId String
-  status    String   @default("HARVESTED")
-  createdAt DateTime @default(now())
+  id           String   @id @unique
+  harvestId    String
+  status       String   @default("HARVESTED")
+  currentStage String   @default("HARVEST") // HARVEST, COLLECTION, LAB, PACKAGING, COMPLETED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 
   harvest Harvest @relation(fields: [harvestId], references: [id])
 
   chainRequests     ChainRequest[]
+  workflowRequests  WorkflowRequest[]
+  requestHistory    RequestHistory[]
   processingRecords ProcessingRecord[]
   labReports        LabReport[]
   packagingRecords  PackagingRecord[]
@@ -102,53 +110,125 @@ model ChainRequest {
   batch Batch @relation(fields: [batchId], references: [id])
 }
 
-model ProcessingRecord {
-  id               String   @id @default(uuid())
-  batchId          String
-  processorId      String
-  quantityReceived Float
-  quantityAfter    Float
-  method           String
-  notes            String?
-  createdAt        DateTime @default(now())
+model WorkflowRequest {
+  id                String    @id @default(uuid())
+  requestId         String    @unique // REQ-COL-2026-XXXX, REQ-LAB-2026-XXXX, REQ-PKG-2026-XXXX
+  batchId           String
+  fromUserId        String
+  toUserId          String?
+  fromRole          String    // HARVESTER, COLLECTOR_PROCESSOR, LAB, PACKAGING
+  toRole            String    // COLLECTOR_PROCESSOR, LAB, PACKAGING
+  requestType       String    // HARVEST_TO_COLLECTION, COLLECTION_TO_LAB, LAB_TO_PACKAGING
+  status            String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, IN_PROGRESS, VERIFIED, COMPLETED, CANCELLED
+  previousRequestId String?
+  quantity          Float?
+  unit              String    @default("kg")
+  notes             String?
+  metadata          String?   // JSON string for additional context
+  acceptedAt        DateTime?
+  completedAt       DateTime?
+  rejectedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  batch     Batch @relation(fields: [batchId], references: [id])
-  processor User  @relation(fields: [processorId], references: [id])
+  batch            Batch             @relation(fields: [batchId], references: [id])
+  fromUser         User              @relation("SentWorkflowRequests", fields: [fromUserId], references: [id])
+  toUser           User?             @relation("ReceivedWorkflowRequests", fields: [toUserId], references: [id])
+  previousRequest  WorkflowRequest?  @relation("RequestChain", fields: [previousRequestId], references: [id])
+  nextRequests     WorkflowRequest[] @relation("RequestChain")
+  history          RequestHistory[]
+  processingRecord ProcessingRecord?
+  labReport        LabReport?
+  packagingRecord  PackagingRecord?
+  provenanceEvents ProvenanceEvent[]
+
+  @@index([batchId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([toRole])
+  @@index([status])
+}
+
+model RequestHistory {
+  id         String   @id @default(uuid())
+  requestId  String
+  batchId    String
+  action     String   // CREATED, ACCEPTED, REJECTED, PROCESSED, TESTED, VERIFIED, PACKAGED, COMPLETED, CANCELLED
+  fromStatus String?
+  toStatus   String
+  actorId    String
+  actorRole  String
+  notes      String?
+  txHash     String?
+  dataHash   String?
+  createdAt  DateTime @default(now())
+
+  request WorkflowRequest @relation(fields: [requestId], references: [id])
+  batch   Batch           @relation(fields: [batchId], references: [id])
+  actor   User            @relation(fields: [actorId], references: [id])
+
+  @@index([requestId])
+  @@index([batchId])
+  @@index([actorId])
+}
+
+model ProcessingRecord {
+  id                String   @id @default(uuid())
+  batchId           String
+  processorId       String
+  requestId         String?  @unique
+  quantityReceived  Float
+  quantityAfter     Float
+  method            String   @default("Standard Cold Extraction")
+  moistureAtReceipt Float?
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  batch     Batch            @relation(fields: [batchId], references: [id])
+  processor User             @relation(fields: [processorId], references: [id])
+  request   WorkflowRequest? @relation(fields: [requestId], references: [id])
 }
 
 model LabReport {
   id                String   @id @default(uuid())
   batchId           String
   labId             String
+  requestId         String?  @unique
   testResults       String
   qualityScore      Float?
   moistureContent   Float?
   purityGrade       String?
-  contaminantsFound String?
-  status            String   @default("SUBMITTED")
+  contaminantsFound String?  @default("None")
+  status            String   @default("APPROVED") // APPROVED, REJECTED
   notes             String?
   createdAt         DateTime @default(now())
 
-  batch Batch @relation(fields: [batchId], references: [id])
-  lab   User  @relation(fields: [labId], references: [id])
+  batch   Batch            @relation(fields: [batchId], references: [id])
+  lab     User             @relation(fields: [labId], references: [id])
+  request WorkflowRequest? @relation(fields: [requestId], references: [id])
 }
 
 model PackagingRecord {
   id               String   @id @default(uuid())
   batchId          String
   packagerId       String
+  requestId        String?  @unique
   finalQuantity    Float
   numberOfPackages Int
+  packageSize      String?  @default("500g Glass Jar")
   notes            String?
+  qrCodeUrl        String?
   createdAt        DateTime @default(now())
 
-  batch    Batch @relation(fields: [batchId], references: [id])
-  packager User  @relation(fields: [packagerId], references: [id])
+  batch    Batch            @relation(fields: [batchId], references: [id])
+  packager User             @relation(fields: [packagerId], references: [id])
+  request  WorkflowRequest? @relation(fields: [requestId], references: [id])
 }
 
 model ProvenanceEvent {
   id                String   @id @default(uuid())
   batchId           String
+  requestId         String?
   eventType         String
   actorId           String
   dataHash          String
@@ -157,11 +237,12 @@ model ProvenanceEvent {
   blockNumber       Int?
   network           String?
   contractAddress   String?
-  status            String   @default("PENDING")
+  status            String   @default("PENDING") // PENDING, CONFIRMED, FAILED
   timestamp         DateTime @default(now())
 
-  batch Batch @relation(fields: [batchId], references: [id])
-  actor User  @relation(fields: [actorId], references: [id])
+  batch   Batch            @relation(fields: [batchId], references: [id])
+  actor   User             @relation(fields: [actorId], references: [id])
+  request WorkflowRequest? @relation(fields: [requestId], references: [id])
 }
 
 model HarvesterVerification {

@@ -45,6 +45,7 @@ const crypto = __importStar(require("crypto"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const hiveRoutes_1 = __importDefault(require("./routes/hiveRoutes"));
 const verificationRoutes_1 = __importDefault(require("./routes/verificationRoutes"));
+const workflowRoutes_1 = __importDefault(require("./routes/workflowRoutes"));
 const verificationService_1 = require("./services/verificationService");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
@@ -147,6 +148,7 @@ app.use('/api/auth', authRoutes_1.default);
 app.use('/api', authRoutes_1.default); // Exposes /api/profile and /api/profile/identity
 app.use('/api/hives', hiveRoutes_1.default);
 app.use('/api/verification', verificationRoutes_1.default);
+app.use('/api', workflowRoutes_1.default); // Exposes /api/requests, /api/batches, /api/lab-reports, /api/packaging
 // ── 1. Create Harvest & Batch ──
 app.post('/api/harvests', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { harvesterId, hiveId, quantity, location, notes } = req.body;
@@ -316,7 +318,7 @@ app.get('/api/verify/harvester/:verificationId', (req, res) => __awaiter(void 0,
 }));
 // ── 8. Public Batch Verification Endpoint (for QR Scanning) ──
 app.get('/api/verify', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v;
     try {
         const batchId = String(req.query.batch || '');
         if (!batchId) {
@@ -326,7 +328,14 @@ app.get('/api/verify', (req, res) => __awaiter(void 0, void 0, void 0, function*
             where: { id: batchId },
             include: {
                 harvest: {
-                    include: { harvester: true, hive: true }
+                    include: {
+                        harvester: { include: { harvesterVerification: true } },
+                        hive: true
+                    }
+                },
+                workflowRequests: {
+                    include: { fromUser: true, toUser: true },
+                    orderBy: { createdAt: 'asc' }
                 },
                 processingRecords: { include: { processor: true } },
                 labReports: { include: { lab: true } },
@@ -341,18 +350,59 @@ app.get('/api/verify', (req, res) => __awaiter(void 0, void 0, void 0, function*
                 message: `Batch ${batchId} not found on HoneyChain Provenance Ledger.`
             });
         }
+        const verifiedLab = batch.labReports.find((r) => r.status === 'APPROVED') || batch.labReports[0] || null;
+        const latestPackaging = batch.packagingRecords[0] || null;
+        const latestProcessing = batch.processingRecords[0] || null;
         res.json({
             success: true,
             found: true,
             batchId: batch.id,
             status: batch.status,
-            harvester: ((_b = (_a = batch.harvest) === null || _a === void 0 ? void 0 : _a.harvester) === null || _b === void 0 ? void 0 : _b.name) || 'Verified Harvester',
-            location: ((_c = batch.harvest) === null || _c === void 0 ? void 0 : _c.location) || 'Cascade Valley, OR',
-            quantityKg: (_d = batch.harvest) === null || _d === void 0 ? void 0 : _d.quantity,
+            currentStage: batch.currentStage,
             createdAt: batch.createdAt,
-            labReport: batch.labReports[0] || null,
-            packaging: batch.packagingRecords[0] || null,
-            events: batch.provenanceEvents
+            harvester: {
+                name: ((_b = (_a = batch.harvest) === null || _a === void 0 ? void 0 : _a.harvester) === null || _b === void 0 ? void 0 : _b.name) || 'Verified Harvester',
+                email: (_d = (_c = batch.harvest) === null || _c === void 0 ? void 0 : _c.harvester) === null || _d === void 0 ? void 0 : _d.email,
+                bsid: ((_f = (_e = batch.harvest) === null || _e === void 0 ? void 0 : _e.harvester) === null || _f === void 0 ? void 0 : _f.bsid) || null,
+                verificationStatus: ((_j = (_h = (_g = batch.harvest) === null || _g === void 0 ? void 0 : _g.harvester) === null || _h === void 0 ? void 0 : _h.harvesterVerification) === null || _j === void 0 ? void 0 : _j.verificationStatus) || 'Verified',
+                location: ((_k = batch.harvest) === null || _k === void 0 ? void 0 : _k.location) || 'Cascade Valley, OR',
+                hiveCode: ((_m = (_l = batch.harvest) === null || _l === void 0 ? void 0 : _l.hive) === null || _m === void 0 ? void 0 : _m.hiveCode) || 'HC-HIVE-01',
+                honeyType: ((_p = (_o = batch.harvest) === null || _o === void 0 ? void 0 : _o.hive) === null || _p === void 0 ? void 0 : _p.honeyType) || 'Wildflower',
+                quantityKg: ((_q = batch.harvest) === null || _q === void 0 ? void 0 : _q.quantity) || 0,
+                harvestDate: ((_r = batch.harvest) === null || _r === void 0 ? void 0 : _r.createdAt) || batch.createdAt
+            },
+            collectionProcessing: latestProcessing ? {
+                processor: ((_s = latestProcessing.processor) === null || _s === void 0 ? void 0 : _s.name) || 'Authorized Processing Center',
+                method: latestProcessing.method,
+                quantityReceived: latestProcessing.quantityReceived,
+                quantityAfter: latestProcessing.quantityAfter,
+                notes: latestProcessing.notes,
+                processedAt: latestProcessing.createdAt
+            } : null,
+            labVerification: verifiedLab ? {
+                labName: ((_t = verifiedLab.lab) === null || _t === void 0 ? void 0 : _t.name) || 'Certified Honey Quality Testing Lab',
+                qualityScore: verifiedLab.qualityScore,
+                moistureContent: verifiedLab.moistureContent,
+                purityGrade: verifiedLab.purityGrade,
+                contaminantsFound: verifiedLab.contaminantsFound,
+                status: verifiedLab.status,
+                verifiedAt: verifiedLab.createdAt
+            } : null,
+            packaging: latestPackaging ? {
+                packager: ((_u = latestPackaging.packager) === null || _u === void 0 ? void 0 : _u.name) || 'HoneyChain Packaging Facility',
+                finalQuantityKg: latestPackaging.finalQuantity,
+                numberOfPackages: latestPackaging.numberOfPackages,
+                packageSize: latestPackaging.packageSize,
+                qrCodeUrl: latestPackaging.qrCodeUrl,
+                packagedAt: latestPackaging.createdAt
+            } : null,
+            provenanceEvents: batch.provenanceEvents,
+            blockchainVerification: {
+                totalConfirmedEvents: batch.provenanceEvents.filter((e) => e.status === 'CONFIRMED').length,
+                network: 'Hardhat Localhost (Chain ID: 31337)',
+                ledgerStatus: batch.provenanceEvents.some((e) => e.status === 'CONFIRMED') ? 'LEDGER_VERIFIED' : 'PENDING_CONFIRMATION',
+                latestTxHash: ((_v = batch.provenanceEvents.find((e) => e.txHash)) === null || _v === void 0 ? void 0 : _v.txHash) || null
+            }
         });
     }
     catch (error) {

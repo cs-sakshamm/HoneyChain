@@ -100,6 +100,7 @@ class AllHivesScreen extends StatelessWidget {
                 child: hives.isEmpty
                     ? _buildEmptyState(context)
                     : ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 120),
                         itemCount: hives.length,
                         separatorBuilder: (context, index) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
@@ -108,8 +109,6 @@ class AllHivesScreen extends StatelessWidget {
                         },
                       ),
               ),
-              // Clear the floating bottom nav pill
-              const SizedBox(height: 90),
             ],
           ),
         ),

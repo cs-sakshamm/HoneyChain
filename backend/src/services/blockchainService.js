@@ -147,6 +147,72 @@ class BlockchainService {
         const jsonString = JSON.stringify(canonicalObj);
         return crypto.createHash('sha256').update(jsonString).digest('hex');
     }
+    /**
+     * Record Batch Lifecycle Event on blockchain
+     */
+    recordBatchEventOnChain(batchId_1, eventType_1, actorId_1, dataObj_1) {
+        return __awaiter(this, arguments, void 0, function* (batchId, eventType, actorId, dataObj, previousEventHash = '') {
+            const dataString = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
+            const dataHash = crypto.createHash('sha256').update(dataString).digest('hex');
+            try {
+                const isOnline = yield this.checkConnection();
+                if (!isOnline) {
+                    return {
+                        success: false,
+                        isOffline: true,
+                        dataHash,
+                        network: NETWORK_NAME,
+                        status: 'PENDING',
+                        error: 'Blockchain node is currently unreachable. Status: Blockchain Pending'
+                    };
+                }
+                const tx = yield this.contract.recordEvent(batchId, eventType, actorId, dataHash, previousEventHash);
+                const receipt = yield tx.wait();
+                return {
+                    success: true,
+                    txHash: receipt.hash,
+                    blockNumber: receipt.blockNumber,
+                    dataHash,
+                    network: NETWORK_NAME,
+                    status: 'CONFIRMED'
+                };
+            }
+            catch (error) {
+                console.warn(`[Blockchain] Could not commit tx on chain for ${eventType}:`, (error === null || error === void 0 ? void 0 : error.message) || error);
+                return {
+                    success: false,
+                    dataHash,
+                    network: NETWORK_NAME,
+                    status: 'PENDING',
+                    error: (error === null || error === void 0 ? void 0 : error.message) || String(error)
+                };
+            }
+        });
+    }
+    /**
+     * Get all on-chain events for a batch
+     */
+    getBatchEventsOnChain(batchId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const isOnline = yield this.checkConnection();
+                if (!isOnline)
+                    return [];
+                const events = yield this.contract.getEvents(batchId);
+                return events.map((e) => ({
+                    batchId: e.batchId,
+                    eventType: e.eventType,
+                    actorId: e.actorId,
+                    dataHash: e.dataHash,
+                    previousEventHash: e.previousEventHash,
+                    timestamp: Number(e.timestamp)
+                }));
+            }
+            catch (_a) {
+                return [];
+            }
+        });
+    }
     get contractAddress() {
         return CONTRACT_ADDRESS;
     }

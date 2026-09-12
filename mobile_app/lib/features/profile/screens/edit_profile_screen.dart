@@ -54,7 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Profile updated successfully'),
+        content: const Text('Profile updated successfully'),
         backgroundColor: AppConstants.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -78,108 +78,109 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  _PillBackButton(),
+                  const _PillBackButton(),
                   const SizedBox(width: 14),
                   Text(
                     context.tr('edit_profile') == 'edit_profile' ? 'Edit Profile' : context.tr('edit_profile'),
-                    style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: context.textPrimaryColor, letterSpacing: -0.3),
+                    style: GoogleFonts.manrope(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: context.textPrimaryColor,
+                      letterSpacing: -0.3,
+                    ),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppConstants.space20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: AppConstants.space16),
-
-              Container(
-                padding: const EdgeInsets.all(AppConstants.space16),
-                decoration: BoxDecoration(
-                  color: context.surfaceColor,
-                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                  border: Border.all(color: context.borderColor),
-                ),
-                child: Column(
-                  children: [
-                    _buildInputField(
-                      context,
-                      label: 'Full Name *',
-                      hint: 'Enter your full name',
-                      controller: _nameController,
-                      validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter your name' : null,
-                    ),
-                    const SizedBox(height: AppConstants.space16),
-                    _buildInputField(
-                      context,
-                      label: 'Email *',
-                      hint: 'email@example.com',
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Please enter your email';
-                        if (!val.contains('@')) return 'Enter a valid email';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: AppConstants.space16),
-                    _buildInputField(
-                      context,
-                      label: 'Phone Number *',
-                      hint: '+91 9876543210',
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter phone number' : null,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppConstants.space24),
-
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.colors.primary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onPrimary),
-                        )
-                      : Text(
-                          'Save Changes',
-                          style: GoogleFonts.manrope(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: context.colors.onPrimary,
-                          ),
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppConstants.space20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: AppConstants.space16),
+                      Container(
+                        padding: const EdgeInsets.all(AppConstants.space16),
+                        decoration: BoxDecoration(
+                          color: context.surfaceColor,
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                          border: Border.all(color: context.borderColor),
                         ),
+                        child: Column(
+                          children: [
+                            _buildInputField(
+                              context,
+                              label: 'Full Name *',
+                              hint: 'Enter your full name',
+                              controller: _nameController,
+                              validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter your name' : null,
+                            ),
+                            const SizedBox(height: AppConstants.space16),
+                            _buildInputField(
+                              context,
+                              label: 'Email *',
+                              hint: 'email@example.com',
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) return 'Please enter your email';
+                                if (!val.contains('@')) return 'Enter a valid email';
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: AppConstants.space16),
+                            _buildInputField(
+                              context,
+                              label: 'Phone Number *',
+                              hint: '+91 9876543210',
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter phone number' : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.space24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _isSaving ? null : _saveProfile,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.colors.primary,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                            ),
+                          ),
+                          child: _isSaving
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onPrimary),
+                                )
+                              : Text(
+                                  'Save Changes',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.colors.onPrimary,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
             ),
           ],
         ),
       ),
     );
   }
-
 
   Widget _buildInputField(
     BuildContext context, {

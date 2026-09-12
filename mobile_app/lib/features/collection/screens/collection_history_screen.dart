@@ -26,17 +26,19 @@ class CollectionHistoryScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
               child: Row(
                 children: [
-                  _PillBackButton(),
-                  const SizedBox(width: 14),
+                  if (Navigator.canPop(context)) ...[
+                    const _PillBackButton(),
+                    const SizedBox(width: 14),
+                  ],
                   Text(
                     context.tr('processing_history') == 'processing_history'
                         ? 'Processing History'
                         : context.tr('processing_history'),
                     style: GoogleFonts.manrope(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: context.textPrimaryColor,
                       letterSpacing: -0.3,
@@ -49,7 +51,7 @@ class CollectionHistoryScreen extends StatelessWidget {
               child: requests.isEmpty
                   ? _buildEmptyState(context)
                   : ListView.separated(
-                      padding: const EdgeInsets.all(AppConstants.space16),
+                      padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
                       itemCount: requests.length,
                       separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
                       itemBuilder: (context, index) {

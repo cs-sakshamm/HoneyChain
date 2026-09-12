@@ -8,7 +8,9 @@ import '../../../core/localization/localization_service.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../collection/screens/batch_timeline_screen.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../../verification/controllers/verification_controller.dart';
 import '../../verification/screens/harvester_verification_screen.dart';
@@ -141,14 +143,45 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
 
                   const SizedBox(height: AppConstants.space24),
 
-                  // Recent requests
-                  Text(
-                    context.tr('recent_requests'),
-                    style: GoogleFonts.manrope(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: context.textPrimaryColor,
-                    ),
+                  // Recent requests header with View All button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        context.tr('recent_requests'),
+                        style: GoogleFonts.manrope(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimaryColor,
+                        ),
+                      ),
+                      if (workflowController.allRequests.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => Scaffold(
+                                  backgroundColor: context.scaffoldBg,
+                                  appBar: AppBar(
+                                    title: Text('My Workflow Requests', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+                                    backgroundColor: context.surfaceColor,
+                                    elevation: 0,
+                                  ),
+                                  body: const MyRequestsView(userRole: 'HARVESTER'),
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'View All (${workflowController.allRequests.length})',
+                            style: GoogleFonts.manrope(
+                              fontWeight: FontWeight.w700,
+                              color: context.colors.primary,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: AppConstants.space12),
                 ],
@@ -174,6 +207,14 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppConstants.space24, vertical: 8),
                     child: AppCard(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BatchTimelineScreen(batchId: request.batchId),
+                          ),
+                        );
+                      },
                       padding: const EdgeInsets.all(AppConstants.space16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,6 +255,21 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                                     color: context.textSecondaryColor,
                                   ),
                                   overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.timeline_rounded, size: 14, color: context.colors.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Tap to view live timeline & blockchain state',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.colors.primary,
                                 ),
                               ),
                             ],

@@ -26,15 +26,17 @@ class PackagingHistoryScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
               child: Row(
                 children: [
-                  _PillBackButton(),
-                  const SizedBox(width: 14),
+                  if (Navigator.canPop(context)) ...[
+                    const _PillBackButton(),
+                    const SizedBox(width: 14),
+                  ],
                   Text(
                     'Packaging History',
                     style: GoogleFonts.manrope(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: context.textPrimaryColor,
                       letterSpacing: -0.3,
@@ -69,10 +71,7 @@ class PackagingHistoryScreen extends StatelessWidget {
                       ),
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppConstants.space16,
-                        vertical: AppConstants.space24,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
                       itemCount: history.length,
                       separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
                       itemBuilder: (context, index) {

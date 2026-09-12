@@ -225,6 +225,8 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AppCard(
       onTap: () {
         context.read<AuthController>().setRole(item.role);
@@ -236,15 +238,13 @@ class _RoleCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? AppConstants.honeyAccent
-                    : AppConstants.primarySoft,
+                color: context.primarySoftColor,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 item.icon,
                 size: 36,
-                color: Colors.black,
+                color: isDark ? Colors.white : Colors.black,
               ),
             ),
             const SizedBox(height: 20),

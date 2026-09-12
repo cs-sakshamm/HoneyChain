@@ -147,6 +147,91 @@ class BlockchainService {
     return crypto.createHash('sha256').update(jsonString).digest('hex');
   }
 
+  /**
+   * Record Batch Lifecycle Event on blockchain
+   */
+  async recordBatchEventOnChain(
+    batchId: string,
+    eventType: string,
+    actorId: string,
+    dataObj: any,
+    previousEventHash: string = ''
+  ): Promise<{
+    success: boolean;
+    txHash?: string;
+    blockNumber?: number;
+    dataHash: string;
+    network: string;
+    status: 'CONFIRMED' | 'PENDING' | 'FAILED';
+    isOffline?: boolean;
+    error?: string;
+  }> {
+    const dataString = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
+    const dataHash = crypto.createHash('sha256').update(dataString).digest('hex');
+
+    try {
+      const isOnline = await this.checkConnection();
+      if (!isOnline) {
+        return {
+          success: false,
+          isOffline: true,
+          dataHash,
+          network: NETWORK_NAME,
+          status: 'PENDING',
+          error: 'Blockchain node is currently unreachable. Status: Blockchain Pending'
+        };
+      }
+
+      const tx = await (this.contract as any).recordEvent(
+        batchId,
+        eventType,
+        actorId,
+        dataHash,
+        previousEventHash
+      );
+      const receipt = await tx.wait();
+
+      return {
+        success: true,
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        dataHash,
+        network: NETWORK_NAME,
+        status: 'CONFIRMED'
+      };
+    } catch (error: any) {
+      console.warn(`[Blockchain] Could not commit tx on chain for ${eventType}:`, error?.message || error);
+      return {
+        success: false,
+        dataHash,
+        network: NETWORK_NAME,
+        status: 'PENDING',
+        error: error?.message || String(error)
+      };
+    }
+  }
+
+  /**
+   * Get all on-chain events for a batch
+   */
+  async getBatchEventsOnChain(batchId: string): Promise<any[]> {
+    try {
+      const isOnline = await this.checkConnection();
+      if (!isOnline) return [];
+      const events = await (this.contract as any).getEvents(batchId);
+      return events.map((e: any) => ({
+        batchId: e.batchId,
+        eventType: e.eventType,
+        actorId: e.actorId,
+        dataHash: e.dataHash,
+        previousEventHash: e.previousEventHash,
+        timestamp: Number(e.timestamp)
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   get contractAddress(): string {
     return CONTRACT_ADDRESS;
   }

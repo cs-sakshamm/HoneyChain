@@ -23,7 +23,7 @@ class AppConstants {
   static const Color primarySoft = Color(0xFFFEF9C3); // Yellow-100 (honey tint)
   static const Color secondary = Color(0xFF52525B); // Zinc-500
 
-  static const Color background = Color(0xFFFFFFFF); // Pure White Background
+  static const Color background = Color(0xFFF9FAFB); // Neutral Off-White Background
   static const Color surface = Color(0xFFFFFFFF); // Pure White Surface
   static const Color border = Color(0xFFE4E4E7); // Zinc-200
   static const Color borderFocus = Color(0xFFEAB308); // Honey Accent

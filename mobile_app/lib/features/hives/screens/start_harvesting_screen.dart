@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../profile/controllers/user_controller.dart';
@@ -64,34 +65,103 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
 
   void _showFinishConfirmation() {
     _timer?.cancel();
+    final quantityCtrl = TextEditingController(text: '15.0');
+    final notesCtrl = TextEditingController();
+
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: context.surfaceColor,
           title: Text(
-            context.tr('finish_harvest') == 'finish_harvest' ? 'Finish Harvest?' : context.tr('finish_harvest'),
+            'Complete Harvest Session',
             style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
           ),
-          content: Text(
-            'Session time: ${_formatTimer(_secondsElapsed)}. This will mark the hive session as complete.',
-            style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Session duration: ${_formatTimer(_secondsElapsed)}',
+                  style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
+                ),
+                const SizedBox(height: AppConstants.space16),
+                Text(
+                  'Harvested Quantity (kg) *',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: quantityCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 15.5',
+                    filled: true,
+                    fillColor: context.scaffoldBg,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: AppConstants.space12),
+                Text(
+                  'Harvest Notes / Source Details',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: notesCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Wild floral, apiary block A',
+                    filled: true,
+                    fillColor: context.scaffoldBg,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                _startTimer(); // Resume timer if dismissed
+                _startTimer();
               },
               child: Text(context.tr('cancel') == 'cancel' ? 'Cancel' : context.tr('cancel')),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                final qty = double.tryParse(quantityCtrl.text.trim()) ?? 0.0;
+                if (qty <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid quantity in kg.')),
+                  );
+                  return;
+                }
                 Navigator.pop(dialogContext);
+
+                final userCtrl = context.read<UserController>();
+                final workflowCtrl = context.read<WorkflowController>();
+
+                final success = await workflowCtrl.createHarvestAndRequest(
+                  harvesterName: userCtrl.user.name.isNotEmpty ? userCtrl.user.name : 'Harvester Operator',
+                  location: widget.hive?.apiaryLocation ?? widget.hive?.location ?? 'Apiary Alpha',
+                  quantity: qty,
+                  hiveId: widget.hive?.id ?? 'HC-HIVE-01',
+                  notes: notesCtrl.text.trim(),
+                );
+
+                if (!mounted) return;
                 Navigator.pop(context);
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Harvest session logged: ${_formatTimer(_secondsElapsed)}'),
+                    content: Text(
+                      success
+                          ? 'Harvest logged & sent to Collection & Processing!'
+                          : 'Harvest logged successfully.',
+                    ),
                     backgroundColor: AppConstants.success,
                   ),
                 );
@@ -103,7 +173,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                   borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
                 ),
               ),
-              child: Text('Confirm & Save', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+              child: Text('Send to Collection', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
             ),
           ],
         );
@@ -129,7 +199,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  _PillBackButton(),
+                  const _PillBackButton(),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(

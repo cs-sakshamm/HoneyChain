@@ -44,7 +44,7 @@ class HarvesterDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  _PillBackButton(),
+                  const _PillBackButton(),
                   const SizedBox(width: 14),
                   Text(
                     'Harvester Details',

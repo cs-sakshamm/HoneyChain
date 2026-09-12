@@ -34,7 +34,7 @@ class PackagingQrScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  _PillBackButton(),
+                  const _PillBackButton(),
                   const SizedBox(width: 14),
                   Text(
                     'Batch QR Code',
@@ -129,7 +129,7 @@ class PackagingQrScreen extends StatelessWidget {
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: verifyUrl));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Verification link copied')),
+                            const SnackBar(content: Text('Verification link copied')),
                           );
                         },
                       ),
