@@ -8,12 +8,11 @@ import 'package:provider/provider.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/global_app_bar.dart';
-import '../../../core/widgets/my_requests_view.dart';
+import '../hives/screens/all_hives_screen.dart';
 import '../hives/screens/harvester_dashboard_screen.dart';
 import '../profile/screens/profile_screen.dart';
-import '../verification/screens/public_verification_lookup_screen.dart';
 
-/// Pinterest-Inspired 4-Tab Navigation (Home | Search | Exchange History | Profile)
+/// Minimal 3-Tab Harvester Navigation (Home | Hives | Profile) with Frosted Floating Pill Dock
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -22,14 +21,13 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> with WidgetsBindingObserver {
-  int _currentIndex = 0; // 0: Home, 1: Search, 2: Exchange History, 3: Profile
+  int _currentIndex = 0; // 0: Home, 1: Hives, 2: Profile
   bool _isNavVisible = true;
   Timer? _idleTimer;
 
   final List<Widget> _pages = const [
     HarvesterDashboardScreen(),
-    PublicVerificationLookupScreen(),
-    MyRequestsView(userRole: 'HARVESTER'),
+    AllHivesScreen(),
     ProfileScreen(),
   ];
 
@@ -123,7 +121,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
           bottom: true,
           minimum: const EdgeInsets.only(bottom: 16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Center(
               heightFactor: 1.0,
               child: ClipRRect(
@@ -131,13 +129,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 340),
+                    constraints: const BoxConstraints(maxWidth: 280),
                     height: 56,
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                     decoration: BoxDecoration(
                       color: isDark
                           ? const Color(0xFF1E1E1E).withValues(alpha: 0.85)
-                          : context.surfaceColor.withValues(alpha: 0.90),
+                          : context.surfaceColor.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
                         color: isDark
@@ -158,31 +156,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                       children: [
                         _buildNavItem(
                           index: 0,
-                          icon: Icons.home_outlined,
-                          activeIcon: Icons.home_rounded,
+                          icon: Icons.grid_view_rounded,
+                          activeIcon: Icons.grid_view_rounded,
                           label: context.tr('home'),
                           isSelected: _currentIndex == 0,
                         ),
                         _buildNavItem(
                           index: 1,
-                          icon: Icons.search_rounded,
-                          activeIcon: Icons.search_rounded,
-                          label: 'Search',
+                          icon: Icons.hive_outlined,
+                          activeIcon: Icons.hive_rounded,
+                          label: context.tr('hives'),
                           isSelected: _currentIndex == 1,
                         ),
                         _buildNavItem(
                           index: 2,
-                          icon: Icons.swap_horiz_rounded,
-                          activeIcon: Icons.swap_horiz_rounded,
-                          label: 'Exchange',
-                          isSelected: _currentIndex == 2,
-                        ),
-                        _buildNavItem(
-                          index: 3,
                           icon: Icons.person_outline_rounded,
                           activeIcon: Icons.person_rounded,
                           label: context.tr('profile'),
-                          isSelected: _currentIndex == 3,
+                          isSelected: _currentIndex == 2,
                         ),
                       ],
                     ),
@@ -227,7 +218,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: pillBg,
               borderRadius: BorderRadius.circular(24),
@@ -259,7 +250,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                           child: Text(
                             label,
                             style: GoogleFonts.manrope(
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: activeColor,
                             ),

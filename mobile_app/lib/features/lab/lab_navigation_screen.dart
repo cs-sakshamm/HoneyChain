@@ -162,8 +162,8 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
                         ),
                         _buildNavItem(
                           index: 1,
-                          icon: Icons.history_outlined,
-                          activeIcon: Icons.history_rounded,
+                          icon: Icons.swap_horiz_rounded,
+                          activeIcon: Icons.swap_horiz_rounded,
                           label: context.tr('history'),
                           isSelected: _currentIndex == 1,
                         ),
