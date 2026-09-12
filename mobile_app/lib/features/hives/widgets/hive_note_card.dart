@@ -64,10 +64,11 @@ class HiveNoteCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: context.primarySoftColor,
                         borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                        border: Border.all(color: context.borderColor),
                       ),
                       child: Icon(
                         Icons.hive_outlined,
-                        color: context.primaryDarkColor,
+                        color: context.textPrimaryColor,
                         size: 20,
                       ),
                     ),

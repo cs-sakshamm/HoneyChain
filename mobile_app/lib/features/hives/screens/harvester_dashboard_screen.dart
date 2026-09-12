@@ -313,7 +313,16 @@ class _StatCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: context.textSecondaryColor),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: context.primarySoftColor,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: Icon(icon, size: 16, color: context.textPrimaryColor),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -463,11 +472,14 @@ class _IdentityCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isVerified ? context.successBgColor : context.primarySoftColor,
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isVerified ? context.successColor.withValues(alpha: 0.2) : context.borderColor,
+                    ),
                   ),
                   child: Icon(
                     isVerified ? Icons.verified_rounded : Icons.shield_outlined,
                     size: 20,
-                    color: isVerified ? context.successColor : context.primaryDarkColor,
+                    color: isVerified ? context.successColor : context.textPrimaryColor,
                   ),
                 ),
                 const SizedBox(width: AppConstants.space16),
@@ -560,13 +572,14 @@ class _HiveInfoCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: hive.statusColor.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
+                    color: context.primarySoftColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.borderColor),
                   ),
-                  child: Icon(Icons.hive_rounded, color: hive.statusColor, size: 24),
+                  child: Icon(Icons.hive_outlined, color: context.textPrimaryColor, size: 22),
                 ),
                 const SizedBox(width: AppConstants.space16),
                 Expanded(

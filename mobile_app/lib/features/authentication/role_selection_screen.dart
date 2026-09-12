@@ -240,11 +240,14 @@ class _RoleCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: context.primarySoftColor,
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor,
+                ),
               ),
               child: Icon(
                 item.icon,
-                size: 36,
-                color: isDark ? Colors.white : Colors.black,
+                size: 32,
+                color: context.textPrimaryColor,
               ),
             ),
             const SizedBox(height: 20),

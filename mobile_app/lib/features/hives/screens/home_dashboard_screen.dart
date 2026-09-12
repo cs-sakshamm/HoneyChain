@@ -208,7 +208,16 @@ class HomeDashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 24, color: context.primaryDarkColor),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: context.primarySoftColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: Icon(icon, size: 20, color: context.textPrimaryColor),
+          ),
           const SizedBox(height: 12),
           Text(
             value,
@@ -248,14 +257,14 @@ class HomeDashboardScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: isPrimary ? context.primarySoftColor : context.textPrimaryColor),
+              Icon(icon, size: 18, color: isPrimary ? Colors.white : context.textPrimaryColor),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: GoogleFonts.manrope(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: isPrimary ? context.primarySoftColor : context.textPrimaryColor,
+                  color: isPrimary ? Colors.white : context.textPrimaryColor,
                 ),
               ),
             ],

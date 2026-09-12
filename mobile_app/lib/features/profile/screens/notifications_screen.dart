@@ -226,6 +226,7 @@ class NotificationsScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: context.primarySoftColor,
               shape: BoxShape.circle,
+              border: Border.all(color: context.borderColor),
             ),
             child: Icon(
               n.category == NotificationCategory.operations
@@ -234,7 +235,7 @@ class NotificationsScreen extends StatelessWidget {
                       ? Icons.warning_amber_rounded
                       : Icons.badge_outlined,
               size: 18,
-              color: context.primaryDarkColor,
+              color: context.textPrimaryColor,
             ),
           ),
           const SizedBox(width: AppConstants.space12),

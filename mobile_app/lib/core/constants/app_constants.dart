@@ -20,7 +20,7 @@ class AppConstants {
   static const Color onPrimary = Color(0xFF1C1917); // Stone-900: readable on honey
   static const Color honeyAccent = Color(0xFFEAB308); // Yellow-500 (Honey)
   static const Color primaryDark = Color(0xFF09090B); // Zinc-950
-  static const Color primarySoft = Color(0xFFFEF9C3); // Yellow-100 (honey tint)
+  static const Color primarySoft = Color(0xFFF4F4F5); // Zinc-100 (neutral soft container)
   static const Color secondary = Color(0xFF52525B); // Zinc-500
 
   static const Color background = Color(0xFFF9FAFB); // Neutral Off-White Background

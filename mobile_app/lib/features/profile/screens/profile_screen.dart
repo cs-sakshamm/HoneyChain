@@ -107,7 +107,7 @@ class ProfileScreen extends StatelessWidget {
                         style: GoogleFonts.manrope(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
-                          color: context.primaryDarkColor,
+                          color: context.textPrimaryColor,
                         ),
                       ),
                     ),
@@ -126,13 +126,14 @@ class ProfileScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: context.primarySoftColor,
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: context.borderColor),
                       ),
                       child: Text(
                         context.tr('role_operator'),
                         style: GoogleFonts.manrope(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: context.primaryDarkColor,
+                          color: context.textPrimaryColor,
                         ),
                       ),
                     ),
@@ -227,7 +228,7 @@ class ProfileScreen extends StatelessWidget {
                           : '${context.watch<VerificationController>().verification.completedStepsCount}/5 Steps',
                       badgeColor: context.watch<VerificationController>().verification.isFullyVerified
                           ? context.successColor
-                          : context.primaryDarkColor,
+                          : context.textPrimaryColor,
                       badgeBg: context.watch<VerificationController>().verification.isFullyVerified
                           ? context.successBgColor
                           : context.primarySoftColor,
@@ -370,8 +371,9 @@ class ProfileScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: context.primarySoftColor,
                   shape: BoxShape.circle,
+                  border: Border.all(color: context.borderColor),
                 ),
-                child: Icon(icon, size: 20, color: context.primaryDarkColor),
+                child: Icon(icon, size: 20, color: context.textPrimaryColor),
               ),
               const SizedBox(width: AppConstants.space16),
               Expanded(
