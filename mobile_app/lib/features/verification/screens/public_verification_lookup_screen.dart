@@ -243,9 +243,9 @@ class _PublicVerificationLookupScreenState extends State<PublicVerificationLooku
                         if (_result!.transactionHash != null)
                           _detailRow(context, 'Transaction Hash', '${_result!.transactionHash!.substring(0, 10)}...'),
                         if (_result!.publicDetails != null) ...[
-                          _detailRow(context, 'Apiary Region', _result!.publicDetails!['apiaryLocation'] ?? 'Cascade Valley, OR'),
-                          _detailRow(context, 'Accreditation ID', _result!.publicDetails!['registrationId'] ?? 'BK-OR-8921'),
-                          _detailRow(context, 'Government ID Ref', _result!.publicDetails!['governmentIdReference'] ?? 'DOC-NAT-***9481'),
+                          _detailRow(context, 'Apiary Region', _result!.publicDetails!['apiaryLocation'] ?? 'No Data Available'),
+                          _detailRow(context, 'Accreditation ID', _result!.publicDetails!['registrationId'] ?? 'No Data Available'),
+                          _detailRow(context, 'Government ID Ref', _result!.publicDetails!['governmentIdReference'] ?? 'No Data Available'),
                         ],
                       ],
                     ),

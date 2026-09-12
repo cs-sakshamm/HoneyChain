@@ -203,19 +203,19 @@ class VerificationCertificateScreen extends StatelessWidget {
                       'Transaction Hash',
                       ver.transactionHash != null && ver.transactionHash!.length > 18
                           ? '${ver.transactionHash!.substring(0, 10)}...${ver.transactionHash!.substring(ver.transactionHash!.length - 8)}'
-                          : ver.transactionHash ?? '0x9a8f4c2e17d6b389',
+                          : ver.transactionHash ?? 'Verification Pending',
                     ),
                     _metaRow(
                       context,
                       'Record Hash (SHA-256)',
                       ver.verificationHash != null && ver.verificationHash!.length > 18
                           ? '${ver.verificationHash!.substring(0, 10)}...${ver.verificationHash!.substring(ver.verificationHash!.length - 8)}'
-                          : ver.verificationHash ?? '7e2b10a459df8c31',
+                          : ver.verificationHash ?? 'Verification Pending',
                     ),
                     _metaRow(context, 'Integrity Status', 'Cryptographic Match Confirmed ✓', isSuccess: true),
-                    _metaRow(context, 'Apiary Region', ver.apiaryLocation ?? 'Cascade Valley, OR'),
-                    _metaRow(context, 'Government ID Ref', ver.governmentIdReference ?? 'DOC-NAT-***9481'),
-                    _metaRow(context, 'Accreditation ID', ver.registrationId ?? 'BK-OR-8921'),
+                    _metaRow(context, 'Apiary Region', ver.apiaryLocation ?? 'No Data Available'),
+                    _metaRow(context, 'Government ID Ref', ver.governmentIdReference ?? 'No Data Available'),
+                    _metaRow(context, 'Accreditation ID', ver.registrationId ?? 'No Data Available'),
                   ],
                 ),
               ),
