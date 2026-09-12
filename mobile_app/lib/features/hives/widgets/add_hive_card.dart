@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// Prominent, minimal Google Keep-inspired "Add Hive" card
 class AddHiveCard extends StatelessWidget {
@@ -14,15 +16,15 @@ class AddHiveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppConstants.surface,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
         border: Border.all(
-          color: AppConstants.primary.withValues(alpha: 0.4),
+          color: context.accentColor.withValues(alpha: 0.4),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: context.textPrimaryColor.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -46,50 +48,50 @@ class AddHiveCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppConstants.primarySoft,
+                    color: context.primarySoftColor,
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                     border: Border.all(
-                      color: AppConstants.primary.withValues(alpha: 0.2),
+                      color: context.accentColor.withValues(alpha: 0.2),
                       width: 1.0,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.add_rounded,
-                    color: AppConstants.primaryDark,
+                    color: context.accentColor,
                     size: 28,
                   ),
                 ),
                 const SizedBox(width: AppConstants.space16),
                 // Text Title & Subtitle
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Add Hive',
+                        context.tr('add_hive'),
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: AppConstants.textPrimary,
+                          color: context.textPrimaryColor,
                           letterSpacing: -0.2,
                         ),
                       ),
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
                       Text(
-                        'Create and manage your hive',
+                        context.tr('create_manage_hive'),
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w400,
-                          color: AppConstants.textSecondary,
+                          color: context.textSecondaryColor,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 16,
-                  color: AppConstants.textMuted,
+                  color: context.textMutedColor,
                 ),
               ],
             ),
@@ -99,3 +101,4 @@ class AddHiveCard extends StatelessWidget {
     );
   }
 }
+

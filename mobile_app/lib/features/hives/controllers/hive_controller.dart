@@ -1,8 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import '../models/hive_model.dart';
 import '../services/hive_storage_service.dart';
 
-/// State management controller for HoneyChain Hives
+/// State management controller for HoneyChain Hives backed by PostgreSQL
 class HiveController extends ChangeNotifier {
   final HiveStorageService _storageService = HiveStorageService();
 
@@ -22,7 +24,7 @@ class HiveController extends ChangeNotifier {
     loadHives();
   }
 
-  /// Initialize and load stored hives
+  /// Initialize and load hives from PostgreSQL backend
   Future<void> loadHives() async {
     _isLoading = true;
     notifyListeners();
@@ -32,29 +34,38 @@ class HiveController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Add a new hive
+  /// Add a new hive to PostgreSQL and local state
   Future<bool> addHive(Hive hive) async {
     _hives.insert(0, hive);
     notifyListeners();
+
+    // Persist to PostgreSQL backend and local cache
+    await _storageService.createHive(hive);
     final success = await _storageService.saveHives(_hives);
     return success;
   }
 
-  /// Update an existing hive
+  /// Update an existing hive in PostgreSQL and local state
   Future<bool> updateHive(Hive updatedHive) async {
     final index = _hives.indexWhere((h) => h.id == updatedHive.id);
     if (index != -1) {
       _hives[index] = updatedHive;
       notifyListeners();
+
+      // Persist to PostgreSQL backend and local cache
+      await _storageService.updateHiveInBackend(updatedHive);
       return await _storageService.saveHives(_hives);
     }
     return false;
   }
 
-  /// Delete a hive by ID
+  /// Delete a hive by ID from PostgreSQL and local state
   Future<bool> deleteHive(String id) async {
     _hives.removeWhere((h) => h.id == id);
     notifyListeners();
+
+    // Persist to PostgreSQL backend and local cache
+    await _storageService.deleteHiveFromBackend(id);
     return await _storageService.saveHives(_hives);
   }
 
@@ -65,6 +76,30 @@ class HiveController extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Whether a hive code is already taken by another hive.
+  bool isHiveCodeTaken(String code, {String? excludingHiveId}) {
+    final normalized = code.trim().toLowerCase();
+    return _hives.any(
+      (h) => h.id != excludingHiveId && h.hiveCode.trim().toLowerCase() == normalized,
+    );
+  }
+
+  /// Issue a unique hive identity code (e.g. "H-7F3A2C").
+  ///
+  /// Locally generates a collision-checked code against every stored hive.
+  String generateUniqueHiveCode() {
+    final rng = Random.secure();
+    String code;
+    do {
+      final hex = List.generate(
+        3,
+        (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0'),
+      ).join().toUpperCase();
+      code = 'H-$hex';
+    } while (isHiveCodeTaken(code));
+    return code;
   }
 
   /// Set search query

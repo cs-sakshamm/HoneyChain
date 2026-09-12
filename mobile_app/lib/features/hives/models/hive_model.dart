@@ -1,3 +1,4 @@
+﻿import '../../../core/constants/app_constants.dart';
 import 'package:flutter/material.dart';
 
 /// Hive Data Model for HoneyChain
@@ -34,6 +35,8 @@ class Hive {
   // Additional Notes
   final String notes;
   final DateTime updatedAt;
+
+  String get location => apiaryLocation;
 
   const Hive({
     required this.id,
@@ -109,13 +112,13 @@ class Hive {
   Color get statusColor {
     switch (overallHealth.trim().toLowerCase()) {
       case 'healthy':
-        return const Color(0xFF059669); // Emerald Success
+        return AppConstants.success;
       case 'needs attention':
-        return const Color(0xFFD97706); // Amber Warning
+        return AppConstants.warning;
       case 'critical':
-        return const Color(0xFFDC2626); // Red Error
+        return AppConstants.error;
       default:
-        return const Color(0xFF4B5563);
+        return AppConstants.textMuted;
     }
   }
 
@@ -243,3 +246,4 @@ class Hive {
     );
   }
 }
+

@@ -1,0 +1,1222 @@
+import { Router, Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import * as crypto from 'crypto';
+import { blockchainService } from '../services/blockchainService';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+// Helper to generate unique Request ID
+function generateRequestId(stagePrefix: string): string {
+  const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `REQ-${stagePrefix}-2026-${hex}`;
+}
+
+// Role normalization helper
+function normalizeRole(role?: string): string {
+  if (!role) return 'HARVESTER';
+  const r = role.toUpperCase().trim();
+  if (r === 'COLLECTION' || r === 'PROCESSOR' || r === 'COLLECTION_PROCESSING' || r === 'COLLECTOR_PROCESSOR') {
+    return 'COLLECTOR_PROCESSOR';
+  }
+  if (r === 'LAB' || r === 'LAB_TESTING') return 'LAB';
+  if (r === 'PACKAGING' || r === 'PACKAGER') return 'PACKAGING';
+  if (r === 'ADMIN') return 'ADMIN';
+  return 'HARVESTER';
+}
+
+// Ensure actor user exists in DB
+async function ensureUser(userIdOrName: string, role: string = 'HARVESTER') {
+  let user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { id: userIdOrName },
+        { name: userIdOrName },
+        { email: userIdOrName }
+      ]
+    }
+  });
+
+  if (!user) {
+    const safeName = userIdOrName.trim();
+    const safeId = safeName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+    user = await prisma.user.create({
+      data: {
+        name: safeName,
+        email: `${safeId || 'user'}@honeychain.io`,
+        role: normalizeRole(role)
+      }
+    });
+  }
+  return user;
+}
+
+// Record blockchain provenance event and store in DB
+async function recordWorkflowProvenance(
+  batchId: string,
+  eventType: string,
+  actorId: string,
+  requestId?: string,
+  payload: any = {}
+) {
+  const onChainResult = await blockchainService.recordBatchEventOnChain(
+    batchId,
+    eventType,
+    actorId,
+    payload
+  );
+
+  const provEvent = await prisma.provenanceEvent.create({
+    data: {
+      batchId,
+      requestId: requestId || null,
+      eventType,
+      actorId,
+      dataHash: onChainResult.dataHash,
+      txHash: onChainResult.txHash || null,
+      blockNumber: onChainResult.blockNumber || null,
+      network: onChainResult.network,
+      contractAddress: blockchainService.contractAddress,
+      status: onChainResult.status
+    }
+  });
+
+  return { provEvent, onChainResult };
+}
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 1. POST /api/requests
+ * Create a new workflow request (e.g. Harvester -> Collection)
+ * ─────────────────────────────────────────────────────────
+ */
+router.post('/requests', async (req: Request, res: Response) => {
+  try {
+    const {
+      batchId,
+      harvesterId,
+      fromUserId,
+      toUserId,
+      fromRole = 'HARVESTER',
+      toRole = 'COLLECTOR_PROCESSOR',
+      requestType = 'HARVEST_TO_COLLECTION',
+      quantity,
+      unit = 'kg',
+      notes,
+      metadata
+    } = req.body;
+
+    if (!batchId) {
+      return res.status(400).json({ success: false, error: 'batchId is required' });
+    }
+
+    // Verify batch exists
+    const batch = await prisma.batch.findUnique({
+      where: { id: batchId },
+      include: { harvest: { include: { harvester: true } } }
+    });
+
+    if (!batch) {
+      return res.status(404).json({ success: false, error: `Batch ${batchId} not found` });
+    }
+
+    // Check for existing pending request on this batch to avoid duplicates
+    const activeRequest = await prisma.workflowRequest.findFirst({
+      where: {
+        batchId,
+        status: { in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS'] }
+      }
+    });
+
+    if (activeRequest) {
+      return res.status(400).json({
+        success: false,
+        error: `Batch ${batchId} already has an active request (${activeRequest.requestId} with status ${activeRequest.status})`
+      });
+    }
+
+    const senderIdentifier = fromUserId || harvesterId || batch.harvest.harvesterId;
+    const sender = await ensureUser(senderIdentifier, fromRole);
+    const receiver = toUserId ? await ensureUser(toUserId, toRole) : null;
+
+    const prefix = toRole.includes('COLLECT') ? 'COL' : toRole.includes('LAB') ? 'LAB' : 'PKG';
+    const requestId = generateRequestId(prefix);
+    const effectiveQty = quantity !== undefined ? Number(quantity) : batch.harvest.quantity;
+
+    // Database transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const newRequest = await tx.workflowRequest.create({
+        data: {
+          requestId,
+          batchId,
+          fromUserId: sender.id,
+          toUserId: receiver?.id || null,
+          fromRole: normalizeRole(fromRole),
+          toRole: normalizeRole(toRole),
+          requestType,
+          status: 'PENDING',
+          quantity: effectiveQty,
+          unit,
+          notes: notes || 'Harvest sent for collection & processing',
+          metadata: metadata ? JSON.stringify(metadata) : null
+        }
+      });
+
+      // Update batch stage
+      await tx.batch.update({
+        where: { id: batchId },
+        data: {
+          status: 'PENDING_COLLECTION',
+          currentStage: 'COLLECTION'
+        }
+      });
+
+      // Audit log in RequestHistory
+      await tx.requestHistory.create({
+        data: {
+          requestId: newRequest.id,
+          batchId,
+          action: 'CREATED',
+          fromStatus: null,
+          toStatus: 'PENDING',
+          actorId: sender.id,
+          actorRole: normalizeRole(fromRole),
+          notes: notes || 'Initiated collection request'
+        }
+      });
+
+      return newRequest;
+    });
+
+    // Record on blockchain
+    const prov = await recordWorkflowProvenance(
+      batchId,
+      'HARVEST_SENT_TO_COLLECTION',
+      sender.id,
+      result.id,
+      { requestId: result.requestId, batchId, quantity: effectiveQty, harvesterId: sender.id }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Workflow request created successfully',
+      request: result,
+      provenance: prov.provEvent,
+      blockchainStatus: prov.onChainResult.status
+    });
+  } catch (error: any) {
+    console.error('Error creating request:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 2. GET /api/requests
+ * List workflow requests with rich filtering
+ * ─────────────────────────────────────────────────────────
+ */
+router.get('/requests', async (req: Request, res: Response) => {
+  try {
+    const {
+      role,
+      status,
+      type,
+      batchId,
+      userId,
+      direction = 'all' // 'incoming', 'outgoing', 'all'
+    } = req.query;
+
+    const where: any = {};
+
+    if (batchId) {
+      where.batchId = String(batchId);
+    }
+
+    if (status) {
+      const statusStr = String(status).toUpperCase();
+      if (statusStr !== 'ALL') {
+        where.status = statusStr;
+      }
+    }
+
+    if (type) {
+      where.requestType = String(type);
+    }
+
+    if (role) {
+      const normRole = normalizeRole(String(role));
+      if (direction === 'incoming') {
+        where.toRole = normRole;
+      } else if (direction === 'outgoing') {
+        where.fromRole = normRole;
+      } else {
+        where.OR = [
+          { toRole: normRole },
+          { fromRole: normRole }
+        ];
+      }
+    }
+
+    if (userId) {
+      const user = await prisma.user.findFirst({
+        where: { OR: [{ id: String(userId) }, { name: String(userId) }, { email: String(userId) }] }
+      });
+      if (user) {
+        if (direction === 'incoming') {
+          where.toUserId = user.id;
+        } else if (direction === 'outgoing') {
+          where.fromUserId = user.id;
+        }
+      }
+    }
+
+    const requests = await prisma.workflowRequest.findMany({
+      where,
+      include: {
+        batch: {
+          include: {
+            harvest: { include: { harvester: true, hive: true } }
+          }
+        },
+        fromUser: true,
+        toUser: true,
+        history: { orderBy: { createdAt: 'desc' }, include: { actor: true } },
+        processingRecord: true,
+        labReport: true,
+        packagingRecord: true,
+        provenanceEvents: { orderBy: { timestamp: 'desc' } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(requests);
+  } catch (error: any) {
+    console.error('Error fetching requests:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 3. GET /api/requests/:id
+ * Get single request details
+ * ─────────────────────────────────────────────────────────
+ */
+router.get('/requests/:id', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const request = await prisma.workflowRequest.findFirst({
+      where: {
+        OR: [{ id }, { requestId: id }]
+      },
+      include: {
+        batch: {
+          include: {
+            harvest: { include: { harvester: true, hive: true } },
+            processingRecords: true,
+            labReports: true,
+            packagingRecords: true
+          }
+        },
+        fromUser: true,
+        toUser: true,
+        previousRequest: true,
+        nextRequests: true,
+        history: { orderBy: { createdAt: 'asc' }, include: { actor: true } },
+        processingRecord: true,
+        labReport: true,
+        packagingRecord: true,
+        provenanceEvents: { orderBy: { timestamp: 'asc' } }
+      }
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, error: `Request ${id} not found` });
+    }
+
+    res.json(request);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 4. PATCH /api/requests/:id/accept
+ * Accept a pending request (Role-guarded & State-guarded)
+ * ─────────────────────────────────────────────────────────
+ */
+router.patch('/requests/:id/accept', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const { actorId, actorRole, notes } = req.body;
+
+    const request = await prisma.workflowRequest.findFirst({
+      where: { OR: [{ id }, { requestId: id }] }
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, error: `Request ${id} not found` });
+    }
+
+    if (request.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot accept request with status ${request.status}. Only PENDING requests can be accepted.`
+      });
+    }
+
+    // Role authorization check
+    const normalizedActorRole = normalizeRole(actorRole || request.toRole);
+    if (normalizedActorRole !== request.toRole && normalizedActorRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: `Unauthorized. Role ${normalizedActorRole} cannot accept requests assigned to ${request.toRole}.`
+      });
+    }
+
+    const actor = await ensureUser(actorId || 'Role Officer', normalizedActorRole);
+
+    let nextBatchStatus = 'ACCEPTED';
+    let provEventType = 'REQUEST_ACCEPTED';
+
+    if (request.requestType === 'HARVEST_TO_COLLECTION') {
+      nextBatchStatus = 'COLLECTION_ACCEPTED';
+      provEventType = 'COLLECTION_ACCEPTED';
+    } else if (request.requestType === 'COLLECTION_TO_LAB') {
+      nextBatchStatus = 'LAB_ACCEPTED';
+      provEventType = 'LAB_ACCEPTED';
+    } else if (request.requestType === 'LAB_TO_PACKAGING') {
+      nextBatchStatus = 'PACKAGING_ACCEPTED';
+      provEventType = 'PACKAGING_ACCEPTED';
+    }
+
+    // Update in database transaction
+    const updatedRequest = await prisma.$transaction(async (tx) => {
+      const updated = await tx.workflowRequest.update({
+        where: { id: request.id },
+        data: {
+          status: 'ACCEPTED',
+          toUserId: actor.id,
+          acceptedAt: new Date(),
+          notes: notes ? `${request.notes ? request.notes + ' | ' : ''}${notes}` : request.notes
+        }
+      });
+
+      await tx.batch.update({
+        where: { id: request.batchId },
+        data: { status: nextBatchStatus }
+      });
+
+      await tx.requestHistory.create({
+        data: {
+          requestId: request.id,
+          batchId: request.batchId,
+          action: 'ACCEPTED',
+          fromStatus: 'PENDING',
+          toStatus: 'ACCEPTED',
+          actorId: actor.id,
+          actorRole: normalizedActorRole,
+          notes: notes || `Request accepted by ${normalizedActorRole}`
+        }
+      });
+
+      return updated;
+    });
+
+    // Record on blockchain
+    const prov = await recordWorkflowProvenance(
+      request.batchId,
+      provEventType,
+      actor.id,
+      request.id,
+      { requestId: request.requestId, action: 'ACCEPTED', actorId: actor.id }
+    );
+
+    res.json({
+      success: true,
+      message: `Request ${request.requestId} accepted`,
+      request: updatedRequest,
+      provenance: prov.provEvent,
+      blockchainStatus: prov.onChainResult.status
+    });
+  } catch (error: any) {
+    console.error('Error accepting request:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 5. PATCH /api/requests/:id/reject
+ * Reject a request with reason
+ * ─────────────────────────────────────────────────────────
+ */
+router.patch('/requests/:id/reject', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const { actorId, actorRole, reason } = req.body;
+
+    const request = await prisma.workflowRequest.findFirst({
+      where: { OR: [{ id }, { requestId: id }] }
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, error: `Request ${id} not found` });
+    }
+
+    if (request.status === 'COMPLETED' || request.status === 'REJECTED') {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot reject request with status ${request.status}.`
+      });
+    }
+
+    const normalizedActorRole = normalizeRole(actorRole || request.toRole);
+    const actor = await ensureUser(actorId || 'Role Officer', normalizedActorRole);
+
+    let nextBatchStatus = 'REJECTED';
+    let provEventType = 'REQUEST_REJECTED';
+
+    if (request.requestType === 'HARVEST_TO_COLLECTION') {
+      nextBatchStatus = 'COLLECTION_REJECTED';
+      provEventType = 'COLLECTION_REJECTED';
+    } else if (request.requestType === 'COLLECTION_TO_LAB') {
+      nextBatchStatus = 'LAB_REJECTED';
+      provEventType = 'LAB_REJECTED';
+    } else if (request.requestType === 'LAB_TO_PACKAGING') {
+      nextBatchStatus = 'PACKAGING_REJECTED';
+      provEventType = 'PACKAGING_REJECTED';
+    }
+
+    const rejectionReason = reason || 'Rejected by authorized role reviewer';
+
+    const updatedRequest = await prisma.$transaction(async (tx) => {
+      const updated = await tx.workflowRequest.update({
+        where: { id: request.id },
+        data: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          notes: `${request.notes ? request.notes + ' | Rejection reason: ' : 'Rejection reason: '}${rejectionReason}`
+        }
+      });
+
+      await tx.batch.update({
+        where: { id: request.batchId },
+        data: { status: nextBatchStatus }
+      });
+
+      await tx.requestHistory.create({
+        data: {
+          requestId: request.id,
+          batchId: request.batchId,
+          action: 'REJECTED',
+          fromStatus: request.status,
+          toStatus: 'REJECTED',
+          actorId: actor.id,
+          actorRole: normalizedActorRole,
+          notes: rejectionReason
+        }
+      });
+
+      return updated;
+    });
+
+    const prov = await recordWorkflowProvenance(
+      request.batchId,
+      provEventType,
+      actor.id,
+      request.id,
+      { requestId: request.requestId, action: 'REJECTED', reason: rejectionReason }
+    );
+
+    res.json({
+      success: true,
+      message: `Request ${request.requestId} rejected`,
+      request: updatedRequest,
+      provenance: prov.provEvent,
+      blockchainStatus: prov.onChainResult.status
+    });
+  } catch (error: any) {
+    console.error('Error rejecting request:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 6. POST /api/requests/:id/send-next
+ * Transition forward to next sequential stage
+ * (Stage 1 -> Stage 2, or Stage 2 -> Stage 3)
+ * ─────────────────────────────────────────────────────────
+ */
+router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const {
+      actorId,
+      actorRole,
+      quantityReceived,
+      quantityAfter,
+      method,
+      moistureAtReceipt,
+      notes
+    } = req.body;
+
+    const currentRequest = await prisma.workflowRequest.findFirst({
+      where: { OR: [{ id }, { requestId: id }] },
+      include: { batch: true, labReport: true }
+    });
+
+    if (!currentRequest) {
+      return res.status(404).json({ success: false, error: `Request ${id} not found` });
+    }
+
+    const batch = currentRequest.batch;
+    const normalizedActorRole = normalizeRole(actorRole);
+
+    // ── Transition Case 1: Collection & Processing -> Lab Testing ──
+    if (currentRequest.requestType === 'HARVEST_TO_COLLECTION') {
+      if (currentRequest.status !== 'ACCEPTED' && currentRequest.status !== 'IN_PROGRESS') {
+        return res.status(400).json({
+          success: false,
+          error: `Stage 1 request must be ACCEPTED before sending to Lab. Current status: ${currentRequest.status}`
+        });
+      }
+
+      if (normalizedActorRole !== 'COLLECTOR_PROCESSOR' && normalizedActorRole !== 'ADMIN') {
+        return res.status(403).json({
+          success: false,
+          error: `Unauthorized. Only Collector/Processor can send batch to Lab.`
+        });
+      }
+
+      const processor = await ensureUser(actorId || 'Processor', 'COLLECTOR_PROCESSOR');
+      const nextRequestId = generateRequestId('LAB');
+      const qtyIn = quantityReceived !== undefined ? Number(quantityReceived) : (currentRequest.quantity || 0);
+      const qtyOut = quantityAfter !== undefined ? Number(quantityAfter) : qtyIn;
+
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Create Processing Record
+        const procRecord = await tx.processingRecord.create({
+          data: {
+            batchId: batch.id,
+            processorId: processor.id,
+            requestId: currentRequest.id,
+            quantityReceived: qtyIn,
+            quantityAfter: qtyOut,
+            method: method || 'Standard Cold Extraction',
+            moistureAtReceipt: moistureAtReceipt ? Number(moistureAtReceipt) : null,
+            notes: notes || 'Extraction completed'
+          }
+        });
+
+        // 2. Complete Current Request
+        await tx.workflowRequest.update({
+          where: { id: currentRequest.id },
+          data: {
+            status: 'COMPLETED',
+            completedAt: new Date()
+          }
+        });
+
+        // 3. Create Stage 2 Request: Collection -> Lab
+        const nextReq = await tx.workflowRequest.create({
+          data: {
+            requestId: nextRequestId,
+            batchId: batch.id,
+            fromUserId: processor.id,
+            fromRole: 'COLLECTOR_PROCESSOR',
+            toRole: 'LAB',
+            requestType: 'COLLECTION_TO_LAB',
+            status: 'PENDING',
+            previousRequestId: currentRequest.id,
+            quantity: qtyOut,
+            unit: 'kg',
+            notes: notes || `Extracted honey sample ready for lab analysis (${qtyOut} kg)`
+          }
+        });
+
+        // 4. Update Batch Status & Stage
+        await tx.batch.update({
+          where: { id: batch.id },
+          data: {
+            status: 'PENDING_LAB',
+            currentStage: 'LAB'
+          }
+        });
+
+        // 5. Request History
+        await tx.requestHistory.create({
+          data: {
+            requestId: nextReq.id,
+            batchId: batch.id,
+            action: 'SENT_TO_LAB',
+            fromStatus: 'PROCESSING_COMPLETED',
+            toStatus: 'PENDING',
+            actorId: processor.id,
+            actorRole: 'COLLECTOR_PROCESSOR',
+            notes: `Batch processed (${qtyOut} kg) and sample forwarded to Lab`
+          }
+        });
+
+        return { procRecord, nextReq };
+      });
+
+      // Blockchain event
+      const prov = await recordWorkflowProvenance(
+        batch.id,
+        'COLLECTION_SENT_TO_LAB',
+        processor.id,
+        result.nextReq.id,
+        {
+          requestId: result.nextReq.requestId,
+          batchId: batch.id,
+          quantity: qtyOut,
+          processorId: processor.id,
+          method: method || 'Standard Cold Extraction'
+        }
+      );
+
+      return res.json({
+        success: true,
+        message: 'Batch processed and sent to Lab Testing',
+        processingRecord: result.procRecord,
+        nextRequest: result.nextReq,
+        provenance: prov.provEvent,
+        blockchainStatus: prov.onChainResult.status
+      });
+    }
+
+    // ── Transition Case 2: Lab Testing -> Packaging ──
+    if (currentRequest.requestType === 'COLLECTION_TO_LAB') {
+      if (currentRequest.status !== 'VERIFIED') {
+        return res.status(400).json({
+          success: false,
+          error: `Batch must be LAB_VERIFIED before approving for packaging. Current status: ${currentRequest.status}`
+        });
+      }
+
+      if (normalizedActorRole !== 'LAB' && normalizedActorRole !== 'ADMIN') {
+        return res.status(403).json({
+          success: false,
+          error: `Unauthorized. Only Lab personnel can approve batch for Packaging.`
+        });
+      }
+
+      const labOfficer = await ensureUser(actorId || 'Lab Officer', 'LAB');
+      const nextRequestId = generateRequestId('PKG');
+
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Complete Current Lab Request
+        await tx.workflowRequest.update({
+          where: { id: currentRequest.id },
+          data: {
+            status: 'COMPLETED',
+            completedAt: new Date()
+          }
+        });
+
+        // 2. Create Stage 3 Request: Lab -> Packaging
+        const nextReq = await tx.workflowRequest.create({
+          data: {
+            requestId: nextRequestId,
+            batchId: batch.id,
+            fromUserId: labOfficer.id,
+            fromRole: 'LAB',
+            toRole: 'PACKAGING',
+            requestType: 'LAB_TO_PACKAGING',
+            status: 'PENDING',
+            previousRequestId: currentRequest.id,
+            quantity: currentRequest.quantity,
+            unit: 'kg',
+            notes: notes || 'Verified batch approved and forwarded for packaging'
+          }
+        });
+
+        // 3. Update Batch Status & Stage
+        await tx.batch.update({
+          where: { id: batch.id },
+          data: {
+            status: 'PENDING_PACKAGING',
+            currentStage: 'PACKAGING'
+          }
+        });
+
+        // 4. Request History
+        await tx.requestHistory.create({
+          data: {
+            requestId: nextReq.id,
+            batchId: batch.id,
+            action: 'APPROVED_FOR_PACKAGING',
+            fromStatus: 'LAB_VERIFIED',
+            toStatus: 'PENDING',
+            actorId: labOfficer.id,
+            actorRole: 'LAB',
+            notes: notes || 'Lab verification complete; approved for packaging'
+          }
+        });
+
+        return nextReq;
+      });
+
+      const prov = await recordWorkflowProvenance(
+        batch.id,
+        'LAB_SENT_TO_PACKAGING',
+        labOfficer.id,
+        result.id,
+        {
+          requestId: result.requestId,
+          batchId: batch.id,
+          labOfficerId: labOfficer.id,
+          labReportId: currentRequest.labReport?.id
+        }
+      );
+
+      return res.json({
+        success: true,
+        message: 'Batch approved and sent to Packaging',
+        nextRequest: result,
+        provenance: prov.provEvent,
+        blockchainStatus: prov.onChainResult.status
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: `Invalid request type ${currentRequest.requestType} for send-next transition`
+    });
+  } catch (error: any) {
+    console.error('Error sending to next stage:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 7. POST /api/lab-reports
+ * Submit lab testing results and verify batch
+ * ─────────────────────────────────────────────────────────
+ */
+router.post('/lab-reports', async (req: Request, res: Response) => {
+  try {
+    const {
+      batchId,
+      requestId,
+      labId,
+      testResults,
+      qualityScore = 95.0,
+      moistureContent = 16.8,
+      purityGrade = 'Grade A',
+      contaminantsFound = 'None',
+      notes
+    } = req.body;
+
+    if (!batchId) {
+      return res.status(400).json({ success: false, error: 'batchId is required' });
+    }
+
+    // Find active lab request
+    let request = requestId
+      ? await prisma.workflowRequest.findFirst({ where: { OR: [{ id: requestId }, { requestId }] } })
+      : await prisma.workflowRequest.findFirst({
+          where: {
+            batchId,
+            requestType: 'COLLECTION_TO_LAB',
+            status: { in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS'] }
+          }
+        });
+
+    if (!request) {
+      return res.status(400).json({
+        success: false,
+        error: `No active Lab request found for batch ${batchId}. A batch must be sent to lab first.`
+      });
+    }
+
+    const labUser = await ensureUser(labId || 'Lab Officer', 'LAB');
+    const score = Number(qualityScore) || 0;
+    const moisture = Number(moistureContent) || 0;
+
+    // Strict validation: honey quality standards
+    // Moisture must be <= 20% and Quality Score >= 70 for verification
+    const isQualityApproved = moisture <= 20.0 && score >= 70.0;
+    const reportStatus = isQualityApproved ? 'APPROVED' : 'REJECTED';
+    const nextReqStatus = isQualityApproved ? 'VERIFIED' : 'REJECTED';
+    const nextBatchStatus = isQualityApproved ? 'LAB_VERIFIED' : 'LAB_REJECTED';
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create Lab Report
+      const report = await tx.labReport.create({
+        data: {
+          batchId,
+          labId: labUser.id,
+          requestId: request.id,
+          testResults: testResults || `Moisture: ${moisture}%, Purity: ${purityGrade}, Score: ${score}/100`,
+          qualityScore: score,
+          moistureContent: moisture,
+          purityGrade: String(purityGrade),
+          contaminantsFound: String(contaminantsFound || 'None'),
+          status: reportStatus,
+          notes: notes || ''
+        }
+      });
+
+      // 2. Update Request Status
+      const updatedReq = await tx.workflowRequest.update({
+        where: { id: request.id },
+        data: {
+          status: nextReqStatus,
+          toUserId: labUser.id,
+          metadata: JSON.stringify({
+            qualityScore: score,
+            moistureContent: moisture,
+            purityGrade: String(purityGrade),
+            contaminantsFound: String(contaminantsFound)
+          })
+        }
+      });
+
+      // 3. Update Batch
+      await tx.batch.update({
+        where: { id: batchId },
+        data: { status: nextBatchStatus }
+      });
+
+      // 4. Request History
+      await tx.requestHistory.create({
+        data: {
+          requestId: request.id,
+          batchId,
+          action: isQualityApproved ? 'VERIFIED' : 'FAILED_QUALITY_CHECK',
+          fromStatus: request.status,
+          toStatus: nextReqStatus,
+          actorId: labUser.id,
+          actorRole: 'LAB',
+          notes: `Lab testing complete: ${reportStatus} (Score: ${score}, Moisture: ${moisture}%)`
+        }
+      });
+
+      return { report, updatedReq };
+    });
+
+    const prov = await recordWorkflowProvenance(
+      batchId,
+      isQualityApproved ? 'LAB_VERIFIED' : 'LAB_REJECTED',
+      labUser.id,
+      request.id,
+      {
+        batchId,
+        labReportId: result.report.id,
+        qualityScore: score,
+        moistureContent: moisture,
+        status: reportStatus
+      }
+    );
+
+    res.json({
+      success: true,
+      verified: isQualityApproved,
+      message: isQualityApproved ? 'Lab report submitted and verified' : 'Lab report submitted; batch rejected due to quality threshold',
+      labReport: result.report,
+      request: result.updatedReq,
+      provenance: prov.provEvent,
+      blockchainStatus: prov.onChainResult.status
+    });
+  } catch (error: any) {
+    console.error('Error submitting lab report:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 8. POST /api/packaging
+ * Finalize packaging, generate QR, and complete batch workflow
+ * ─────────────────────────────────────────────────────────
+ */
+router.post('/packaging', async (req: Request, res: Response) => {
+  try {
+    const {
+      batchId,
+      requestId,
+      packagerId,
+      finalQuantity,
+      numberOfPackages,
+      packageSize = '500g Glass Jar',
+      notes
+    } = req.body;
+
+    if (!batchId) {
+      return res.status(400).json({ success: false, error: 'batchId is required' });
+    }
+
+    const batch = await prisma.batch.findUnique({
+      where: { id: batchId },
+      include: { labReports: true }
+    });
+
+    if (!batch) {
+      return res.status(404).json({ success: false, error: `Batch ${batchId} not found` });
+    }
+
+    // Security check: cannot package without lab verification
+    const verifiedLabReport = batch.labReports.find((r) => r.status === 'APPROVED');
+    if (!verifiedLabReport) {
+      return res.status(400).json({
+        success: false,
+        error: 'Packaging forbidden. Batch has not passed lab verification.'
+      });
+    }
+
+    // Find active packaging request
+    let request = requestId
+      ? await prisma.workflowRequest.findFirst({ where: { OR: [{ id: requestId }, { requestId }] } })
+      : await prisma.workflowRequest.findFirst({
+          where: {
+            batchId,
+            requestType: 'LAB_TO_PACKAGING',
+            status: { in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS'] }
+          }
+        });
+
+    const packagerUser = await ensureUser(packagerId || 'Packager', 'PACKAGING');
+    const finalQty = finalQuantity !== undefined ? Number(finalQuantity) : (request?.quantity || 25.0);
+    const numPkgs = numberOfPackages !== undefined ? Number(numberOfPackages) : 50;
+
+    // Real verifiable QR link for provenance scanning
+    const qrCodeUrl = `https://honeychain.io/verify?batch=${encodeURIComponent(batchId)}`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create Packaging Record
+      const pkgRecord = await tx.packagingRecord.create({
+        data: {
+          batchId,
+          packagerId: packagerUser.id,
+          requestId: request?.id || null,
+          finalQuantity: finalQty,
+          numberOfPackages: numPkgs,
+          packageSize,
+          notes: notes || 'Packaging sealed & QR verification assigned',
+          qrCodeUrl
+        }
+      });
+
+      // 2. Complete Request
+      if (request) {
+        await tx.workflowRequest.update({
+          where: { id: request.id },
+          data: {
+            status: 'COMPLETED',
+            toUserId: packagerUser.id,
+            completedAt: new Date()
+          }
+        });
+
+        await tx.requestHistory.create({
+          data: {
+            requestId: request.id,
+            batchId,
+            action: 'COMPLETED',
+            fromStatus: request.status,
+            toStatus: 'COMPLETED',
+            actorId: packagerUser.id,
+            actorRole: 'PACKAGING',
+            notes: `Packaging completed: ${numPkgs} packages of ${packageSize} (${finalQty} kg total)`
+          }
+        });
+      }
+
+      // 3. Complete Batch
+      const updatedBatch = await tx.batch.update({
+        where: { id: batchId },
+        data: {
+          status: 'COMPLETED',
+          currentStage: 'COMPLETED'
+        }
+      });
+
+      return { pkgRecord, updatedBatch };
+    });
+
+    const prov = await recordWorkflowProvenance(
+      batchId,
+      'PACKAGING_COMPLETED',
+      packagerUser.id,
+      request?.id,
+      {
+        batchId,
+        packagingRecordId: result.pkgRecord.id,
+        finalQuantity: finalQty,
+        numberOfPackages: numPkgs,
+        qrCodeUrl
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Batch packaging finalized and verified on HoneyChain',
+      packagingRecord: result.pkgRecord,
+      batch: result.updatedBatch,
+      qrVerificationUrl: qrCodeUrl,
+      provenance: prov.provEvent,
+      blockchainStatus: prov.onChainResult.status
+    });
+  } catch (error: any) {
+    console.error('Error finalizing packaging:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 9. GET /api/batches/:id/workflow
+ * Comprehensive batch lifecycle & request chain progress
+ * ─────────────────────────────────────────────────────────
+ */
+router.get('/batches/:id/workflow', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+
+    const batch = await prisma.batch.findUnique({
+      where: { id },
+      include: {
+        harvest: {
+          include: {
+            harvester: {
+              include: { harvesterVerification: true }
+            },
+            hive: true
+          }
+        },
+        workflowRequests: {
+          include: {
+            fromUser: true,
+            toUser: true,
+            history: { orderBy: { createdAt: 'asc' }, include: { actor: true } },
+            processingRecord: true,
+            labReport: true,
+            packagingRecord: true
+          },
+          orderBy: { createdAt: 'asc' }
+        },
+        processingRecords: { include: { processor: true } },
+        labReports: { include: { lab: true } },
+        packagingRecords: { include: { packager: true } },
+        provenanceEvents: { orderBy: { timestamp: 'asc' } }
+      }
+    });
+
+    if (!batch) {
+      return res.status(404).json({ success: false, error: `Batch ${id} not found` });
+    }
+
+    // Determine workflow step statuses
+    const hasHarvest = !!batch.harvest;
+    const hasProcessing = batch.processingRecords.length > 0;
+    const verifiedLab = batch.labReports.find((l) => l.status === 'APPROVED');
+    const hasPackaging = batch.packagingRecords.length > 0;
+    const isCompleted = batch.status === 'COMPLETED' || batch.currentStage === 'COMPLETED';
+
+    const stages = [
+      {
+        stage: 'HARVEST',
+        title: 'Honey Harvested',
+        completed: hasHarvest,
+        date: batch.harvest?.createdAt || batch.createdAt,
+        actor: batch.harvest?.harvester?.name || 'Harvester',
+        details: `${batch.harvest?.quantity || 0} kg from ${batch.harvest?.location || 'Apiary'}`
+      },
+      {
+        stage: 'COLLECTION',
+        title: 'Collection & Processing',
+        completed: hasProcessing,
+        date: batch.processingRecords[0]?.createdAt || null,
+        actor: batch.processingRecords[0]?.processor?.name || null,
+        details: batch.processingRecords[0]
+          ? `${batch.processingRecords[0].method} (${batch.processingRecords[0].quantityAfter} kg)`
+          : 'Pending collection'
+      },
+      {
+        stage: 'LAB',
+        title: 'Lab Testing & Verification',
+        completed: !!verifiedLab,
+        date: verifiedLab?.createdAt || null,
+        actor: verifiedLab?.lab?.name || null,
+        details: verifiedLab
+          ? `Score: ${verifiedLab.qualityScore}/100, Moisture: ${verifiedLab.moistureContent}%`
+          : 'Pending test'
+      },
+      {
+        stage: 'PACKAGING',
+        title: 'Packaging & Sealing',
+        completed: hasPackaging,
+        date: batch.packagingRecords[0]?.createdAt || null,
+        actor: batch.packagingRecords[0]?.packager?.name || null,
+        details: batch.packagingRecords[0]
+          ? `${batch.packagingRecords[0].numberOfPackages} packages (${batch.packagingRecords[0].packageSize})`
+          : 'Pending packaging'
+      },
+      {
+        stage: 'COMPLETED',
+        title: 'Provenance Finalized',
+        completed: isCompleted,
+        date: batch.updatedAt,
+        details: isCompleted ? 'Ledger verified and sealed' : 'Workflow in progress'
+      }
+    ];
+
+    res.json({
+      success: true,
+      batchId: batch.id,
+      status: batch.status,
+      currentStage: batch.currentStage,
+      stages,
+      requests: batch.workflowRequests,
+      harvest: batch.harvest,
+      processing: batch.processingRecords[0] || null,
+      labReport: verifiedLab || batch.labReports[0] || null,
+      packaging: batch.packagingRecords[0] || null,
+      provenanceEvents: batch.provenanceEvents
+    });
+  } catch (error: any) {
+    console.error('Error fetching batch workflow:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * ─────────────────────────────────────────────────────────
+ * 10. GET /api/batches/:id/history
+ * Full audit timeline of all state transitions
+ * ─────────────────────────────────────────────────────────
+ */
+router.get('/batches/:id/history', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+
+    const history = await prisma.requestHistory.findMany({
+      where: { batchId: id },
+      include: { actor: true, request: true },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const provenance = await prisma.provenanceEvent.findMany({
+      where: { batchId: id },
+      include: { actor: true },
+      orderBy: { timestamp: 'asc' }
+    });
+
+    res.json({
+      success: true,
+      batchId: id,
+      history,
+      provenanceEvents: provenance
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+export default router;

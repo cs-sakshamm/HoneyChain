@@ -13,7 +13,9 @@ class AuthService {
     FirebaseAuth? firebaseAuth,
     GoogleSignIn? googleSignIn,
   })  : _customFirebaseAuth = firebaseAuth,
-        _googleSignIn = googleSignIn ?? GoogleSignIn();
+        _googleSignIn = googleSignIn ?? GoogleSignIn(
+          clientId: kIsWeb ? 'dummy-client-id.apps.googleusercontent.com' : null,
+        );
 
   bool get isFirebaseInitialized => Firebase.apps.isNotEmpty;
 

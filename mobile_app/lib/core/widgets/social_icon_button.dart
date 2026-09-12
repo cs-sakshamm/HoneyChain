@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
 
 /// Production Square Icon Button for Social / Provider Auth
 class SocialIconButton extends StatelessWidget {
@@ -24,7 +25,7 @@ class SocialIconButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: AppConstants.surface,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
         child: InkWell(
           onTap: isLoading ? null : onPressed,
@@ -34,16 +35,16 @@ class SocialIconButton extends StatelessWidget {
             height: size,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              border: Border.all(color: AppConstants.border, width: 1.0),
+              border: Border.all(color: context.borderColor, width: 1.0),
             ),
             alignment: Alignment.center,
             child: isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(context.accentColor),
                     ),
                   )
                 : icon,

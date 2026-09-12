@@ -1,0 +1,19 @@
+{
+  "name": "blockchain",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "ethers": "^6.17.0",
+    "ganache": "^7.9.2",
+    "hardhat": "^3.16.0",
+    "solc": "^0.8.37"
+  },
+  "type": "module"
+}

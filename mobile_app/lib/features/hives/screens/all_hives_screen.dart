@@ -1,326 +1,268 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../controllers/hive_controller.dart';
-import '../widgets/hive_note_card.dart';
+import '../models/hive_model.dart';
+import '../../profile/controllers/user_controller.dart';
 import 'add_edit_hive_screen.dart';
 import 'hive_details_screen.dart';
 
-import '../../../core/widgets/global_app_bar.dart';
-
-/// Complete "All Hives" screen with search, filtering, sorting, and management
+/// Hives list screen — in-body header (no top navbar) with pill Add Hive.
 class AllHivesScreen extends StatelessWidget {
   const AllHivesScreen({super.key});
 
-  void _showDeleteDialog(BuildContext context, String hiveId, String hiveName) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Delete this hive?'),
-          content: Text(
-            'Are you sure you want to delete "$hiveName"? This action cannot be undone.',
-            style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                final controller = context.read<HiveController>();
-                final success = await controller.deleteHive(hiveId);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success ? 'Hive deleted' : 'Failed to delete hive',
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Delete Hive', style: TextStyle(color: AppConstants.error, fontWeight: FontWeight.w600)),
-            ),
-          ],
-        );
-      },
+  void _openAddHive(BuildContext context) {
+    final userCtrl = context.read<UserController>();
+    if (!userCtrl.user.isProfileComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('complete_profile_first'))),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddEditHiveScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<HiveController>();
-    final hives = controller.filteredAndSortedHives;
-
-    final filterOptions = [
-      'All',
-      'Healthy',
-      'Needs Attention',
-      'High Production',
-      'Recently Inspected',
-    ];
-
-    final sortOptions = [
-      'Name A-Z',
-      'Production High-Low',
-      'Last Inspected',
-      'Date Added',
-    ];
+    final hives = controller.hives;
 
     return Scaffold(
-      backgroundColor: AppConstants.background,
-      appBar: GlobalAppBar(
-        extraActions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppConstants.space8),
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AddEditHiveScreen(),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppConstants.primarySoft,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppConstants.primary.withValues(alpha: 0.3)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_rounded, size: 16, color: AppConstants.primaryDark),
-                    SizedBox(width: 4),
-                    Text(
-                      'Add Hive',
-                      style: TextStyle(
-                        fontSize: 12,
+      backgroundColor: context.scaffoldBg,
+      body: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppConstants.space20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // In-body header: title + pill Add Hive action
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      context.tr('hives'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 24,
                         fontWeight: FontWeight.w700,
-                        color: AppConstants.primaryDark,
+                        color: context.textPrimaryColor,
+                        letterSpacing: -0.4,
                       ),
                     ),
-                  ],
+                  ),
+                  Material(
+                    color: context.primarySoftColor,
+                    borderRadius: BorderRadius.circular(30),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _openAddHive(context),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, size: 16, color: context.primaryDarkColor),
+                            const SizedBox(width: 6),
+                            Text(
+                              context.tr('add_hive'),
+                              style: GoogleFonts.manrope(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: context.primaryDarkColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                context.tr('your_active_fields'),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: context.textSecondaryColor,
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Search & Filter Container
-          Container(
-            color: AppConstants.surface,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.space16,
-              vertical: AppConstants.space12,
-            ),
-            child: Column(
-              children: [
-                // Search Input Field
-                TextField(
-                  onChanged: (val) => controller.setSearchQuery(val),
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search by hive name, ID, or location...',
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppConstants.textMuted, size: 20),
-                    suffixIcon: controller.searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18, color: AppConstants.textMuted),
-                            onPressed: () => controller.setSearchQuery(''),
-                          )
-                        : null,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    fillColor: AppConstants.background,
-                  ),
-                ),
-                const SizedBox(height: AppConstants.space12),
 
-                // Horizontal Filter Chips & Sort Selector
-                Row(
-                  children: [
-                    // Sort Dropdown Button
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: AppConstants.background,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppConstants.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: controller.selectedSort,
-                          icon: const Icon(Icons.sort_rounded, size: 16, color: AppConstants.textSecondary),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppConstants.textPrimary),
-                          onChanged: (val) {
-                            if (val != null) controller.setSort(val);
-                          },
-                          items: sortOptions.map((opt) {
-                            return DropdownMenuItem(
-                              value: opt,
-                              child: Text(opt),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppConstants.space8),
-                    // Scrollable Filter Chips
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: filterOptions.map((filter) {
-                            final isSelected = controller.selectedFilter == filter;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: FilterChip(
-                                label: Text(
-                                  filter,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSelected ? Colors.white : AppConstants.textSecondary,
-                                  ),
-                                ),
-                                selected: isSelected,
-                                selectedColor: AppConstants.primaryDark,
-                                backgroundColor: AppConstants.background,
-                                side: BorderSide(
-                                  color: isSelected ? AppConstants.primaryDark : AppConstants.border,
-                                ),
-                                showCheckmark: false,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                onSelected: (_) => controller.setFilter(filter),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
+              const SizedBox(height: AppConstants.space20),
 
-          // Main List of Hives
-          Expanded(
-            child: hives.isEmpty
-                ? _buildEmptyState(context, controller)
-                : ListView.builder(
-                    padding: const EdgeInsets.all(AppConstants.space16),
-                    itemCount: hives.length,
-                    itemBuilder: (context, index) {
-                      final hive = hives[index];
-                      return HiveNoteCard(
-                        hive: hive,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => HiveDetailsScreen(hiveId: hive.id),
-                            ),
-                          );
+              Expanded(
+                child: hives.isEmpty
+                    ? _buildEmptyState(context)
+                    : ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 120),
+                        itemCount: hives.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final hive = hives[index];
+                          return _buildFieldCard(context, hive);
                         },
-                        onEdit: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => AddEditHiveScreen(hive: hive),
-                            ),
-                          );
-                        },
-                        onDelete: () => _showDeleteDialog(context, hive.id, hive.name),
-                      );
-                    },
-                  ),
+                      ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, HiveController controller) {
-    final hasSearchOrFilter =
-        controller.searchQuery.isNotEmpty || controller.selectedFilter != 'All';
+  Widget _buildFieldCard(BuildContext context, Hive hive) {
+    final healthy = hive.isHealthy;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.space32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: AppConstants.primarySoft,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.search_off_rounded,
-                size: 36,
-                color: AppConstants.primaryDark,
-              ),
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HiveDetailsScreen(hiveId: hive.id),
             ),
-            const SizedBox(height: AppConstants.space16),
-            Text(
-              hasSearchOrFilter ? 'No matching hives found' : 'No hives added yet',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppConstants.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              hasSearchOrFilter
-                  ? 'Try adjusting your search query or clear active filters.'
-                  : 'Create your first hive to start tracking production and health.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppConstants.textSecondary,
-              ),
-            ),
-            const SizedBox(height: AppConstants.space24),
-            if (hasSearchOrFilter)
-              OutlinedButton(
-                onPressed: () {
-                  controller.setSearchQuery('');
-                  controller.setFilter('All');
-                },
-                child: const Text('Clear Filters'),
-              )
-            else
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.primaryDark,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddEditHiveScreen(),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(AppConstants.space16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      hive.name,
+                      style: GoogleFonts.manrope(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimaryColor,
+                      ),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add Your First Hive'),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: healthy ? context.successBgColor : context.warningBgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      hive.overallHealth,
+                      style: GoogleFonts.manrope(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: healthy ? context.successColor : context.warningColor,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                '${hive.hiveCode} · ${hive.apiaryLocation} · ${hive.hiveType}',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: context.textSecondaryColor,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${hive.currentYearProductionKg.toStringAsFixed(1)} kg this year',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimaryColor,
+                    ),
+                  ),
+                  Text(
+                    'Target ${hive.expectedProductionKg.toStringAsFixed(0)} kg',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: context.textMutedColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: hive.expectedProductionKg > 0
+                      ? (hive.currentYearProductionKg / hive.expectedProductionKg).clamp(0.0, 1.0)
+                      : 0.0,
+                  minHeight: 5,
+                  backgroundColor: context.borderColor,
+                  valueColor: AlwaysStoppedAnimation<Color>(context.colors.primary),
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.hive_outlined, size: 56, color: context.textMutedColor),
+          const SizedBox(height: AppConstants.space16),
+          Text(
+            context.tr('no_hives_yet'),
+            style: GoogleFonts.manrope(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: context.textPrimaryColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            context.tr('no_hives_subtitle'),
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: context.textSecondaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Material(
+            color: context.colors.primary,
+            borderRadius: BorderRadius.circular(30),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _openAddHive(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                child: Text(
+                  context.tr('add_first_hive'),
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.onPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

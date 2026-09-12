@@ -17,6 +17,8 @@ dependencies:
   provider: ^6.1.2
   shared_preferences: ^2.5.5
   intl: ^0.20.3
+  qr_flutter: ^4.1.0
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

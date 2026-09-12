@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/localization_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/global_app_bar.dart';
 import '../controllers/user_controller.dart';
 
 /// Form screen to Change Password
@@ -49,7 +51,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Password updated successfully'),
+          content: Text(context.tr('password_updated'), style: GoogleFonts.inter()),
           backgroundColor: AppConstants.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -64,12 +66,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConstants.background,
-      appBar: const GlobalAppBar(
-        showBackButton: true,
-        titleText: 'Change Password',
-      ),
-      body: Form(
+      backgroundColor: context.scaffoldBg,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  const _PillBackButton(),
+                  const SizedBox(width: 14),
+                  Text(
+                    context.tr('change_password') == 'change_password' ? 'Change Password' : context.tr('change_password'),
+                    style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: context.textPrimaryColor, letterSpacing: -0.3),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Form(
         key: _formKey,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppConstants.space24),
@@ -78,44 +94,47 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               Container(
                 padding: const EdgeInsets.all(AppConstants.space16),
                 decoration: BoxDecoration(
-                  color: AppConstants.surface,
+                  color: context.surfaceColor,
                   borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                  border: Border.all(color: AppConstants.border),
+                  border: Border.all(color: context.borderColor),
                 ),
                 child: Column(
                   children: [
                     _buildPasswordField(
-                      label: 'Current Password *',
+                      context: context,
+                      label: '${context.tr('current_password')} *',
                       controller: _currentPasswordController,
                       obscureText: _obscureCurrent,
                       onToggleVisibility: () =>
                           setState(() => _obscureCurrent = !_obscureCurrent),
                       validator: (val) =>
-                          (val == null || val.isEmpty) ? 'Enter current password' : null,
+                          (val == null || val.isEmpty) ? context.tr('current_password') : null,
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildPasswordField(
-                      label: 'New Password *',
+                      context: context,
+                      label: '${context.tr('new_password')} *',
                       controller: _newPasswordController,
                       obscureText: _obscureNew,
                       onToggleVisibility: () =>
                           setState(() => _obscureNew = !_obscureNew),
                       validator: (val) {
-                        if (val == null || val.isEmpty) return 'Enter new password';
-                        if (val.length < 6) return 'Password must be at least 6 characters';
+                        if (val == null || val.isEmpty) return context.tr('new_password');
+                        if (val.length < 6) return context.tr('new_password');
                         return null;
                       },
                     ),
                     const SizedBox(height: AppConstants.space16),
                     _buildPasswordField(
-                      label: 'Confirm New Password *',
+                      context: context,
+                      label: '${context.tr('confirm_password')} *',
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirm,
                       onToggleVisibility: () =>
                           setState(() => _obscureConfirm = !_obscureConfirm),
                       validator: (val) {
-                        if (val == null || val.isEmpty) return 'Confirm password';
-                        if (val != _newPasswordController.text) return 'Passwords do not match';
+                        if (val == null || val.isEmpty) return context.tr('confirm_password');
+                        if (val != _newPasswordController.text) return context.tr('confirm_password');
                         return null;
                       },
                     ),
@@ -124,7 +143,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
               const SizedBox(height: AppConstants.space32),
               AppButton(
-                text: 'Update Password',
+                text: context.tr('update_password'),
                 isLoading: _isLoading,
                 variant: AppButtonVariant.primary,
                 onPressed: _updatePassword,
@@ -133,10 +152,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
         ),
       ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
+
   Widget _buildPasswordField({
+    required BuildContext context,
     required String label,
     required TextEditingController controller,
     required bool obscureText,
@@ -148,25 +173,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: GoogleFonts.manrope(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppConstants.textPrimary,
+            color: context.textPrimaryColor,
           ),
         ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           obscureText: obscureText,
-          style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary),
+          style: GoogleFonts.inter(fontSize: 14, color: context.textPrimaryColor),
           decoration: InputDecoration(
             hintText: '••••••••',
+            hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+            fillColor: context.surfaceColor,
+            filled: true,
             isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: BorderSide(color: context.borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              borderSide: const BorderSide(color: AppConstants.primary, width: 1.5),
+            ),
             suffixIcon: IconButton(
               icon: Icon(
                 obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                 size: 20,
-                color: AppConstants.textMuted,
+                color: context.textMutedColor,
               ),
               onPressed: onToggleVisibility,
             ),
@@ -174,6 +211,29 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           validator: validator,
         ),
       ],
+    );
+  }
+}
+
+class _PillBackButton extends StatelessWidget {
+  const _PillBackButton();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.surfaceColor,
+      borderRadius: BorderRadius.circular(30),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: context.borderColor),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
+        ),
+      ),
     );
   }
 }

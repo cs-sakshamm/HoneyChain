@@ -1,0 +1,157 @@
+/* ============================================================
+   Pinterest-Inspired Navigation Styles (Top & Bottom)
+============================================================ */
+
+/* ---------------- Top Navbar ---------------- */
+.top-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  padding: 12px 16px;
+  z-index: 50;
+  background: rgba(18, 18, 18, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+.top-navbar-container {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  outline: none;
+}
+
+.logo-link:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.logo-text {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  user-select: none;
+  transition: opacity 0.15s ease;
+}
+
+.logo-link:hover .logo-text {
+  opacity: 0.85;
+}
+
+.top-navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-icon-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  text-decoration: none;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.nav-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.nav-icon-btn:active {
+  transform: scale(0.94);
+}
+
+.nav-icon-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+
+.notification-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #121212;
+}
+
+/* ---------------- Floating Bottom Dock ---------------- */
+.bottom-dock-wrapper {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  pointer-events: auto;
+}
+
+.bottom-dock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(30, 30, 30, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+
+.dock-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dock-item:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dock-item.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: scale(1.02);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+.dock-item:active {
+  transform: scale(0.92);
+}
+
+.dock-item:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+}

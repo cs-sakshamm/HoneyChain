@@ -1,10 +1,10 @@
+﻿import '../theme/app_theme.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-
+import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 
-/// Professional, minimal SaaS Logo for HoneyChain
-/// Geometric Hexagon + Interlocking Chain Link ('H' concept)
+/// Professional, minimal SaaS Logo & Typeset Wordmark for HoneyChain
 class AppLogo extends StatelessWidget {
   final double size;
   final bool showWordmark;
@@ -13,7 +13,7 @@ class AppLogo extends StatelessWidget {
 
   const AppLogo({
     super.key,
-    this.size = 36.0,
+    this.size = 26.0,
     this.showWordmark = true,
     this.isDark = false,
     this.subtitle,
@@ -26,8 +26,8 @@ class AppLogo extends StatelessWidget {
       height: size,
       child: CustomPaint(
         painter: _HoneyChainLogoPainter(
-          primaryColor: AppConstants.primary,
-          secondaryColor: AppConstants.primaryDark,
+          primaryColor: context.colors.primary,
+          secondaryColor: context.textPrimaryColor,
         ),
       ),
     );
@@ -36,27 +36,26 @@ class AppLogo extends StatelessWidget {
       return mark;
     }
 
-    final textColor = isDark ? Colors.white : AppConstants.textPrimary;
-    final subtitleColor = isDark ? Colors.white70 : AppConstants.textSecondary;
+    final textColor = context.textPrimaryColor;
+    final subtitleColor = context.textSecondaryColor;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         mark,
-        SizedBox(width: size * 0.3),
+        SizedBox(width: size * 0.35),
         Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               AppConstants.appName,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: size * 0.6,
+              style: GoogleFonts.manrope(
+                fontSize: size * 0.65,
                 fontWeight: FontWeight.w700,
                 color: textColor,
-                letterSpacing: -0.5,
+                letterSpacing: -0.4,
                 height: 1.1,
               ),
             ),
@@ -64,9 +63,8 @@ class AppLogo extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle!,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: size * 0.3,
+                style: GoogleFonts.inter(
+                  fontSize: size * 0.32,
                   fontWeight: FontWeight.w400,
                   color: subtitleColor,
                 ),
@@ -102,7 +100,7 @@ class _HoneyChainLogoPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // 1. Draw outer geometric flat-topped hexagon
+    // 1. Outer geometric flat-topped hexagon
     final Path hexPath = Path();
     for (int i = 0; i < 6; i++) {
       final double angle = (i * 60 - 30) * math.pi / 180;
@@ -119,7 +117,7 @@ class _HoneyChainLogoPainter extends CustomPainter {
     strokePaint.color = primaryColor;
     canvas.drawPath(hexPath, strokePaint);
 
-    // 2. Draw inner geometric chain node / 'H' motif
+    // 2. Inner geometric chain node / 'H' motif
     final double linkWidth = w * 0.36;
     final double linkHeight = h * 0.28;
     final double thickness = w * 0.08;
@@ -162,3 +160,4 @@ class _HoneyChainLogoPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+

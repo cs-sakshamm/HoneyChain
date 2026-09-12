@@ -7,36 +7,47 @@ class AppConstants {
   // App Identity
   static const String appName = 'HoneyChain';
   static const String appTagline = 'Supply chain management simplified for business owners.';
+
+  // Backend / API base (single source of truth for mobile → backend calls)
+  static const String backendBaseUrl = 'http://127.0.0.1:3000';
   static const String legalDisclaimer =
       'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
 
-  // Design Tokens: Color Palette (Senior SaaS Product Palette)
-  static const Color primary = Color(0xFFD97706); // Warm Honey Amber
-  static const Color honeyAccent = primary; // Alias for compatibility
-  static const Color primaryDark = Color(0xFFB45309); // Deep Amber
-  static const Color primarySoft = Color(0xFFFFFBEB); // Soft Amber Tint
+  // Design Tokens: Color Palette (Honey Brand & Neutrals)
+  // Honey is the single brand accent across BOTH themes (buttons, icons,
+  // highlights, active states, progress). Neutrals carry the surfaces/text.
+  static const Color primary = honeyAccent; // Honey — brand primary
+  static const Color onPrimary = Color(0xFF1C1917); // Stone-900: readable on honey
+  static const Color honeyAccent = Color(0xFFEAB308); // Yellow-500 (Honey)
+  static const Color primaryDark = Color(0xFF09090B); // Zinc-950
+  static const Color primarySoft = Color(0xFFFEF9C3); // Yellow-100 (honey tint)
+  static const Color secondary = Color(0xFF52525B); // Zinc-500
 
-  static const Color background = Color(0xFFF9FAFB); // Neutral Light Background (Gray-50)
+  static const Color background = Color(0xFFF9FAFB); // Neutral Off-White Background
   static const Color surface = Color(0xFFFFFFFF); // Pure White Surface
-  static const Color border = Color(0xFFE5E7EB); // Subtle Border (Gray-200)
-  static const Color borderFocus = Color(0xFFD97706); // Active Input Focus
+  static const Color border = Color(0xFFE4E4E7); // Zinc-200
+  static const Color borderFocus = Color(0xFFEAB308); // Honey Accent
 
-  static const Color textPrimary = Color(0xFF111827); // Dark Neutral (Gray-900)
-  static const Color textSecondary = Color(0xFF4B5563); // Muted Body Text (Gray-600)
-  static const Color textMuted = Color(0xFF9CA3AF); // Placeholder / Caption (Gray-400)
+  static const Color textPrimary = Color(0xFF09090B); // Zinc-950
+  static const Color textSecondary = Color(0xFF52525B); // Zinc-500
+  static const Color textMuted = Color(0xFFA1A1AA); // Zinc-400
 
-  static const Color success = Color(0xFF059669); // Emerald Success
-  static const Color successBackground = Color(0xFFECFDF5);
-  static const Color error = Color(0xFFDC2626); // Production Error Red
-  static const Color errorBackground = Color(0xFFFEF2F2);
-  static const Color warning = Color(0xFFD97706); // Warning Amber
+  static const Color success = Color(0xFF22C55E); // Green-500
+  static const Color successBackground = Color(0xFFF0FDF4); // Green-50
+  static const Color error = Color(0xFFEF4444); // Red-500
+  static const Color errorBackground = Color(0xFFFEF2F2); // Red-50
+  static const Color warning = Color(0xFFF59E0B); // Amber-500
+  static const Color warningBackground = Color(0xFFFFFBEB); // Amber-50
 
   // Spacing Tokens (4px Grid System)
   static const double space4 = 4.0;
+  static const double space6 = 6.0;
   static const double space8 = 8.0;
   static const double space12 = 12.0;
   static const double space16 = 16.0;
+  static const double space20 = 20.0;
   static const double space24 = 24.0;
+  static const double space28 = 28.0;
   static const double space32 = 32.0;
   static const double space48 = 48.0;
 
@@ -48,15 +59,22 @@ class AppConstants {
   static const double borderRadiusLarge = 16.0;
 
   // Auth Text & Strings
-  static const String emailOrPhoneHint = 'Business Email or Phone';
-  static const String passwordHint = 'Password';
-  static const String businessNameHint = 'Legal Business Name';
-  static const String loginButtonText = 'Sign In to Account';
-  static const String createAccountButtonText = 'Create Business Account';
-  static const String forgotPasswordText = 'Forgot Password?';
-  static const String orDividerText = 'OR CONTINUE WITH';
+  static const String loginTitle = 'Welcome back';
+  static const String loginSubtitle = 'Sign in to continue to HoneyChain.';
+  static const String brandHeadline = 'Everything you need, connected in one place.';
+  static const String brandSubtitle = 'Sign in to continue your HoneyChain experience.';
+  static const String emailLabel = 'Email address';
+  static const String emailHint = 'Enter your email address';
+  static const String passwordLabel = 'Password';
+  static const String passwordHint = 'Enter your password';
+  static const String loginButtonText = 'Sign in';
+  static const String createAccountButtonText = 'Create account';
+  static const String forgotPasswordText = 'Forgot password?';
+  static const String orDividerText = 'OR';
 
-  // Provider Tooltips
+  // Provider Tooltips & Text
+  static const String continueWithGoogleText = 'Continue with Google';
+  static const String continueWithPhoneText = 'Continue with phone';
   static const String googleSignInText = 'Sign in with Google';
   static const String appleSignInText = 'Sign in with Apple';
   static const String phoneSignInText = 'Sign in with Phone';
@@ -89,4 +107,8 @@ class AppConstants {
   static const String logoutSubtitle = 'Are you sure you want to end your current session?';
   static const String logoutCancel = 'Cancel';
   static const String logoutConfirm = 'Log Out';
+
+  // Harvester identity (issued by backend when available; locally unique otherwise)
+  static const String bsidPrefix = 'BSID';
+  static const String bspPassPrefix = 'BSP';
 }

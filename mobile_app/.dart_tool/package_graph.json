@@ -13,7 +13,11 @@
         "flutter",
         "google_fonts",
         "google_sign_in",
-        "provider"
+        "http",
+        "intl",
+        "provider",
+        "qr_flutter",
+        "shared_preferences"
       ],
       "devDependencies": [
         "flutter_lints",
@@ -46,6 +50,103 @@
       ]
     },
     {
+      "name": "http",
+      "version": "1.6.0",
+      "dependencies": [
+        "async",
+        "http_parser",
+        "meta",
+        "web"
+      ]
+    },
+    {
+      "name": "qr_flutter",
+      "version": "4.1.0",
+      "dependencies": [
+        "flutter",
+        "qr"
+      ]
+    },
+    {
+      "name": "intl",
+      "version": "0.20.3",
+      "dependencies": [
+        "clock",
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "shared_preferences",
+      "version": "2.5.5",
+      "dependencies": [
+        "flutter",
+        "shared_preferences_android",
+        "shared_preferences_foundation",
+        "shared_preferences_linux",
+        "shared_preferences_platform_interface",
+        "shared_preferences_web",
+        "shared_preferences_windows"
+      ]
+    },
+    {
+      "name": "provider",
+      "version": "6.1.5+1",
+      "dependencies": [
+        "collection",
+        "flutter",
+        "nested"
+      ]
+    },
+    {
+      "name": "google_fonts",
+      "version": "6.3.3",
+      "dependencies": [
+        "crypto",
+        "flutter",
+        "http",
+        "path_provider"
+      ]
+    },
+    {
+      "name": "google_sign_in",
+      "version": "6.3.0",
+      "dependencies": [
+        "flutter",
+        "google_sign_in_android",
+        "google_sign_in_ios",
+        "google_sign_in_platform_interface",
+        "google_sign_in_web"
+      ]
+    },
+    {
+      "name": "firebase_auth",
+      "version": "5.7.0",
+      "dependencies": [
+        "firebase_auth_platform_interface",
+        "firebase_auth_web",
+        "firebase_core",
+        "firebase_core_platform_interface",
+        "flutter",
+        "meta"
+      ]
+    },
+    {
+      "name": "firebase_core",
+      "version": "3.15.2",
+      "dependencies": [
+        "firebase_core_platform_interface",
+        "firebase_core_web",
+        "flutter",
+        "meta"
+      ]
+    },
+    {
+      "name": "cupertino_icons",
+      "version": "1.0.9",
+      "dependencies": []
+    },
+    {
       "name": "flutter",
       "version": "0.0.0",
       "dependencies": [
@@ -58,9 +159,78 @@
       ]
     },
     {
+      "name": "lints",
+      "version": "5.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "stream_channel",
+      "version": "2.1.4",
+      "dependencies": [
+        "async"
+      ]
+    },
+    {
+      "name": "meta",
+      "version": "1.18.3",
+      "dependencies": []
+    },
+    {
+      "name": "collection",
+      "version": "1.19.1",
+      "dependencies": []
+    },
+    {
+      "name": "leak_tracker_flutter_testing",
+      "version": "3.0.10",
+      "dependencies": [
+        "flutter",
+        "leak_tracker",
+        "leak_tracker_testing",
+        "matcher",
+        "meta"
+      ]
+    },
+    {
       "name": "vector_math",
       "version": "2.4.0",
       "dependencies": []
+    },
+    {
+      "name": "stack_trace",
+      "version": "1.12.2",
+      "dependencies": [
+        "path"
+      ]
+    },
+    {
+      "name": "clock",
+      "version": "1.1.3",
+      "dependencies": []
+    },
+    {
+      "name": "fake_async",
+      "version": "1.3.3",
+      "dependencies": [
+        "clock",
+        "collection"
+      ]
+    },
+    {
+      "name": "path",
+      "version": "1.9.1",
+      "dependencies": []
+    },
+    {
+      "name": "matcher",
+      "version": "0.12.20",
+      "dependencies": [
+        "async",
+        "meta",
+        "stack_trace",
+        "term_glyph",
+        "test_api"
+      ]
     },
     {
       "name": "test_api",
@@ -78,83 +248,119 @@
       ]
     },
     {
-      "name": "stream_channel",
-      "version": "2.1.4",
-      "dependencies": [
-        "async"
-      ]
-    },
-    {
-      "name": "path",
-      "version": "1.9.1",
+      "name": "web",
+      "version": "1.1.1",
       "dependencies": []
     },
     {
-      "name": "meta",
-      "version": "1.18.3",
-      "dependencies": []
-    },
-    {
-      "name": "matcher",
-      "version": "0.12.20",
+      "name": "http_parser",
+      "version": "4.1.2",
       "dependencies": [
-        "async",
-        "meta",
-        "stack_trace",
-        "term_glyph",
-        "test_api"
+        "collection",
+        "source_span",
+        "string_scanner",
+        "typed_data"
       ]
     },
     {
-      "name": "leak_tracker_flutter_testing",
-      "version": "3.0.10",
+      "name": "async",
+      "version": "2.13.1",
       "dependencies": [
-        "flutter",
-        "leak_tracker",
-        "leak_tracker_testing",
-        "matcher",
+        "collection",
         "meta"
       ]
     },
     {
-      "name": "fake_async",
-      "version": "1.3.3",
+      "name": "qr",
+      "version": "3.0.2",
       "dependencies": [
-        "clock",
-        "collection"
+        "meta"
       ]
     },
     {
-      "name": "collection",
-      "version": "1.19.1",
-      "dependencies": []
-    },
-    {
-      "name": "sky_engine",
-      "version": "0.0.0",
-      "dependencies": []
-    },
-    {
-      "name": "material_color_utilities",
-      "version": "0.13.0",
+      "name": "shared_preferences_windows",
+      "version": "2.4.1",
       "dependencies": [
-        "collection"
+        "file",
+        "flutter",
+        "path",
+        "path_provider_platform_interface",
+        "path_provider_windows",
+        "shared_preferences_platform_interface"
       ]
     },
     {
-      "name": "characters",
-      "version": "1.4.1",
-      "dependencies": []
-    },
-    {
-      "name": "google_sign_in",
-      "version": "6.3.0",
+      "name": "shared_preferences_web",
+      "version": "2.4.3",
       "dependencies": [
         "flutter",
-        "google_sign_in_android",
-        "google_sign_in_ios",
-        "google_sign_in_platform_interface",
-        "google_sign_in_web"
+        "flutter_web_plugins",
+        "shared_preferences_platform_interface",
+        "web"
+      ]
+    },
+    {
+      "name": "shared_preferences_platform_interface",
+      "version": "2.4.2",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "shared_preferences_linux",
+      "version": "2.4.1",
+      "dependencies": [
+        "file",
+        "flutter",
+        "path",
+        "path_provider_linux",
+        "path_provider_platform_interface",
+        "shared_preferences_platform_interface"
+      ]
+    },
+    {
+      "name": "shared_preferences_foundation",
+      "version": "2.5.7",
+      "dependencies": [
+        "flutter",
+        "meta",
+        "shared_preferences_platform_interface"
+      ]
+    },
+    {
+      "name": "shared_preferences_android",
+      "version": "2.4.28",
+      "dependencies": [
+        "flutter",
+        "meta",
+        "shared_preferences_platform_interface"
+      ]
+    },
+    {
+      "name": "nested",
+      "version": "1.0.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "path_provider",
+      "version": "2.1.6",
+      "dependencies": [
+        "flutter",
+        "path_provider_android",
+        "path_provider_foundation",
+        "path_provider_linux",
+        "path_provider_platform_interface",
+        "path_provider_windows"
+      ]
+    },
+    {
+      "name": "crypto",
+      "version": "3.0.7",
+      "dependencies": [
+        "typed_data"
       ]
     },
     {
@@ -178,50 +384,6 @@
       ]
     },
     {
-      "name": "flutter_web_plugins",
-      "version": "0.0.0",
-      "dependencies": [
-        "flutter"
-      ]
-    },
-    {
-      "name": "cupertino_icons",
-      "version": "1.0.9",
-      "dependencies": []
-    },
-    {
-      "name": "stack_trace",
-      "version": "1.12.2",
-      "dependencies": [
-        "path"
-      ]
-    },
-    {
-      "name": "clock",
-      "version": "1.1.3",
-      "dependencies": []
-    },
-    {
-      "name": "leak_tracker_testing",
-      "version": "3.0.2",
-      "dependencies": [
-        "leak_tracker",
-        "matcher",
-        "meta"
-      ]
-    },
-    {
-      "name": "leak_tracker",
-      "version": "11.0.2",
-      "dependencies": [
-        "clock",
-        "collection",
-        "meta",
-        "path",
-        "vm_service"
-      ]
-    },
-    {
       "name": "google_sign_in_ios",
       "version": "5.9.0",
       "dependencies": [
@@ -238,113 +400,14 @@
       ]
     },
     {
-      "name": "plugin_platform_interface",
-      "version": "2.1.8",
-      "dependencies": [
-        "meta"
-      ]
-    },
-    {
-      "name": "lints",
-      "version": "5.1.1",
-      "dependencies": []
-    },
-    {
-      "name": "term_glyph",
-      "version": "1.2.2",
-      "dependencies": []
-    },
-    {
-      "name": "boolean_selector",
-      "version": "2.1.2",
-      "dependencies": [
-        "source_span",
-        "string_scanner"
-      ]
-    },
-    {
-      "name": "provider",
-      "version": "6.1.5+1",
+      "name": "firebase_core_platform_interface",
+      "version": "6.0.3",
       "dependencies": [
         "collection",
         "flutter",
-        "nested"
-      ]
-    },
-    {
-      "name": "nested",
-      "version": "1.0.0",
-      "dependencies": [
-        "flutter"
-      ]
-    },
-    {
-      "name": "web",
-      "version": "1.1.1",
-      "dependencies": []
-    },
-    {
-      "name": "typed_data",
-      "version": "1.4.0",
-      "dependencies": [
-        "collection"
-      ]
-    },
-    {
-      "name": "google_fonts",
-      "version": "6.3.3",
-      "dependencies": [
-        "crypto",
-        "flutter",
-        "http",
-        "path_provider"
-      ]
-    },
-    {
-      "name": "async",
-      "version": "2.13.1",
-      "dependencies": [
-        "collection",
-        "meta"
-      ]
-    },
-    {
-      "name": "string_scanner",
-      "version": "1.4.1",
-      "dependencies": [
-        "source_span"
-      ]
-    },
-    {
-      "name": "http_parser",
-      "version": "4.1.2",
-      "dependencies": [
-        "collection",
-        "source_span",
-        "string_scanner",
-        "typed_data"
-      ]
-    },
-    {
-      "name": "firebase_auth",
-      "version": "5.7.0",
-      "dependencies": [
-        "firebase_auth_platform_interface",
-        "firebase_auth_web",
-        "firebase_core",
-        "firebase_core_platform_interface",
-        "flutter",
-        "meta"
-      ]
-    },
-    {
-      "name": "firebase_core",
-      "version": "3.15.2",
-      "dependencies": [
-        "firebase_core_platform_interface",
-        "firebase_core_web",
-        "flutter",
-        "meta"
+        "flutter_test",
+        "meta",
+        "plugin_platform_interface"
       ]
     },
     {
@@ -385,25 +448,52 @@
       ]
     },
     {
-      "name": "_flutterfire_internals",
-      "version": "1.3.59",
+      "name": "sky_engine",
+      "version": "0.0.0",
+      "dependencies": []
+    },
+    {
+      "name": "material_color_utilities",
+      "version": "0.13.0",
       "dependencies": [
-        "collection",
-        "firebase_core",
-        "firebase_core_platform_interface",
-        "flutter",
+        "collection"
+      ]
+    },
+    {
+      "name": "characters",
+      "version": "1.4.1",
+      "dependencies": []
+    },
+    {
+      "name": "leak_tracker_testing",
+      "version": "3.0.2",
+      "dependencies": [
+        "leak_tracker",
+        "matcher",
         "meta"
       ]
     },
     {
-      "name": "firebase_core_platform_interface",
-      "version": "6.0.3",
+      "name": "leak_tracker",
+      "version": "11.0.2",
       "dependencies": [
+        "clock",
         "collection",
-        "flutter",
-        "flutter_test",
         "meta",
-        "plugin_platform_interface"
+        "path",
+        "vm_service"
+      ]
+    },
+    {
+      "name": "term_glyph",
+      "version": "1.2.2",
+      "dependencies": []
+    },
+    {
+      "name": "string_scanner",
+      "version": "1.4.1",
+      "dependencies": [
+        "source_span"
       ]
     },
     {
@@ -416,45 +506,18 @@
       ]
     },
     {
-      "name": "crypto",
-      "version": "3.0.7",
+      "name": "boolean_selector",
+      "version": "2.1.2",
       "dependencies": [
-        "typed_data"
+        "source_span",
+        "string_scanner"
       ]
     },
     {
-      "name": "google_identity_services_web",
-      "version": "0.3.3+1",
+      "name": "typed_data",
+      "version": "1.4.0",
       "dependencies": [
-        "meta",
-        "web"
-      ]
-    },
-    {
-      "name": "http",
-      "version": "1.6.0",
-      "dependencies": [
-        "async",
-        "http_parser",
-        "meta",
-        "web"
-      ]
-    },
-    {
-      "name": "vm_service",
-      "version": "15.3.0",
-      "dependencies": []
-    },
-    {
-      "name": "path_provider",
-      "version": "2.1.6",
-      "dependencies": [
-        "flutter",
-        "path_provider_android",
-        "path_provider_foundation",
-        "path_provider_linux",
-        "path_provider_platform_interface",
-        "path_provider_windows"
+        "collection"
       ]
     },
     {
@@ -465,6 +528,37 @@
         "flutter",
         "path",
         "path_provider_platform_interface"
+      ]
+    },
+    {
+      "name": "path_provider_platform_interface",
+      "version": "2.1.3",
+      "dependencies": [
+        "flutter",
+        "platform",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "file",
+      "version": "7.0.1",
+      "dependencies": [
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "plugin_platform_interface",
+      "version": "2.1.8",
+      "dependencies": [
+        "meta"
       ]
     },
     {
@@ -479,15 +573,6 @@
       ]
     },
     {
-      "name": "path_provider_platform_interface",
-      "version": "2.1.3",
-      "dependencies": [
-        "flutter",
-        "platform",
-        "plugin_platform_interface"
-      ]
-    },
-    {
       "name": "path_provider_foundation",
       "version": "2.6.0",
       "dependencies": [
@@ -498,73 +583,43 @@
       ]
     },
     {
-      "name": "logging",
-      "version": "1.3.0",
+      "name": "path_provider_android",
+      "version": "2.3.1",
+      "dependencies": [
+        "flutter",
+        "jni",
+        "jni_flutter",
+        "path_provider_platform_interface"
+      ]
+    },
+    {
+      "name": "google_identity_services_web",
+      "version": "0.3.3+1",
+      "dependencies": [
+        "meta",
+        "web"
+      ]
+    },
+    {
+      "name": "_flutterfire_internals",
+      "version": "1.3.59",
+      "dependencies": [
+        "collection",
+        "firebase_core",
+        "firebase_core_platform_interface",
+        "flutter",
+        "meta"
+      ]
+    },
+    {
+      "name": "vm_service",
+      "version": "15.3.0",
       "dependencies": []
     },
     {
       "name": "ffi",
       "version": "2.2.0",
       "dependencies": []
-    },
-    {
-      "name": "pub_semver",
-      "version": "2.2.1",
-      "dependencies": [
-        "collection"
-      ]
-    },
-    {
-      "name": "objective_c",
-      "version": "9.5.0",
-      "dependencies": [
-        "code_assets",
-        "collection",
-        "ffi",
-        "hooks",
-        "logging",
-        "meta",
-        "pub_semver"
-      ]
-    },
-    {
-      "name": "yaml",
-      "version": "3.1.4",
-      "dependencies": [
-        "collection",
-        "source_span",
-        "string_scanner"
-      ]
-    },
-    {
-      "name": "code_assets",
-      "version": "1.2.1",
-      "dependencies": [
-        "collection",
-        "hooks"
-      ]
-    },
-    {
-      "name": "hooks",
-      "version": "2.0.2",
-      "dependencies": [
-        "collection",
-        "crypto",
-        "logging",
-        "meta",
-        "pub_semver",
-        "record_use",
-        "yaml"
-      ]
-    },
-    {
-      "name": "record_use",
-      "version": "0.6.0",
-      "dependencies": [
-        "collection",
-        "meta",
-        "pub_semver"
-      ]
     },
     {
       "name": "platform",
@@ -582,13 +637,16 @@
       ]
     },
     {
-      "name": "path_provider_android",
-      "version": "2.3.1",
+      "name": "objective_c",
+      "version": "9.5.0",
       "dependencies": [
-        "flutter",
-        "jni",
-        "jni_flutter",
-        "path_provider_platform_interface"
+        "code_assets",
+        "collection",
+        "ffi",
+        "hooks",
+        "logging",
+        "meta",
+        "pub_semver"
       ]
     },
     {
@@ -614,6 +672,46 @@
       ]
     },
     {
+      "name": "pub_semver",
+      "version": "2.2.1",
+      "dependencies": [
+        "collection"
+      ]
+    },
+    {
+      "name": "logging",
+      "version": "1.3.0",
+      "dependencies": []
+    },
+    {
+      "name": "hooks",
+      "version": "2.0.2",
+      "dependencies": [
+        "collection",
+        "crypto",
+        "logging",
+        "meta",
+        "pub_semver",
+        "record_use",
+        "yaml"
+      ]
+    },
+    {
+      "name": "code_assets",
+      "version": "1.2.1",
+      "dependencies": [
+        "collection",
+        "hooks"
+      ]
+    },
+    {
+      "name": "package_config",
+      "version": "3.0.0",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
       "name": "jni_util",
       "version": "1.0.0",
       "dependencies": [
@@ -626,10 +724,21 @@
       "dependencies": []
     },
     {
-      "name": "package_config",
-      "version": "3.0.0",
+      "name": "yaml",
+      "version": "3.1.4",
       "dependencies": [
-        "meta"
+        "collection",
+        "source_span",
+        "string_scanner"
+      ]
+    },
+    {
+      "name": "record_use",
+      "version": "0.6.0",
+      "dependencies": [
+        "collection",
+        "meta",
+        "pub_semver"
       ]
     }
   ],

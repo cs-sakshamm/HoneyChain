@@ -16,17 +16,23 @@ class AppleSignInButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Brand-accurate white in light mode; theme surface in dark mode.
+    final bgColor = isDark ? theme.colorScheme.surface : Colors.white;
+    final textColor = isDark ? theme.colorScheme.onSurface : const Color(0xFF202124);
+    final borderColor = isDark ? theme.colorScheme.outline : const Color(0xFFDADCE0);
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 320, minHeight: 48),
       child: OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF202124),
+          backgroundColor: bgColor,
+          foregroundColor: textColor,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          side: const BorderSide(color: Color(0xFFDADCE0), width: 1),
+          side: BorderSide(color: borderColor, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -37,24 +43,23 @@ class AppleSignInButton extends StatelessWidget {
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(AppConstants.honeyAccent),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppConstants.honeyAccent),
                 ),
               )
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.apple,
                     size: 22,
-                    color: Color(0xFF000000),
+                    color: textColor,
                   ),
                   const SizedBox(width: 12),
                   Text(
                     AppConstants.appleSignInText,
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: const Color(0xFF202124),
+                      color: textColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
