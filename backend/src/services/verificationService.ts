@@ -210,6 +210,14 @@ export class VerificationService {
       include: { harvester: true }
     });
 
+    // Associate verified phone with user's account in database
+    if (verification.harvesterId) {
+      await prisma.user.update({
+        where: { id: verification.harvesterId },
+        data: { phone: mobile }
+      }).catch(() => {});
+    }
+
     return updated;
   }
 

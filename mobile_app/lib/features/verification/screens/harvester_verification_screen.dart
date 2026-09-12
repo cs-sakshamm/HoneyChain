@@ -44,7 +44,15 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
           : (user.beekeeperId ?? 'harvester');
       context.read<VerificationController>().loadVerification(harvesterId);
       if (user.phone.isNotEmpty) {
-        _phoneController.text = user.phone;
+        String digits = user.phone.replaceAll(RegExp(r'\D'), '');
+        if (digits.startsWith('91') && digits.length > 10) {
+          digits = digits.substring(2);
+        }
+        if (digits.length == 10) {
+          _phoneController.text = '+91 ${digits.substring(0, 5)} ${digits.substring(5)}';
+        } else {
+          _phoneController.text = user.phone;
+        }
       }
       if (user.organizationName != null && user.organizationName!.isNotEmpty) {
         _apiaryNameController.text = user.organizationName!;
@@ -425,83 +433,58 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
               // ── STEP 2: Mobile Number + OTP ──
               _buildStepCard(
                 stepNumber: 2,
-                title: 'Mobile Number + OTP',
-                subtitle: 'Real-Time Backend OTP Generation & Validation',
+                title: 'Mobile Number Verification',
+                subtitle: '2Factor SMS Gateway · India DLT Compliant OTP',
                 icon: Icons.phone_android_rounded,
                 isCompleted: ver.isStep2Complete,
-                statusText: ver.mobileVerified,
+                statusText: ver.mobileVerified == 'Verified' ? 'Mobile Verified ✓' : ver.mobileVerified,
                 content: ver.isStep2Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Verified Phone',
-                        value: ver.mobileNumber ?? 'Verified',
-                        subtext: 'Mobile identity confirmed with 2FA OTP',
+                        label: 'Verified Phone Number',
+                        value: ver.mobileNumber ?? '+91 XXXXX XXXXX',
+                        subtext: 'Mobile identity confirmed with 2FA OTP Gateway',
+                        verifiedBadgeText: 'Mobile Number — Verified ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Business Mobile Number',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                          ),
-                          const SizedBox(height: 6),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: InputDecoration(
-                                    hintText: '+1234567890',
-                                    hintStyle: GoogleFonts.inter(color: context.textMutedColor),
-                                    filled: true,
-                                    fillColor: context.scaffoldBg,
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  ),
-                                ),
+                              Text(
+                                'Mobile Number',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                               ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: verCtrl.canResendOtp && !verCtrl.isLoading
-                                    ? () {
-                                        final phone = _phoneController.text.trim();
-                                        if (phone.isEmpty) {
-                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter mobile number.')));
-                                          return;
-                                        }
-                                        verCtrl.sendMobileOtp(phone);
-                                      }
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: context.primarySoftColor,
-                                  foregroundColor: context.primaryDarkColor,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: context.primarySoftColor,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  verCtrl.otpCooldown > 0 ? '${verCtrl.otpCooldown}s' : 'Send OTP',
-                                  style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
+                                  '+91 India Mobile',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.primaryDarkColor,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '6-Digit Verification Code',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                          ),
                           const SizedBox(height: 6),
                           TextField(
-                            controller: _otpController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 6,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            maxLength: 15,
+                            enabled: !verCtrl.mobileOtpSent && !verCtrl.isLoading,
+                            inputFormatters: [
+                              _IndianPhoneNumberFormatter(),
+                            ],
                             decoration: InputDecoration(
                               counterText: '',
-                              hintText: 'Enter 6-digit code',
+                              hintText: '+91 XXXXX XXXXX',
+                              prefixIcon: Icon(Icons.phone_outlined, size: 20, color: context.textSecondaryColor),
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
@@ -511,20 +494,136 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          _ActionButton(
-                            label: 'Validate Mobile OTP',
-                            icon: Icons.verified_user_outlined,
-                            isLoading: verCtrl.isLoading,
-                            onTap: () {
-                              final code = _otpController.text.trim();
-                              if (code.length != 6) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter 6-digit code.')));
-                                return;
-                              }
-                              verCtrl.verifyMobileOtp(code);
-                            },
-                          ),
+                          if (!verCtrl.mobileOtpSent) ...[
+                            const SizedBox(height: 12),
+                            _ActionButton(
+                              label: 'Send OTP',
+                              icon: Icons.send_rounded,
+                              isLoading: verCtrl.isLoading,
+                              onTap: () {
+                                final phone = _phoneController.text.trim();
+                                final digits = phone.replaceAll(RegExp(r'\D'), '');
+                                if (digits.length < 10) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter a valid 10-digit mobile number.')),
+                                  );
+                                  return;
+                                }
+                                verCtrl.sendMobileOtp(phone);
+                              },
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 12),
+                            // OTP Sent Banner
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: context.primarySoftColor.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.sms_outlined, size: 20, color: context.primaryDarkColor),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'OTP sent to ${verCtrl.pendingMobileNumber}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.textPrimaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Enter OTP',
+                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                                ),
+                                GestureDetector(
+                                  onTap: verCtrl.isLoading ? null : () => verCtrl.resetMobileOtpState(),
+                                  child: Text(
+                                    'Change Number',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.primaryDarkColor,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _otpController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 6,
+                                    autofocus: true,
+                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                    decoration: InputDecoration(
+                                      counterText: '',
+                                      hintText: '_ _ _ _ _ _',
+                                      prefixIcon: Icon(Icons.pin_outlined, size: 20, color: context.textSecondaryColor),
+                                      hintStyle: GoogleFonts.inter(color: context.textMutedColor, letterSpacing: 3.0),
+                                      filled: true,
+                                      fillColor: context.scaffoldBg,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: verCtrl.canResendOtp && !verCtrl.isLoading
+                                      ? () {
+                                          final phone = _phoneController.text.trim();
+                                          verCtrl.sendMobileOtp(phone);
+                                        }
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: context.primarySoftColor,
+                                    foregroundColor: context.primaryDarkColor,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  ),
+                                  child: Text(
+                                    verCtrl.otpCooldown > 0 ? '${verCtrl.otpCooldown}s' : 'Resend OTP',
+                                    style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _ActionButton(
+                              label: 'Verify OTP',
+                              icon: Icons.verified_user_outlined,
+                              isLoading: verCtrl.isLoading,
+                              onTap: () {
+                                final code = _otpController.text.trim();
+                                if (code.length != 6) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter 6-digit OTP.')),
+                                  );
+                                  return;
+                                }
+                                verCtrl.verifyMobileOtp(code);
+                              },
+                            ),
+                          ],
                         ],
                       ),
               ),
@@ -977,6 +1076,44 @@ class _AadhaarNumberFormatter extends TextInputFormatter {
         buffer.write(' ');
       }
       buffer.write(digitsOnly[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class _IndianPhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('91') && digits.length > 10) {
+      digits = digits.substring(2);
+    }
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    if (digits.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    final buffer = StringBuffer();
+    buffer.write('+91 ');
+    for (int i = 0; i < digits.length; i++) {
+      if (i == 5) {
+        buffer.write(' ');
+      }
+      buffer.write(digits[i]);
     }
 
     final formatted = buffer.toString();

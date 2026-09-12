@@ -21,6 +21,7 @@ class VerificationController extends ChangeNotifier {
   String? _devAadhaarOtp;
 
   // Mobile OTP State
+  bool _mobileOtpSent = false;
   int _otpCooldown = 0;
   Timer? _cooldownTimer;
   String _pendingMobileNumber = '';
@@ -50,6 +51,7 @@ class VerificationController extends ChangeNotifier {
   String? get devAadhaarOtp => _devAadhaarOtp;
 
   // Mobile OTP Getters
+  bool get mobileOtpSent => _mobileOtpSent;
   int get otpCooldown => _otpCooldown;
   bool get canResendOtp => _otpCooldown == 0;
   String get pendingMobileNumber => _pendingMobileNumber;
@@ -68,6 +70,15 @@ class VerificationController extends ChangeNotifier {
     _devAadhaarOtp = null;
     _aadhaarCooldown = 0;
     _aadhaarCooldownTimer?.cancel();
+    notifyListeners();
+  }
+
+  void resetMobileOtpState() {
+    _mobileOtpSent = false;
+    _pendingMobileNumber = '';
+    _devOtp = null;
+    _otpCooldown = 0;
+    _cooldownTimer?.cancel();
     notifyListeners();
   }
 
@@ -204,6 +215,7 @@ class VerificationController extends ChangeNotifier {
       final res = await _apiService.sendMobileOtp(mobile);
       if (res['success'] == true) {
         _pendingMobileNumber = mobile;
+        _mobileOtpSent = true;
         _otpCooldown = res['cooldownSeconds'] ?? 60;
         _devOtp = res['devOtp'];
         _successMessage = res['message'] ?? 'Verification code sent.';
@@ -252,6 +264,8 @@ class VerificationController extends ChangeNotifier {
         otp: otp,
       );
       _successMessage = 'Mobile number verified successfully.';
+      _mobileOtpSent = false;
+      _devOtp = null;
       return true;
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
