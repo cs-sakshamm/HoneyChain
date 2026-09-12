@@ -96,7 +96,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const cleanIdentifier = emailOrPhone.trim();
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: {
         OR: [
           { email: cleanIdentifier.toLowerCase() },

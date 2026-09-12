@@ -25,7 +25,7 @@ const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY || '0xac0974bec39a17e36ba
 const PROVIDER_URL = process.env.BLOCKCHAIN_PROVIDER_URL || 'http://127.0.0.1:8545';
 const contractAddress = process.env.CONTRACT_ADDRESS || '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
-const provider = new ethers.JsonRpcProvider(PROVIDER_URL);
+const provider = new ethers.JsonRpcProvider(PROVIDER_URL, undefined, { staticNetwork: true });
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 const contractAbi = [
