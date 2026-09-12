@@ -10,7 +10,6 @@ import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/honeycomb_painter.dart';
 import 'auth_controller.dart';
-import 'login_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -26,8 +25,8 @@ class RoleSelectionScreen extends StatelessWidget {
             child: CustomPaint(
               painter: HoneycombBackgroundPainter(
                 color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white.withOpacity(0.03)
-                    : AppConstants.primaryDark.withOpacity(0.05),
+                    ? Colors.white.withValues(alpha: 0.03)
+                    : AppConstants.primaryDark.withValues(alpha: 0.05),
                 hexagonRadius: 60,
                 strokeWidth: 1.5,
               ),
@@ -237,13 +236,15 @@ class _RoleCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: context.primarySoftColor,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppConstants.honeyAccent
+                    : AppConstants.primarySoft,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 item.icon,
                 size: 36,
-                color: context.accentColor,
+                color: Colors.black,
               ),
             ),
             const SizedBox(height: 20),
