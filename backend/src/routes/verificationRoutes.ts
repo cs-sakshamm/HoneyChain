@@ -36,8 +36,47 @@ router.post('/harvester/start', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/verification/harvester/aadhaar/send-otp
+ * Step 1a: Send Aadhaar OTP to linked mobile
+ */
+router.post('/harvester/aadhaar/send-otp', async (req: Request, res: Response) => {
+  try {
+    const { harvesterId, aadhaarNumber } = req.body;
+    if (!harvesterId || !aadhaarNumber) {
+      return res.status(400).json({ success: false, error: 'harvesterId and aadhaarNumber are required' });
+    }
+
+    const result = await verificationService.sendAadhaarOtp(harvesterId, aadhaarNumber);
+    if (!result.success) {
+      return res.status(429).json(result);
+    }
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * POST /api/verification/harvester/aadhaar/verify-otp
+ * Step 1b: Verify Aadhaar OTP
+ */
+router.post('/harvester/aadhaar/verify-otp', async (req: Request, res: Response) => {
+  try {
+    const { harvesterId, aadhaarNumber, otp } = req.body;
+    if (!harvesterId || !aadhaarNumber || !otp) {
+      return res.status(400).json({ success: false, error: 'harvesterId, aadhaarNumber, and otp are required' });
+    }
+
+    const verification = await verificationService.verifyAadhaarOtp(harvesterId, aadhaarNumber, otp);
+    res.json({ success: true, message: 'Aadhaar Verified ✓', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
  * POST /api/verification/harvester/government-id
- * Step 1: Submit Government ID
+ * Step 1: Submit Government ID (Aadhaar / Standard)
  */
 router.post('/harvester/government-id', async (req: Request, res: Response) => {
   try {

@@ -39,19 +39,32 @@ async function runTests() {
       assert(e.message.includes('Requirements not met'), 'Blocked blockchain verification before requirements met');
     }
 
-    // 3. Step 1: Government ID Verification
-    console.log('\n--- 3. Step 1: Government ID Verification & Masking ---');
+    // 3. Step 1: Government ID Verification (Aadhaar Card OTP + Masking)
+    console.log('\n--- 3. Step 1: Aadhaar Card Verification & Masking ---');
     try {
-      await verificationService.submitGovernmentId(testHarvesterId, 'INVALID_TYPE', '12345');
-      assert(false, 'Invalid document type should be rejected');
+      await verificationService.sendAadhaarOtp(testHarvesterId, '1234');
+      assert(false, 'Invalid Aadhaar number (<12 digits) should be rejected');
     } catch (e: any) {
-      assert(e.message.includes('Invalid document type'), 'Invalid document type rejected');
+      assert(e.message.includes('12-digit Aadhaar'), 'Invalid Aadhaar length rejected');
     }
 
-    const govResult = await verificationService.submitGovernmentId(testHarvesterId, 'NATIONAL_ID', 'ID-987654321');
-    assert(govResult.governmentIdVerified === 'Verified', 'Government ID verified');
-    assert(govResult.governmentIdReference?.startsWith('DOC-NAT-***4321') === true, 'Government ID properly masked without exposing complete ID');
-    assert(govResult.governmentIdDocHash !== undefined && govResult.governmentIdDocHash.length === 64, 'SHA-256 document checksum generated');
+    const testAadhaar = '987654321098';
+    const aadhaarOtpRes = await verificationService.sendAadhaarOtp(testHarvesterId, testAadhaar);
+    assert(aadhaarOtpRes.success === true, 'Aadhaar OTP generated successfully');
+    assert(aadhaarOtpRes.message.includes('Aadhaar-linked mobile'), 'Proper Aadhaar OTP message returned');
+    assert(aadhaarOtpRes.devOtp !== undefined && aadhaarOtpRes.devOtp.length === 6, 'Aadhaar OTP 6 digits generated in dev mode');
+
+    try {
+      await verificationService.verifyAadhaarOtp(testHarvesterId, testAadhaar, '000000');
+      assert(false, 'Wrong Aadhaar OTP should be rejected');
+    } catch (e: any) {
+      assert(e.message.includes('Incorrect') || e.message.includes('verification code'), 'Wrong Aadhaar OTP rejected');
+    }
+
+    const govResult = await verificationService.verifyAadhaarOtp(testHarvesterId, testAadhaar, aadhaarOtpRes.devOtp!);
+    assert(govResult.governmentIdVerified === 'Verified', 'Aadhaar verified successfully');
+    assert(govResult.governmentIdReference === 'AADHAAR-***1098', 'Aadhaar reference masked as AADHAAR-***XXXX');
+    assert(govResult.governmentIdDocHash !== undefined && govResult.governmentIdDocHash.length === 64, 'SHA-256 document checksum generated for Aadhaar');
 
     // 4. Step 2: Mobile Number & OTP Verification
     console.log('\n--- 4. Step 2: Mobile OTP System ---');

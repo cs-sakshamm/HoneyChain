@@ -17,9 +17,9 @@ class HarvesterVerificationScreen extends StatefulWidget {
 }
 
 class _HarvesterVerificationScreenState extends State<HarvesterVerificationScreen> {
-  // Step 1 Form
-  String _docType = 'NATIONAL_ID';
-  final TextEditingController _docNumberController = TextEditingController();
+  // Step 1 Form (Aadhaar Card ONLY)
+  final TextEditingController _aadhaarNumberController = TextEditingController();
+  final TextEditingController _aadhaarOtpController = TextEditingController();
 
   // Step 2 Form
   final TextEditingController _phoneController = TextEditingController();
@@ -57,7 +57,8 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
   @override
   void dispose() {
-    _docNumberController.dispose();
+    _aadhaarNumberController.dispose();
+    _aadhaarOtpController.dispose();
     _phoneController.dispose();
     _otpController.dispose();
     _registrationIdController.dispose();
@@ -75,7 +76,55 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      appBar: AppBar(
+        backgroundColor: context.scaffoldBg,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Center(
+            child: _PillBackButton(onTap: () => Navigator.pop(context)),
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Harvester Verification',
+              style: GoogleFonts.manrope(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: context.textPrimaryColor,
+                letterSpacing: -0.3,
+              ),
+            ),
+            Text(
+              '5-Parameter Trust & Provenance Protocol',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: context.textSecondaryColor,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: context.textSecondaryColor),
+            tooltip: 'Refresh Verification Status',
+            onPressed: () {
+              final user = context.read<UserController>().user;
+              final harvesterId = (user.id != null && user.id!.isNotEmpty)
+                  ? user.id!
+                  : (user.beekeeperId ?? 'harvester');
+              verCtrl.loadVerification(harvesterId);
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: AppConstants.space20),
@@ -83,39 +132,6 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppConstants.space12),
-
-              // Header
-              Row(
-                children: [
-                  _PillBackButton(onTap: () => Navigator.pop(context)),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Harvester Verification',
-                          style: GoogleFonts.manrope(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: context.textPrimaryColor,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        Text(
-                          '5-Parameter Trust & Provenance Protocol',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: context.textSecondaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppConstants.space20),
 
               // Progress Overview Card
               Container(
@@ -195,64 +211,70 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space20),
 
-              // ── STEP 1: Government ID Verification ──
+              // ── STEP 1: Government ID Verification (Aadhaar Card ONLY) ──
               _buildStepCard(
                 stepNumber: 1,
                 title: 'Government ID Verification',
-                subtitle: 'Privacy-Preserving Credential Check',
+                subtitle: 'Aadhaar Card · Privacy-Preserving UIDAI OTP Protocol',
                 icon: Icons.badge_outlined,
                 isCompleted: ver.isStep1Complete,
-                statusText: ver.governmentIdVerified,
+                statusText: ver.governmentIdVerified == 'Verified' ? 'Aadhaar Verified ✓' : ver.governmentIdVerified,
                 content: ver.isStep1Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Masked ID Reference',
-                        value: ver.governmentIdReference ?? 'DOC-VERIFIED',
+                        label: 'Masked Aadhaar Reference',
+                        value: ver.governmentIdReference ?? 'AADHAAR-***XXXX',
                         subtext: 'Tamper-Evident SHA-256 Hash Stored Off-Chain',
+                        verifiedBadgeText: 'Aadhaar Verified ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Select Document Type',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            decoration: BoxDecoration(
-                              color: context.scaffoldBg,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: context.borderColor),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _docType,
-                                isExpanded: true,
-                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
-                                dropdownColor: context.surfaceColor,
-                                items: const [
-                                  DropdownMenuItem(value: 'NATIONAL_ID', child: Text('National Identity Card')),
-                                  DropdownMenuItem(value: 'PASSPORT', child: Text('Passport')),
-                                  DropdownMenuItem(value: 'DRIVERS_LICENSE', child: Text("Driver's License")),
-                                  DropdownMenuItem(value: 'BEEKEEPER_PERMIT', child: Text('State Apiculture Permit')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _docType = val);
-                                },
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Aadhaar Card Number',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.textPrimaryColor,
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Document / License Number',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: context.primarySoftColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '12-Digit UIDAI',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.primaryDarkColor,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 6),
                           TextField(
-                            controller: _docNumberController,
+                            controller: _aadhaarNumberController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 14,
+                            enabled: !verCtrl.aadhaarOtpSent && !verCtrl.isLoading,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[\d ]')),
+                              _AadhaarNumberFormatter(),
+                            ],
                             decoration: InputDecoration(
-                              hintText: 'e.g. DL-98421094',
-                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              counterText: '',
+                              hintText: 'XXXX  XXXX  XXXX',
+                              prefixIcon: Icon(Icons.fingerprint_rounded, size: 20, color: context.textSecondaryColor),
+                              hintStyle: GoogleFonts.inter(
+                                color: context.textMutedColor,
+                                letterSpacing: 2.0,
+                              ),
                               filled: true,
                               fillColor: context.scaffoldBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
@@ -261,20 +283,139 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          _ActionButton(
-                            label: 'Verify Government ID',
-                            icon: Icons.check_circle_outline_rounded,
-                            isLoading: verCtrl.isLoading,
-                            onTap: () {
-                              final num = _docNumberController.text.trim();
-                              if (num.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter document number.')));
-                                return;
-                              }
-                              verCtrl.submitGovernmentId(docType: _docType, docNumber: num);
-                            },
-                          ),
+                          if (!verCtrl.aadhaarOtpSent) ...[
+                            const SizedBox(height: 12),
+                            _ActionButton(
+                              label: 'Get Aadhaar OTP',
+                              icon: Icons.send_rounded,
+                              isLoading: verCtrl.isLoading,
+                              onTap: () {
+                                final raw = _aadhaarNumberController.text.replaceAll(' ', '').trim();
+                                if (raw.length != 12 || !RegExp(r'^\d{12}$').hasMatch(raw)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter a valid 12-digit Aadhaar number.')),
+                                  );
+                                  return;
+                                }
+                                verCtrl.sendAadhaarOtp(raw);
+                              },
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 12),
+                            // OTP Sent Info Banner
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: context.primarySoftColor.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.mark_email_read_outlined, size: 20, color: context.primaryDarkColor),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'OTP sent to your Aadhaar-linked mobile number.',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.textPrimaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '6-Digit Aadhaar OTP',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.textPrimaryColor,
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: verCtrl.isLoading ? null : () => verCtrl.resetAadhaarState(),
+                                  child: Text(
+                                    'Change Number',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.primaryDarkColor,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _aadhaarOtpController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 6,
+                                    autofocus: true,
+                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                    decoration: InputDecoration(
+                                      counterText: '',
+                                      hintText: 'Enter 6-digit OTP',
+                                      prefixIcon: Icon(Icons.shield_outlined, size: 20, color: context.textSecondaryColor),
+                                      hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                                      filled: true,
+                                      fillColor: context.scaffoldBg,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: verCtrl.canResendAadhaarOtp && !verCtrl.isLoading
+                                      ? () {
+                                          final raw = _aadhaarNumberController.text.replaceAll(' ', '').trim();
+                                          verCtrl.sendAadhaarOtp(raw);
+                                        }
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: context.primarySoftColor,
+                                    foregroundColor: context.primaryDarkColor,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  ),
+                                  child: Text(
+                                    verCtrl.aadhaarCooldown > 0 ? '${verCtrl.aadhaarCooldown}s' : 'Resend',
+                                    style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _ActionButton(
+                              label: 'Verify Aadhaar OTP',
+                              icon: Icons.check_circle_outline_rounded,
+                              isLoading: verCtrl.isLoading,
+                              onTap: () {
+                                final code = _aadhaarOtpController.text.trim();
+                                if (code.length != 6) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter the complete 6-digit Aadhaar OTP.')),
+                                  );
+                                  return;
+                                }
+                                verCtrl.verifyAadhaarOtp(code);
+                              },
+                            ),
+                          ],
                         ],
                       ),
               ),
@@ -744,6 +885,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
     required String label,
     required String value,
     required String subtext,
+    String? verifiedBadgeText,
   }) {
     return Container(
       width: double.infinity,
@@ -756,13 +898,35 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: context.textSecondaryColor,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.textSecondaryColor,
+                ),
+              ),
+              if (verifiedBadgeText != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: context.successBgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.successColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    verifiedBadgeText,
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: context.successColor,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 2),
           Text(
@@ -792,6 +956,33 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AadhaarNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length > 12) {
+      return oldValue;
+    }
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < digitsOnly.length; i++) {
+      if (i > 0 && i % 4 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(digitsOnly[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

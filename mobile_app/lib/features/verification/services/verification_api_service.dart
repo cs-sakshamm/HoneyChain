@@ -60,7 +60,54 @@ class VerificationApiService {
     return _loadCachedVerification(cleanId);
   }
 
-  /// Step 1: Submit Government ID
+  /// Step 1a: Send Aadhaar OTP to linked mobile
+  Future<Map<String, dynamic>> sendAadhaarOtp({
+    required String harvesterId,
+    required String aadhaarNumber,
+  }) async {
+    final cleanId = harvesterId.trim();
+    final cleanAadhaar = aadhaarNumber.replaceAll(' ', '').trim();
+    final url = Uri.parse('$baseUrl/verification/harvester/aadhaar/send-otp');
+    final body = jsonEncode({
+      'harvesterId': cleanId,
+      'aadhaarNumber': cleanAadhaar,
+    });
+
+    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 || response.statusCode == 429) {
+      return data;
+    }
+    return {'success': false, 'message': data['error'] ?? data['message'] ?? 'Failed to send Aadhaar OTP.'};
+  }
+
+  /// Step 1b: Verify Aadhaar OTP
+  Future<HarvesterVerificationModel> verifyAadhaarOtp({
+    required String harvesterId,
+    required String aadhaarNumber,
+    required String otp,
+  }) async {
+    final cleanId = harvesterId.trim();
+    final cleanAadhaar = aadhaarNumber.replaceAll(' ', '').trim();
+    final url = Uri.parse('$baseUrl/verification/harvester/aadhaar/verify-otp');
+    final body = jsonEncode({
+      'harvesterId': cleanId,
+      'aadhaarNumber': cleanAadhaar,
+      'otp': otp.trim(),
+    });
+
+    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
+      final model = HarvesterVerificationModel.fromJson(data['verification']);
+      await _cacheLocalVerification(cleanId, model);
+      return model;
+    } else {
+      throw Exception(data['error'] ?? data['message'] ?? 'Failed to verify Aadhaar OTP.');
+    }
+  }
+
+  /// Step 1: Submit Government ID (Standard Fallback)
   Future<HarvesterVerificationModel> submitGovernmentId({
     required String harvesterId,
     required String documentType,
@@ -71,7 +118,7 @@ class VerificationApiService {
     final body = jsonEncode({
       'harvesterId': cleanId,
       'documentType': documentType.trim(),
-      'documentNumber': documentNumber.trim(),
+      'documentNumber': documentNumber.replaceAll(' ', '').trim(),
     });
 
     final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));

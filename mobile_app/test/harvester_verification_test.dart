@@ -26,11 +26,12 @@ void main() {
       const step1Model = HarvesterVerificationModel(
         id: 'ver-1',
         harvesterId: 'harvester-123',
-        governmentIdType: 'National ID',
-        governmentIdReference: 'DOC-NAT-***1234',
+        governmentIdType: 'AADHAAR',
+        governmentIdReference: 'AADHAAR-***1234',
         governmentIdVerified: 'Verified',
       );
       expect(step1Model.isStep1Complete, isTrue);
+      expect(step1Model.governmentIdReference, 'AADHAAR-***1234');
       expect(step1Model.isStep2Complete, isFalse);
       expect(step1Model.canSubmitBlockchain, isFalse);
       expect(step1Model.completedStepsCount, 1);

@@ -66,8 +66,81 @@ export class VerificationService {
   }
 
   /**
-   * 1. Submit Government ID for verification
-   * Preserves privacy: Stores only masked reference (DOC-***XXXX) and SHA-256 document checksum.
+   * 1a. Send Aadhaar OTP for Step 1
+   */
+  async sendAadhaarOtp(harvesterId: string, aadhaarNumberRaw: string) {
+    if (!harvesterId || harvesterId.trim().length === 0) {
+      throw new Error('harvesterId is required');
+    }
+    const cleanAadhaar = (aadhaarNumberRaw || '').replace(/\s+/g, '').trim();
+    if (!cleanAadhaar || cleanAadhaar.length !== 12 || !/^\d{12}$/.test(cleanAadhaar)) {
+      throw new Error('Please enter a valid 12-digit Aadhaar number.');
+    }
+
+    // Use Aadhaar virtual phone (+91 + 12 digits) for OTP service
+    const aadhaarPhone = `+91${cleanAadhaar}`;
+    const otpResult = await otpService.sendOtp(aadhaarPhone);
+    if (!otpResult.success) {
+      return otpResult;
+    }
+
+    return {
+      success: true,
+      message: 'OTP sent to your Aadhaar-linked mobile number.',
+      cooldownSeconds: otpResult.cooldownSeconds,
+      expiresInSeconds: otpResult.expiresInSeconds,
+      devOtp: otpResult.devOtp
+    };
+  }
+
+  /**
+   * 1b. Verify Aadhaar OTP for Step 1
+   */
+  async verifyAadhaarOtp(harvesterId: string, aadhaarNumberRaw: string, otp: string) {
+    if (!harvesterId || harvesterId.trim().length === 0) {
+      throw new Error('harvesterId is required');
+    }
+    const cleanAadhaar = (aadhaarNumberRaw || '').replace(/\s+/g, '').trim();
+    if (!cleanAadhaar || cleanAadhaar.length !== 12 || !/^\d{12}$/.test(cleanAadhaar)) {
+      throw new Error('Please enter a valid 12-digit Aadhaar number.');
+    }
+    const cleanOtp = (otp || '').trim();
+    if (!cleanOtp || cleanOtp.length !== 6 || !/^\d{6}$/.test(cleanOtp)) {
+      throw new Error('Please enter a valid 6-digit numeric OTP.');
+    }
+
+    const aadhaarPhone = `+91${cleanAadhaar}`;
+    const otpResult = await otpService.verifyOtp(aadhaarPhone, cleanOtp);
+    if (!otpResult.success) {
+      throw new Error(otpResult.message);
+    }
+
+    // Mask Aadhaar: AADHAAR-***XXXX
+    const last4 = cleanAadhaar.slice(-4);
+    const maskedRef = `AADHAAR-***${last4}`;
+    const docHash = crypto.createHash('sha256').update(cleanAadhaar).digest('hex');
+
+    const existing = await this.getOrCreateVerification(harvesterId);
+
+    const updated = await prisma.harvesterVerification.update({
+      where: { id: existing.id },
+      data: {
+        governmentIdType: 'AADHAAR',
+        governmentIdReference: maskedRef,
+        governmentIdDocHash: docHash,
+        governmentIdVerified: 'Verified',
+        governmentIdSubmittedAt: new Date(),
+        verificationStatus: existing.verificationStatus === 'Not Started' ? 'In Progress' : existing.verificationStatus
+      },
+      include: { harvester: true }
+    });
+
+    return updated;
+  }
+
+  /**
+   * 1c. Submit Government ID for verification (Supports Aadhaar & Standard IDs)
+   * Preserves privacy: Stores only masked reference (AADHAAR-***XXXX / DOC-***XXXX) and SHA-256 document checksum.
    * Never stores raw document numbers in plaintext.
    */
   async submitGovernmentId(
@@ -75,25 +148,33 @@ export class VerificationService {
     docTypeRaw: string,
     docNumberRaw: string
   ) {
-    const validDocTypes = ['NATIONAL_ID', 'PASSPORT', 'DRIVERS_LICENSE', 'BEEKEEPER_PERMIT', 'APICULTURE_PERMIT'];
-    const docType = (docTypeRaw || 'NATIONAL_ID').toUpperCase().trim();
+    const validDocTypes = ['AADHAAR', 'AADHAAR_CARD', 'NATIONAL_ID', 'PASSPORT', 'DRIVERS_LICENSE', 'BEEKEEPER_PERMIT', 'APICULTURE_PERMIT'];
+    const docType = (docTypeRaw || 'AADHAAR').toUpperCase().trim();
     const docNumber = (docNumberRaw || '').trim();
 
     if (!validDocTypes.includes(docType)) {
-      throw new Error(`Invalid document type "${docType}". Supported types: National ID, Passport, Driver's License, Apiculture Permit.`);
+      throw new Error(`Invalid document type "${docType}". Supported types: Aadhaar Card, National ID, Passport, Driver's License.`);
     }
 
-    if (!docNumber || docNumber.length < 5) {
-      throw new Error('Please provide a valid Government ID / Document number (minimum 5 characters).');
+    const canonicalDocNumber = docNumber.replace(/\s+/g, '').toUpperCase();
+    if (!canonicalDocNumber || canonicalDocNumber.length < 5) {
+      throw new Error('Please provide a valid Government ID / Document number.');
     }
 
-    // Mask ID: keep prefix + last 4 characters, mask middle
-    const last4 = docNumber.slice(-4).toUpperCase();
-    const prefix = docType.substring(0, 3);
-    const maskedRef = `DOC-${prefix}-***${last4}`;
+    let maskedRef: string;
+    if (docType === 'AADHAAR' || docType === 'AADHAAR_CARD') {
+      if (canonicalDocNumber.length !== 12 || !/^\d{12}$/.test(canonicalDocNumber)) {
+        throw new Error('Please enter a valid 12-digit Aadhaar number.');
+      }
+      const last4 = canonicalDocNumber.slice(-4);
+      maskedRef = `AADHAAR-***${last4}`;
+    } else {
+      const last4 = canonicalDocNumber.slice(-4);
+      const prefix = docType.substring(0, 3);
+      maskedRef = `DOC-${prefix}-***${last4}`;
+    }
     
     // Compute deterministic SHA-256 tamper-evident checksum of canonical raw document number
-    const canonicalDocNumber = docNumber.replace(/\s+/g, '').toUpperCase();
     const docHash = crypto.createHash('sha256').update(canonicalDocNumber).digest('hex');
 
     const existing = await this.getOrCreateVerification(harvesterId);
@@ -102,7 +183,7 @@ export class VerificationService {
     const updated = await prisma.harvesterVerification.update({
       where: { id: existing.id },
       data: {
-        governmentIdType: docType,
+        governmentIdType: docType.includes('AADHAAR') ? 'AADHAAR' : docType,
         governmentIdReference: maskedRef,
         governmentIdDocHash: docHash,
         governmentIdVerified: 'Verified',
