@@ -68,9 +68,9 @@ class HoneyChainLogo extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: 'Honey',
-                    style: (textStyle ?? GoogleFonts.plusJakartaSans()).copyWith(
+                    style: (textStyle ?? GoogleFonts.shareTech()).copyWith(
                       fontSize: fontSize,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: textColor,
                       letterSpacing: letterSpacing,
                       height: 1.0,
@@ -78,9 +78,9 @@ class HoneyChainLogo extends StatelessWidget {
                   ),
                   TextSpan(
                     text: 'Chain',
-                    style: (textStyle ?? GoogleFonts.plusJakartaSans()).copyWith(
+                    style: (textStyle ?? GoogleFonts.shareTech()).copyWith(
                       fontSize: fontSize,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w400,
                       color: textColor,
                       letterSpacing: letterSpacing,
                       height: 1.0,
@@ -95,11 +95,11 @@ class HoneyChainLogo extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle!,
-                style: GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.shareTech(
                   fontSize: size * 0.32,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w400,
                   color: subtitleColor,
-                  letterSpacing: -0.2,
+                  letterSpacing: 0.1,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
