@@ -351,12 +351,15 @@ class UserController extends ChangeNotifier {
       email: email.trim(),
       phone: phone.trim(),
       role: effectiveRole,
+      photoUrl: _user.photoUrl,
       organizationName: organizationName?.trim(),
       facilityLocation: facilityLocation?.trim(),
       licenseNumber: licenseNumber?.trim(),
       designation: designation?.trim(),
+      beekeeperId: _user.beekeeperId,
       bsid: _user.bsid,
       bspPass: _user.bspPass,
+      authProvider: _user.authProvider,
     );
     notifyListeners();
 
