@@ -7,6 +7,8 @@ import '../../../core/theme/app_theme.dart';
 import '../controllers/user_controller.dart';
 
 /// Form screen to Edit User Profile
+/// Adapts dynamically based on the active role while maintaining
+/// the exact existing Harvester profile structure for Harvesters.
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -19,6 +21,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+
+  // Role-specific controllers
+  late TextEditingController _organizationController;
+  late TextEditingController _locationController;
+  late TextEditingController _licenseController;
+  late TextEditingController _designationController;
+
   bool _isSaving = false;
 
   @override
@@ -28,6 +37,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController(text: user.name);
     _emailController = TextEditingController(text: user.email);
     _phoneController = TextEditingController(text: user.phone);
+    _organizationController = TextEditingController(text: user.organizationName ?? '');
+    _locationController = TextEditingController(text: user.facilityLocation ?? '');
+    _licenseController = TextEditingController(text: user.licenseNumber ?? '');
+    _designationController = TextEditingController(text: user.designation ?? '');
   }
 
   @override
@@ -35,7 +48,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _organizationController.dispose();
+    _locationController.dispose();
+    _licenseController.dispose();
+    _designationController.dispose();
     super.dispose();
+  }
+
+  bool _isHarvester(String role) {
+    final r = role.toUpperCase().trim();
+    return r.isEmpty || r == 'HARVESTER';
+  }
+
+  bool _isCollection(String role) {
+    final r = role.toUpperCase().trim();
+    return r.contains('COLLECT') || r.contains('PROCESS');
+  }
+
+  bool _isLab(String role) {
+    final r = role.toUpperCase().trim();
+    return r.contains('LAB');
+  }
+
+  bool _isPackaging(String role) {
+    final r = role.toUpperCase().trim();
+    return r.contains('PKG') || r.contains('PACKAG');
   }
 
   Future<void> _saveProfile() async {
@@ -43,10 +80,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isSaving = true);
 
     final userCtrl = context.read<UserController>();
+    final user = userCtrl.user;
+    final isHarv = _isHarvester(user.role);
+
     await userCtrl.updateProfile(
       name: _nameController.text,
       email: _emailController.text,
       phone: _phoneController.text,
+      role: user.role,
+      organizationName: !isHarv ? _organizationController.text : null,
+      facilityLocation: !isHarv ? _locationController.text : null,
+      licenseNumber: !isHarv ? _licenseController.text : null,
+      designation: !isHarv && _designationController.text.isNotEmpty ? _designationController.text : null,
     );
 
     if (!mounted) return;
@@ -67,6 +112,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userCtrl = context.watch<UserController>();
+    final user = userCtrl.user;
+    final role = user.role;
+
+    final isHarv = _isHarvester(role);
+    final isCol = _isCollection(role);
+    final isLb = _isLab(role);
+    final isPkg = _isPackaging(role);
+
+    String nameLabel = 'Full Name *';
+    String nameHint = 'Enter your full name';
+    String orgLabel = 'Organization / Business Name *';
+    String orgHint = 'e.g. Cascade Processing Facility';
+    String locLabel = 'Processing Location *';
+    String locHint = 'e.g. Bend Industrial Park, OR';
+    String licLabel = 'FSSAI Registration / License Number *';
+    String licHint = 'e.g. FSSAI-PROC-2026-9812';
+
+    if (isLb) {
+      nameLabel = 'Authorized Person Name *';
+      nameHint = 'e.g. Dr. Evelyn Vance';
+      orgLabel = 'Laboratory Name *';
+      orgHint = 'e.g. Pacific Pure Apiculture Labs';
+      locLabel = 'Laboratory Address *';
+      locHint = 'e.g. Corvallis Tech Campus, OR';
+      licLabel = 'Laboratory Registration / Accreditation Number *';
+      licHint = 'e.g. LAB-ACCRED-2026-4402';
+    } else if (isPkg) {
+      nameLabel = 'Authorized Person Name *';
+      nameHint = 'e.g. Marcus Sterling';
+      orgLabel = 'Company / Packaging Unit Name *';
+      orgHint = 'e.g. Artisan Honey Packaging Co.';
+      locLabel = 'Packaging Facility Location *';
+      locHint = 'e.g. Portland Logistics Hub, OR';
+      licLabel = 'FSSAI Registration / License Number *';
+      licHint = 'e.g. FSSAI-PKG-2026-1184';
+    } else if (isCol) {
+      nameLabel = 'Full Name *';
+      nameHint = 'e.g. Cascade Facility Manager';
+      orgLabel = 'Organization / Business Name *';
+      orgHint = 'e.g. Cascade Processing Ltd.';
+      locLabel = 'Collection / Processing Location *';
+      locHint = 'e.g. Bend Industrial Park, OR';
+      licLabel = 'FSSAI Registration / License Number *';
+      licHint = 'e.g. FSSAI-PROC-2026-9812';
+    }
+
     return Scaffold(
       backgroundColor: context.scaffoldBg,
       body: SafeArea(
@@ -100,7 +192,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: AppConstants.space16),
+                      const SizedBox(height: AppConstants.space8),
+                      // Section 1: Personal & Contact Information
                       Container(
                         padding: const EdgeInsets.all(AppConstants.space16),
                         decoration: BoxDecoration(
@@ -109,13 +202,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           border: Border.all(color: context.borderColor),
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text(
+                              'Contact Information',
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: AppConstants.space16),
                             _buildInputField(
                               context,
-                              label: 'Full Name *',
-                              hint: 'Enter your full name',
+                              label: nameLabel,
+                              hint: nameHint,
                               controller: _nameController,
-                              validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter your name' : null,
+                              validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter name' : null,
                             ),
                             const SizedBox(height: AppConstants.space16),
                             _buildInputField(
@@ -125,7 +228,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               validator: (val) {
-                                if (val == null || val.trim().isEmpty) return 'Please enter your email';
+                                if (val == null || val.trim().isEmpty) return 'Please enter email';
                                 if (!val.contains('@')) return 'Enter a valid email';
                                 return null;
                               },
@@ -133,8 +236,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             const SizedBox(height: AppConstants.space16),
                             _buildInputField(
                               context,
-                              label: 'Phone Number *',
-                              hint: '+91 9876543210',
+                              label: 'Mobile Number *',
+                              hint: '+1 (555) 234-5678',
                               controller: _phoneController,
                               keyboardType: TextInputType.phone,
                               validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter phone number' : null,
@@ -142,6 +245,64 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ],
                         ),
                       ),
+
+                      // Section 2: Role-specific Business / Facility Information (Non-Harvester)
+                      if (!isHarv) ...[
+                        const SizedBox(height: AppConstants.space16),
+                        Container(
+                          padding: const EdgeInsets.all(AppConstants.space16),
+                          decoration: BoxDecoration(
+                            color: context.surfaceColor,
+                            borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                            border: Border.all(color: context.borderColor),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Facility & Accreditation Information',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: AppConstants.space16),
+                              _buildInputField(
+                                context,
+                                label: orgLabel,
+                                hint: orgHint,
+                                controller: _organizationController,
+                                validator: (val) => (val == null || val.trim().isEmpty) ? 'This field is required' : null,
+                              ),
+                              const SizedBox(height: AppConstants.space16),
+                              _buildInputField(
+                                context,
+                                label: locLabel,
+                                hint: locHint,
+                                controller: _locationController,
+                                validator: (val) => (val == null || val.trim().isEmpty) ? 'This field is required' : null,
+                              ),
+                              const SizedBox(height: AppConstants.space16),
+                              _buildInputField(
+                                context,
+                                label: licLabel,
+                                hint: licHint,
+                                controller: _licenseController,
+                                validator: (val) => (val == null || val.trim().isEmpty) ? 'This field is required' : null,
+                              ),
+                              const SizedBox(height: AppConstants.space16),
+                              _buildInputField(
+                                context,
+                                label: 'Designation / Title (Optional)',
+                                hint: 'e.g. Operations Director / Quality Inspector',
+                                controller: _designationController,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: AppConstants.space24),
                       SizedBox(
                         width: double.infinity,
@@ -171,6 +332,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 ),
                         ),
                       ),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),

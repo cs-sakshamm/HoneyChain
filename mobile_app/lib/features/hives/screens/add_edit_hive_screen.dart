@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../profile/controllers/user_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 
@@ -128,21 +130,17 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     final h = widget.hive;
 
     _nameController = TextEditingController(text: h?.name ?? '');
-    // Issue a unique hive identity code for new hives (editable if needed).
-    _hiveCodeController = TextEditingController(
-      text: h?.hiveCode ??
-          context.read<HiveController>().generateUniqueHiveCode(),
-    );
+    _hiveCodeController = TextEditingController(text: h?.hiveCode ?? '');
     _apiaryLocationController = TextEditingController(text: h?.apiaryLocation ?? '');
-    _totalFramesController = TextEditingController(text: h?.totalFrames.toString() ?? '10');
-    _broodFramesController = TextEditingController(text: h?.broodFrames.toString() ?? '6');
-    _queenAgeMonthsController = TextEditingController(text: h?.queenAgeMonths.toString() ?? '12');
+    _totalFramesController = TextEditingController(text: h != null ? h.totalFrames.toString() : '10');
+    _broodFramesController = TextEditingController(text: h != null ? h.broodFrames.toString() : '');
+    _queenAgeMonthsController = TextEditingController(text: h != null ? h.queenAgeMonths.toString() : '');
     _expectedProductionController =
-        TextEditingController(text: h?.expectedProductionKg.toString() ?? '35.0');
+        TextEditingController(text: h != null ? h.expectedProductionKg.toString() : '');
     _previousYearProductionController =
-        TextEditingController(text: h?.previousYearProductionKg.toString() ?? '25.0');
+        TextEditingController(text: h != null ? h.previousYearProductionKg.toString() : '');
     _currentYearProductionController =
-        TextEditingController(text: h?.currentYearProductionKg.toString() ?? '28.0');
+        TextEditingController(text: h != null ? h.currentYearProductionKg.toString() : '');
     _notesController = TextEditingController(text: h?.notes ?? '');
 
     _hiveType = h?.hiveType ?? _hiveTypeOptions.first;
@@ -157,6 +155,18 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     _feedingRequired = h?.feedingRequired ?? false;
     _dateAdded = h?.dateAdded ?? DateTime.now();
     _lastInspectionDate = h?.lastInspectionDate ?? DateTime.now();
+
+    // Fetch authoritative unique hive code from backend if adding new hive
+    if (h == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final code = await context.read<HiveController>().fetchAuthoritativeHiveCode();
+        if (mounted && code != null && _hiveCodeController.text.trim().isEmpty) {
+          setState(() {
+            _hiveCodeController.text = code;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -204,16 +214,27 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
   }
 
   Future<void> _saveHive() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all required hive details correctly before saving.'),
+          backgroundColor: AppConstants.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (_isSaving) return;
 
+    final userController = context.read<UserController>();
     setState(() => _isSaving = true);
 
     final controller = context.read<HiveController>();
     final code = _hiveCodeController.text.trim();
 
-    // Enforce globally unique hive identity codes.
-    if (controller.isHiveCodeTaken(code, excludingHiveId: widget.hive?.id)) {
+    // Check if code is already used in local state
+    if (code.isNotEmpty && controller.isHiveCodeTaken(code, excludingHiveId: widget.hive?.id)) {
       if (!mounted) return;
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -230,7 +251,8 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     final isEditing = widget.hive != null;
 
     final hiveData = Hive(
-      id: isEditing ? widget.hive!.id : 'hive_${now.millisecondsSinceEpoch}',
+      id: isEditing ? widget.hive!.id : '', // Let backend assign UUID for new hives
+      userId: userController.user.id,
       name: _nameController.text.trim(),
       hiveCode: _hiveCodeController.text.trim(),
       apiaryLocation: _apiaryLocationController.text.trim(),
@@ -238,9 +260,9 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       dateAdded: _dateAdded,
       queenStatus: _queenStatus,
       totalFrames: int.tryParse(_totalFramesController.text.trim()) ?? 10,
-      broodFrames: int.tryParse(_broodFramesController.text.trim()) ?? 6,
+      broodFrames: int.tryParse(_broodFramesController.text.trim()) ?? 0,
       colonyStrength: _colonyStrength,
-      queenAgeMonths: int.tryParse(_queenAgeMonthsController.text.trim()) ?? 12,
+      queenAgeMonths: int.tryParse(_queenAgeMonthsController.text.trim()) ?? 0,
       beeBreed: _beeBreed,
       expectedProductionKg:
           double.tryParse(_expectedProductionController.text.trim()) ?? 0.0,
@@ -261,9 +283,9 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
 
     bool success;
     if (isEditing) {
-      success = await controller.updateHive(hiveData);
+      success = await controller.updateHive(hiveData, userId: userController.user.id);
     } else {
-      success = await controller.addHive(hiveData);
+      success = await controller.addHive(hiveData, userId: userController.user.id);
     }
 
     if (!mounted) return;
@@ -286,7 +308,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Failed to save hive data. Please try again.'),
+          content: Text('Failed to save hive data. Please verify your profile and try again.'),
           backgroundColor: AppConstants.error,
         ),
       );
@@ -336,8 +358,12 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   label: '${context.tr('hive_name')} *',
                   hint: 'e.g. Hive Alpha',
                   controller: _nameController,
-                  validator: (val) =>
-                      (val == null || val.trim().isEmpty) ? context.tr('hive_name') : null,
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter hive name';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: AppConstants.space16),
                 Row(
@@ -345,11 +371,14 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     Expanded(
                       child: _buildTextField(
                         label: '${context.tr('hive_code')} *',
-                        hint: 'e.g. H-001',
+                        hint: 'e.g. HIVE-A1B2C3',
                         controller: _hiveCodeController,
-                        validator: (val) => (val == null || val.trim().isEmpty)
-                            ? context.tr('hive_code')
-                            : null,
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter hive code';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(width: AppConstants.space12),
@@ -368,8 +397,12 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   label: '${context.tr('apiary_location')} *',
                   hint: 'e.g. Main Apiary, Meadow Field',
                   controller: _apiaryLocationController,
-                  validator: (val) =>
-                      (val == null || val.trim().isEmpty) ? context.tr('apiary_location') : null,
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter apiary location';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: AppConstants.space16),
                 Row(
@@ -404,12 +437,17 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     Expanded(
                       child: _buildTextField(
                         label: '${context.tr('total_frames')} *',
-                        hint: '10',
+                        hint: 'e.g. 10',
                         controller: _totalFramesController,
                         keyboardType: TextInputType.number,
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) return context.tr('total_frames');
-                          if (int.tryParse(val.trim()) == null) return context.tr('total_frames');
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter total frames';
+                          }
+                          final parsed = int.tryParse(val.trim());
+                          if (parsed == null || parsed <= 0) {
+                            return 'Must be at least 1';
+                          }
                           return null;
                         },
                       ),
@@ -418,12 +456,21 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     Expanded(
                       child: _buildTextField(
                         label: '${context.tr('brood_frames')} *',
-                        hint: '6',
+                        hint: 'e.g. 6',
                         controller: _broodFramesController,
                         keyboardType: TextInputType.number,
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) return context.tr('brood_frames');
-                          if (int.tryParse(val.trim()) == null) return context.tr('brood_frames');
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter brood frames';
+                          }
+                          final parsed = int.tryParse(val.trim());
+                          if (parsed == null || parsed < 0) {
+                            return 'Must be 0 or more';
+                          }
+                          final total = int.tryParse(_totalFramesController.text.trim()) ?? 0;
+                          if (total > 0 && parsed > total) {
+                            return 'Max $total frames';
+                          }
                           return null;
                         },
                       ),
@@ -444,10 +491,20 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildTextField(
-                        label: context.tr('queen_age'),
-                        hint: '12',
+                        label: '${context.tr('queen_age')} (months) *',
+                        hint: 'e.g. 12',
                         controller: _queenAgeMonthsController,
                         keyboardType: TextInputType.number,
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter queen age';
+                          }
+                          final parsed = int.tryParse(val.trim());
+                          if (parsed == null || parsed < 0) {
+                            return 'Must be 0 or more';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                   ],
@@ -470,19 +527,39 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: context.tr('expected_honey'),
-                        hint: '35.0',
+                        label: '${context.tr('expected_honey')} (kg) *',
+                        hint: 'e.g. 35.0',
                         controller: _expectedProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter expected yield';
+                          }
+                          final parsed = double.tryParse(val.trim());
+                          if (parsed == null || parsed < 0) {
+                            return 'Valid number >= 0';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildTextField(
-                        label: context.tr('previous_year'),
-                        hint: '25.0',
+                        label: '${context.tr('previous_year')} (kg) *',
+                        hint: 'e.g. 25.0',
                         controller: _previousYearProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter previous yield';
+                          }
+                          final parsed = double.tryParse(val.trim());
+                          if (parsed == null || parsed < 0) {
+                            return 'Valid number >= 0';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                   ],
@@ -492,10 +569,20 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: context.tr('current_year'),
-                        hint: '28.0',
+                        label: '${context.tr('current_year')} (kg) *',
+                        hint: 'e.g. 28.0',
                         controller: _currentYearProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter current yield';
+                          }
+                          final parsed = double.tryParse(val.trim());
+                          if (parsed == null || parsed < 0) {
+                            return 'Valid number >= 0';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(width: AppConstants.space12),
@@ -575,28 +662,31 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     border: Border.all(color: context.borderColor),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            context.tr('feeding_required'),
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: context.textPrimaryColor,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.tr('feeding_required'),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: context.textPrimaryColor,
+                              ),
                             ),
-                          ),
-                          Text(
-                            context.tr('feeding_sub'),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecondaryColor,
+                            const SizedBox(height: 2),
+                            Text(
+                              context.tr('feeding_sub'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.textSecondaryColor,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Switch(
                         value: _feedingRequired,
                         activeTrackColor: context.textPrimaryColor,

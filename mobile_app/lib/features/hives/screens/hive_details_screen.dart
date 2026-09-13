@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
@@ -178,7 +180,7 @@ class HiveDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${hive.hiveType} • ${hive.totalFrames} Frames',
+                    '${hive.hiveCode} • ${hive.hiveType} • ${hive.totalFrames} Frames',
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       color: context.textSecondaryColor,
@@ -187,9 +189,9 @@ class HiveDetailsScreen extends StatelessWidget {
 
                   const SizedBox(height: AppConstants.space20),
 
-                  // 1. Hive Overview Section
+                  // 1. Hive Specifications
                   Text(
-                    context.tr('overview') == 'overview' ? 'Hive Overview' : context.tr('overview'),
+                    'Hive Specifications',
                     style: GoogleFonts.manrope(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -206,22 +208,32 @@ class HiveDetailsScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
+                        _buildRowItem(context, 'Hive Code', hive.hiveCode),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Hive Type', hive.hiveType),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Bee Breed', hive.beeBreed),
+                        const Divider(height: 16),
                         _buildRowItem(context, 'Colony Strength', hive.colonyStrength),
                         const Divider(height: 16),
                         _buildRowItem(context, 'Honey Type', hive.honeyType),
                         const Divider(height: 16),
-                        _buildRowItem(context, 'Expected Production', '${hive.expectedProductionKg.toStringAsFixed(1)} kg'),
-                        const Divider(height: 16),
-                        _buildRowItem(context, 'Overall Health', hive.overallHealth),
+                        _buildRowItem(
+                          context,
+                          'Brood Frames',
+                          hive.broodFrames > 0
+                              ? '${hive.broodFrames} / ${hive.totalFrames}'
+                              : '0 / ${hive.totalFrames}',
+                        ),
                       ],
                     ),
                   ),
 
                   const SizedBox(height: AppConstants.space20),
 
-                  // 7-Day Hive History Section
+                  // 2. Production Information
                   Text(
-                    '7-Day Hive History',
+                    'Production Information',
                     style: GoogleFonts.manrope(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -230,7 +242,6 @@ class HiveDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    width: double.infinity,
                     padding: const EdgeInsets.all(AppConstants.space16),
                     decoration: BoxDecoration(
                       color: context.surfaceColor,
@@ -238,27 +249,78 @@ class HiveDetailsScreen extends StatelessWidget {
                       border: Border.all(color: context.borderColor),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Icon(Icons.history_rounded, size: 32, color: context.textMutedColor),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No historical data available.',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.textPrimaryColor,
-                          ),
+                        _buildRowItem(
+                          context,
+                          'Expected Production',
+                          hive.expectedProductionKg > 0
+                              ? '${hive.expectedProductionKg.toStringAsFixed(1)} kg'
+                              : 'Not recorded',
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Sensor and production data (temperature, humidity, weight, anomalies) will appear here once IoT devices are connected.',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: context.textSecondaryColor,
-                          ),
-                          textAlign: TextAlign.center,
+                        const Divider(height: 16),
+                        _buildRowItem(
+                          context,
+                          'Current Season Yield',
+                          hive.currentYearProductionKg > 0
+                              ? '${hive.currentYearProductionKg.toStringAsFixed(1)} kg'
+                              : '0.0 kg (No harvest yet)',
                         ),
+                        const Divider(height: 16),
+                        _buildRowItem(
+                          context,
+                          'Previous Season Yield',
+                          hive.previousYearProductionKg > 0
+                              ? '${hive.previousYearProductionKg.toStringAsFixed(1)} kg'
+                              : 'No prior record',
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: AppConstants.space20),
+
+                  // 3. Health & Inspection Status
+                  Text(
+                    'Health & Inspection',
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(AppConstants.space16),
+                    decoration: BoxDecoration(
+                      color: context.surfaceColor,
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                      border: Border.all(color: context.borderColor),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildRowItem(context, 'Overall Health', hive.overallHealth),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Queen Status', '${hive.queenStatus} (${hive.queenCondition})'),
+                        const Divider(height: 16),
+                        _buildRowItem(
+                          context,
+                          'Queen Age',
+                          hive.queenAgeMonths > 0 ? '${hive.queenAgeMonths} months' : 'Not recorded',
+                        ),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Mite Status', hive.miteStatus.isNotEmpty ? hive.miteStatus : 'None'),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Disease Status', hive.diseaseStatus.isNotEmpty ? hive.diseaseStatus : 'None'),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Feeding Required', hive.feedingRequired ? 'Yes' : 'No'),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Last Inspected', '${hive.lastInspectionDate.day}/${hive.lastInspectionDate.month}/${hive.lastInspectionDate.year}'),
+                        const Divider(height: 16),
+                        _buildRowItem(context, 'Next Inspection Due', '${hive.nextInspectionDate.day}/${hive.nextInspectionDate.month}/${hive.nextInspectionDate.year}'),
+                        if (hive.notes.trim().isNotEmpty) ...[
+                          const Divider(height: 16),
+                          _buildRowItem(context, 'Notes', hive.notes.trim()),
+                        ],
                       ],
                     ),
                   ),
@@ -295,8 +357,9 @@ class HiveDetailsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         Container(
-                          height: 110,
+                          height: 80,
                           width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           decoration: BoxDecoration(
                             color: context.scaffoldBg,
                             borderRadius: BorderRadius.circular(8),
@@ -306,13 +369,19 @@ class HiveDetailsScreen extends StatelessWidget {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.map_outlined, size: 20, color: context.textMutedColor),
+                                Icon(Icons.location_on_outlined, size: 20, color: context.primaryDarkColor),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'GPS Map Preview (28.6139° N, 77.2090° E)',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: context.textMutedColor,
+                                Expanded(
+                                  child: Text(
+                                    hive.apiaryLocation.isNotEmpty
+                                        ? 'Registered Apiary Location: ${hive.apiaryLocation}'
+                                        : 'No GPS coordinates recorded',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: context.textSecondaryColor,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
@@ -335,35 +404,77 @@ class HiveDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppConstants.space16),
-                    decoration: BoxDecoration(
-                      color: context.surfaceColor,
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                      border: Border.all(color: context.borderColor),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildHistoryRow(
-                          context,
-                          title: 'Harvest started',
-                          time: 'Today · 8:42 AM',
+                  Builder(
+                    builder: (context) {
+                      final workflowCtrl = context.watch<WorkflowController>();
+                      final hiveRequests = workflowCtrl.harvesterRequests
+                          .where((r) =>
+                              (hive.apiaryLocation.isNotEmpty && r.location.toLowerCase().contains(hive.apiaryLocation.toLowerCase())) ||
+                              (hive.hiveCode.isNotEmpty && (r.notes.contains(hive.hiveCode) || r.batchId.contains(hive.hiveCode))))
+                          .toList();
+
+                      if (hiveRequests.isEmpty) {
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppConstants.space16),
+                          decoration: BoxDecoration(
+                            color: context.surfaceColor,
+                            borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                            border: Border.all(color: context.borderColor),
+                          ),
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: AppConstants.space12),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.inventory_2_outlined, size: 28, color: context.textMutedColor),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'No records found',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.textPrimaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'No harvest records logged yet for this hive.',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: context.textSecondaryColor,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppConstants.space16),
+                        decoration: BoxDecoration(
+                          color: context.surfaceColor,
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                          border: Border.all(color: context.borderColor),
                         ),
-                        const Divider(height: 20),
-                        _buildHistoryRow(
-                          context,
-                          title: 'Progress updated',
-                          time: 'Today · 10:15 AM',
+                        child: Column(
+                          children: [
+                            for (int i = 0; i < hiveRequests.length; i++) ...[
+                              if (i > 0) const Divider(height: 20),
+                              _buildHistoryRow(
+                                context,
+                                title: 'Batch ${hiveRequests[i].batchId} (${hiveRequests[i].estimatedQuantityKg.toStringAsFixed(1)} kg)',
+                                time: '${hiveRequests[i].status.name.toUpperCase()} · ${_formatDate(hiveRequests[i].createdAt)}',
+                              ),
+                            ],
+                          ],
                         ),
-                        const Divider(height: 20),
-                        _buildHistoryRow(
-                          context,
-                          title: 'Harvest paused',
-                          time: 'Yesterday · 5:30 PM',
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: AppConstants.space24),
@@ -384,6 +495,7 @@ class HiveDetailsScreen extends StatelessWidget {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
+                  if (!ProfileGuard.checkOrPrompt(context)) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -417,21 +529,29 @@ class HiveDetailsScreen extends StatelessWidget {
 
   Widget _buildRowItem(BuildContext context, String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: context.textSecondaryColor,
+        Expanded(
+          flex: 4,
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: context.textSecondaryColor,
+            ),
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.manrope(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: context.textPrimaryColor,
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 6,
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: GoogleFonts.manrope(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: context.textPrimaryColor,
+            ),
           ),
         ),
       ],
@@ -442,14 +562,18 @@ class HiveDetailsScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: GoogleFonts.manrope(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: context.textPrimaryColor,
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.manrope(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: context.textPrimaryColor,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           time,
           style: GoogleFonts.inter(
@@ -459,6 +583,15 @@ class HiveDetailsScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _formatDate(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 }
 

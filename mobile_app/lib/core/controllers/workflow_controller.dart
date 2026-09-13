@@ -10,7 +10,10 @@ class WorkflowController extends ChangeNotifier {
   List<WorkflowRequest> _requests = [];
   bool isLoading = false;
   String? errorMessage;
+  String? lastErrorCode;
   String? lastSuccessMessage;
+
+  bool get isProfileIncompleteError => lastErrorCode == 'PROFILE_INCOMPLETE';
 
   final String apiUrl;
   final http.Client _client;
@@ -37,6 +40,24 @@ class WorkflowController extends ChangeNotifier {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
+
+  void clearError() {
+    errorMessage = null;
+    lastErrorCode = null;
+    notifyListeners();
+  }
+
+  void _handleErrorResponse(http.Response res, String defaultMessage) {
+    try {
+      final body = json.decode(res.body);
+      lastErrorCode = body['code'];
+      errorMessage = body['message'] ?? body['error'] ?? defaultMessage;
+    } catch (_) {
+      lastErrorCode = null;
+      errorMessage = defaultMessage;
+    }
+    notifyListeners();
+  }
 
   List<WorkflowRequest> get allRequests => List.unmodifiable(_requests);
 
@@ -192,7 +213,7 @@ class WorkflowController extends ChangeNotifier {
             headers: _headers,
             body: json.encode({
               'harvesterId': harvesterName,
-              'hiveId': hiveId ?? 'HC-HIVE-01',
+              if (hiveId != null) 'hiveId': hiveId,
               'quantity': quantity,
               'location': location,
               'notes': notes,
@@ -206,7 +227,7 @@ class WorkflowController extends ChangeNotifier {
 
         if (batchId != null) {
           // Step 2: Create Workflow Request: Harvester -> Collection
-          await _client
+          final reqRes = await _client
               .post(
                 Uri.parse('$apiUrl/requests'),
                 headers: _headers,
@@ -221,10 +242,18 @@ class WorkflowController extends ChangeNotifier {
                 }),
               )
               .timeout(const Duration(seconds: 5));
+
+          if (reqRes.statusCode != 200 && reqRes.statusCode != 201) {
+            _handleErrorResponse(reqRes, 'Failed to create collection request');
+            return false;
+          }
         }
 
         await fetchAllData();
         return true;
+      } else {
+        _handleErrorResponse(harvestRes, 'Failed to create harvest');
+        return false;
       }
     } catch (e) {
       debugPrint('createHarvestAndRequest error: $e');
@@ -253,14 +282,14 @@ class WorkflowController extends ChangeNotifier {
         await fetchAllData();
         return true;
       } else {
-        final err = json.decode(res.body)['error'] ?? 'Accept failed';
-        errorMessage = err;
-        notifyListeners();
+        _handleErrorResponse(res, 'Accept failed');
+        return false;
       }
     } catch (e) {
       debugPrint('acceptRequest error: $e');
-      // Optimistic local update
-      _updateLocalStatus(requestId, RequestStatus.accepted);
+      if (!isProfileIncompleteError) {
+        _updateLocalStatus(requestId, RequestStatus.accepted);
+      }
     }
     return false;
   }
@@ -284,13 +313,14 @@ class WorkflowController extends ChangeNotifier {
         await fetchAllData();
         return true;
       } else {
-        final err = json.decode(res.body)['error'] ?? 'Rejection failed';
-        errorMessage = err;
-        notifyListeners();
+        _handleErrorResponse(res, 'Rejection failed');
+        return false;
       }
     } catch (e) {
       debugPrint('rejectRequest error: $e');
-      _updateLocalStatus(requestId, RequestStatus.denied, denialReason: reason);
+      if (!isProfileIncompleteError) {
+        _updateLocalStatus(requestId, RequestStatus.denied, denialReason: reason);
+      }
     }
     return false;
   }
@@ -325,14 +355,14 @@ class WorkflowController extends ChangeNotifier {
         await fetchAllData();
         return true;
       } else {
-        final err = json.decode(res.body)['error'] ?? 'Failed to send to Lab';
-        errorMessage = err;
-        notifyListeners();
+        _handleErrorResponse(res, 'Failed to send to Lab');
+        return false;
       }
     } catch (e) {
       debugPrint('sendToLab error: $e');
-      // Fallback via legacy processing endpoint
-      await processBatch(batchId, processorId ?? 'Processor', qtyReceived, qtyAfter, method, notes ?? '');
+      if (!isProfileIncompleteError) {
+        await processBatch(batchId, processorId ?? 'Processor', qtyReceived, qtyAfter, method, notes ?? '');
+      }
     }
     return false;
   }
@@ -341,7 +371,7 @@ class WorkflowController extends ChangeNotifier {
   Future<void> processBatch(String batchId, String processorId, double qtyReceived,
       double qtyAfter, String method, String notes) async {
     try {
-      await _client.post(
+      final res = await _client.post(
         Uri.parse('$apiUrl/processing'),
         headers: _headers,
         body: json.encode({
@@ -353,7 +383,11 @@ class WorkflowController extends ChangeNotifier {
           'notes': notes,
         }),
       ).timeout(const Duration(seconds: 5));
-      await fetchAllData();
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        await fetchAllData();
+      } else {
+        _handleErrorResponse(res, 'Process Batch failed');
+      }
     } catch (e) {
       debugPrint("Process Batch Error: $e");
     }
@@ -393,13 +427,14 @@ class WorkflowController extends ChangeNotifier {
         await fetchAllData();
         return true;
       } else {
-        final err = json.decode(res.body)['error'] ?? 'Lab report submission failed';
-        errorMessage = err;
-        notifyListeners();
+        _handleErrorResponse(res, 'Lab report submission failed');
+        return false;
       }
     } catch (e) {
       debugPrint('submitLabReport error: $e');
-      _updateLocalStatus(requestId, RequestStatus.labApproved);
+      if (!isProfileIncompleteError) {
+        _updateLocalStatus(requestId, RequestStatus.labApproved);
+      }
     }
     return false;
   }
@@ -428,13 +463,14 @@ class WorkflowController extends ChangeNotifier {
         await fetchAllData();
         return true;
       } else {
-        final err = json.decode(res.body)['error'] ?? 'Failed to send to Packaging';
-        errorMessage = err;
-        notifyListeners();
+        _handleErrorResponse(res, 'Failed to send to Packaging');
+        return false;
       }
     } catch (e) {
       debugPrint('sendToPackaging error: $e');
-      _updateLocalStatus(requestId, RequestStatus.readyForPackaging);
+      if (!isProfileIncompleteError) {
+        _updateLocalStatus(requestId, RequestStatus.readyForPackaging);
+      }
     }
     return false;
   }
@@ -470,13 +506,14 @@ class WorkflowController extends ChangeNotifier {
         await fetchAllData();
         return true;
       } else {
-        final err = json.decode(res.body)['error'] ?? 'Packaging finalization failed';
-        errorMessage = err;
-        notifyListeners();
+        _handleErrorResponse(res, 'Packaging finalization failed');
+        return false;
       }
     } catch (e) {
       debugPrint('finalizePackaging error: $e');
-      await completePackaging(batchId, packagerId ?? 'Packager', finalQuantity, numberOfPackages, notes ?? '');
+      if (!isProfileIncompleteError) {
+        await completePackaging(batchId, packagerId ?? 'Packager', finalQuantity, numberOfPackages, notes ?? '');
+      }
     }
     return false;
   }

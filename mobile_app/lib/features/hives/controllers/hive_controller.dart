@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 import '../models/hive_model.dart';
 import '../services/hive_storage_service.dart';
@@ -13,6 +11,7 @@ class HiveController extends ChangeNotifier {
   String _searchQuery = '';
   String _selectedFilter = 'All'; // All, Healthy, Needs Attention, High Production, Recently Added
   String _selectedSort = 'Name A-Z'; // Name A-Z, Production High-Low, Last Inspected, Date Added
+  String? _activeUserId;
 
   List<Hive> get hives => _hives;
   bool get isLoading => _isLoading;
@@ -24,49 +23,74 @@ class HiveController extends ChangeNotifier {
     loadHives();
   }
 
-  /// Initialize and load hives from PostgreSQL backend
-  Future<void> loadHives() async {
+  /// Initialize and load hives from PostgreSQL backend for the active beekeeper
+  Future<void> loadHives({String? userId}) async {
+    if (userId != null && userId.trim().isNotEmpty) {
+      _activeUserId = userId.trim();
+    }
     _isLoading = true;
     notifyListeners();
 
-    _hives = await _storageService.loadHives();
+    _hives = await _storageService.loadHives(userId: _activeUserId);
     _isLoading = false;
     notifyListeners();
   }
 
-  /// Add a new hive to PostgreSQL and local state
-  Future<bool> addHive(Hive hive) async {
-    _hives.insert(0, hive);
-    notifyListeners();
+  /// Set the active beekeeper context and refresh hives
+  Future<void> setActiveBeekeeper(String? userId) async {
+    _activeUserId = userId;
+    await loadHives(userId: userId);
+  }
 
-    // Persist to PostgreSQL backend and local cache
-    await _storageService.createHive(hive);
-    final success = await _storageService.saveHives(_hives);
-    return success;
+  /// Fetch an authoritative unique hive code from the backend
+  Future<String?> fetchAuthoritativeHiveCode() async {
+    return await _storageService.fetchUniqueHiveCode();
+  }
+
+  /// Add a new hive to PostgreSQL and local state.
+  /// Uses server-assigned unique ID and server-validated hive code.
+  Future<bool> addHive(Hive hive, {String? userId}) async {
+    final effectiveUserId = userId ?? _activeUserId;
+    final createdHive = await _storageService.createHive(hive, userId: effectiveUserId);
+
+    if (createdHive != null) {
+      _hives.insert(0, createdHive);
+      await _storageService.saveHives(_hives);
+      notifyListeners();
+      return true;
+    }
+    return false;
   }
 
   /// Update an existing hive in PostgreSQL and local state
-  Future<bool> updateHive(Hive updatedHive) async {
-    final index = _hives.indexWhere((h) => h.id == updatedHive.id);
-    if (index != -1) {
-      _hives[index] = updatedHive;
-      notifyListeners();
+  Future<bool> updateHive(Hive updatedHive, {String? userId}) async {
+    final effectiveUserId = userId ?? _activeUserId;
+    final success = await _storageService.updateHiveInBackend(updatedHive, userId: effectiveUserId);
 
-      // Persist to PostgreSQL backend and local cache
-      await _storageService.updateHiveInBackend(updatedHive);
-      return await _storageService.saveHives(_hives);
+    if (success) {
+      final index = _hives.indexWhere((h) => h.id == updatedHive.id);
+      if (index != -1) {
+        _hives[index] = updatedHive;
+      }
+      await _storageService.saveHives(_hives);
+      notifyListeners();
+      return true;
     }
     return false;
   }
 
   /// Delete a hive by ID from PostgreSQL and local state
-  Future<bool> deleteHive(String id) async {
-    _hives.removeWhere((h) => h.id == id);
-    notifyListeners();
+  Future<bool> deleteHive(String id, {String? userId}) async {
+    final effectiveUserId = userId ?? _activeUserId;
+    final success = await _storageService.deleteHiveFromBackend(id, userId: effectiveUserId);
 
-    // Persist to PostgreSQL backend and local cache
-    await _storageService.deleteHiveFromBackend(id);
-    return await _storageService.saveHives(_hives);
+    if (success) {
+      _hives.removeWhere((h) => h.id == id);
+      await _storageService.saveHives(_hives);
+      notifyListeners();
+      return true;
+    }
+    return false;
   }
 
   /// Get hive by ID
@@ -78,28 +102,12 @@ class HiveController extends ChangeNotifier {
     }
   }
 
-  /// Whether a hive code is already taken by another hive.
+  /// Whether a hive code is already taken in the loaded list
   bool isHiveCodeTaken(String code, {String? excludingHiveId}) {
     final normalized = code.trim().toLowerCase();
     return _hives.any(
       (h) => h.id != excludingHiveId && h.hiveCode.trim().toLowerCase() == normalized,
     );
-  }
-
-  /// Issue a unique hive identity code (e.g. "H-7F3A2C").
-  ///
-  /// Locally generates a collision-checked code against every stored hive.
-  String generateUniqueHiveCode() {
-    final rng = Random.secure();
-    String code;
-    do {
-      final hex = List.generate(
-        3,
-        (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0'),
-      ).join().toUpperCase();
-      code = 'H-$hex';
-    } while (isHiveCodeTaken(code));
-    return code;
   }
 
   /// Set search query
@@ -183,3 +191,4 @@ class HiveController extends ChangeNotifier {
     return result;
   }
 }
+

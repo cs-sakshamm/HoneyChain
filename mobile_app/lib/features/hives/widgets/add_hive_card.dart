@@ -51,14 +51,14 @@ class AddHiveCard extends StatelessWidget {
                     color: context.primarySoftColor,
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                     border: Border.all(
-                      color: context.accentColor.withValues(alpha: 0.2),
+                      color: context.borderColor,
                       width: 1.0,
                     ),
                   ),
                   child: Icon(
                     Icons.add_rounded,
-                    color: context.accentColor,
-                    size: 28,
+                    color: context.textPrimaryColor,
+                    size: 26,
                   ),
                 ),
                 const SizedBox(width: AppConstants.space16),

@@ -20,7 +20,7 @@ class AppConstants {
   static const Color onPrimary = Color(0xFF1C1917); // Stone-900: readable on honey
   static const Color honeyAccent = Color(0xFFEAB308); // Yellow-500 (Honey)
   static const Color primaryDark = Color(0xFF09090B); // Zinc-950
-  static const Color primarySoft = Color(0xFFFEF9C3); // Yellow-100 (honey tint)
+  static const Color primarySoft = Color(0xFFF4F4F5); // Zinc-100 (neutral soft container)
   static const Color secondary = Color(0xFF52525B); // Zinc-500
 
   static const Color background = Color(0xFFF9FAFB); // Neutral Off-White Background
@@ -73,28 +73,19 @@ class AppConstants {
   static const String orDividerText = 'OR';
 
   // Provider Tooltips & Text
+  static const String googleRecommendationText = 'Recommended for faster sign-in';
   static const String continueWithGoogleText = 'Continue with Google';
-  static const String continueWithPhoneText = 'Continue with phone';
   static const String googleSignInText = 'Sign in with Google';
   static const String appleSignInText = 'Sign in with Apple';
-  static const String phoneSignInText = 'Sign in with Phone';
 
   // Navigation Links
-  static const String dontHaveAccountText = "New to HoneyChain? ";
-  static const String createAccountLinkText = 'Create Business Account';
+  static const String dontHaveAccountText = "Don't have an account? ";
+  static const String createAccountLinkText = 'Create account';
   static const String alreadyHaveAccountText = 'Already have an account? Sign In';
-
-  // OTP Verification
-  static const String phoneOtpTitle = 'Security Verification';
-  static const String phoneOtpSubtitle = 'Enter the 6-digit code sent to your registered phone number.';
-  static const String enterPhoneNumberHint = 'Mobile phone number (+1 234 567 8900)';
-  static const String sendOtpButtonText = 'Send Verification Code';
-  static const String verifyOtpButtonText = 'Verify & Access Dashboard';
-  static const String resendOtpText = 'Resend Code';
 
   // Password Reset
   static const String resetPasswordTitle = 'Reset Password';
-  static const String resetPasswordSubtitle = 'Enter your business email or phone to receive reset instructions.';
+  static const String resetPasswordSubtitle = 'Enter your registered email address to receive reset instructions.';
   static const String sendResetLinkText = 'Send Reset Instructions';
 
   // Status & Feedback

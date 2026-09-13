@@ -1,17 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
+import { isUserProfileComplete, PROFILE_INCOMPLETE_RESPONSE, BEEKEEPER_PROFILE_INCOMPLETE_RESPONSE, HARVESTER_VERIFICATION_REQUIRED_RESPONSE, isHarvesterFullyVerified } from '../services/profileService';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// Helper to generate unique hive code
-async function generateUniqueHiveCode(): Promise<string> {
+// Helper to generate unique collision-free hive code
+export async function generateUniqueHiveCode(): Promise<string> {
   let isTaken = true;
   let code = '';
   while (isTaken) {
     const hex = crypto.randomBytes(3).toString('hex').toUpperCase();
-    code = `H-${hex}`;
+    code = `HIVE-${hex}`;
     const found = await prisma.hive.findUnique({ where: { hiveCode: code } });
     if (!found) {
       isTaken = false;
@@ -22,18 +23,27 @@ async function generateUniqueHiveCode(): Promise<string> {
 
 /**
  * GET /api/hives
- * Fetch all hives with optional query filters and sorting
+ * Fetch all hives for the authenticated beekeeper with optional search/filter/sort
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { search, filter, sort } = req.query;
+    const { search, filter, sort, userId: queryUserId, harvesterId, beekeeperId } = req.query;
+    const headerUserId = req.headers['x-user-id'] as string;
+    const targetUserId = (queryUserId as string) || (harvesterId as string) || (beekeeperId as string) || headerUserId;
+
+    const whereClause: any = {};
+    if (targetUserId && targetUserId.trim().length > 0) {
+      whereClause.userId = targetUserId.trim();
+    }
 
     const hives = await prisma.hive.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     });
 
     let result = hives.map((h) => ({
       id: h.id,
+      userId: h.userId,
       name: h.name,
       hiveCode: h.hiveCode,
       apiaryLocation: h.apiaryLocation,
@@ -128,6 +138,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json({
       id: h.id,
+      userId: h.userId,
       name: h.name,
       hiveCode: h.hiveCode,
       apiaryLocation: h.apiaryLocation,
@@ -159,15 +170,56 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 /**
  * POST /api/hives
- * Create a new Hive record in PostgreSQL
+ * Create a new Hive record in PostgreSQL with strict Beekeeper Profile Gate and Unique Identifiers
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
     const data = req.body;
-    if (!data.name) {
+    if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
       return res.status(400).json({ success: false, error: 'Hive name is required' });
     }
 
+    // 1. Mandatory authenticated beekeeper identity resolution
+    const rawUserId = data.userId || data.harvesterId || data.beekeeperId || (req.headers['x-user-id'] as string);
+    if (!rawUserId || typeof rawUserId !== 'string' || rawUserId.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'AUTH_REQUIRED',
+        message: 'Authenticated beekeeper ID (userId) is required to add a beehive.'
+      });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: rawUserId.trim() },
+          { email: rawUserId.trim().toLowerCase() }
+        ]
+      },
+      include: {
+        harvesterVerification: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'USER_NOT_FOUND',
+        message: 'Beekeeper account not found for the provided ID.'
+      });
+    }
+
+    // 2. Mandatory profile completion gate for Harvester/Beekeeper
+    if (!isUserProfileComplete(user)) {
+      return res.status(403).json(BEEKEEPER_PROFILE_INCOMPLETE_RESPONSE);
+    }
+
+    // 3. Mandatory Harvester Verification Gate
+    if (user.role === 'HARVESTER' && !isHarvesterFullyVerified(user.harvesterVerification)) {
+      return res.status(403).json(HARVESTER_VERIFICATION_REQUIRED_RESPONSE);
+    }
+
+    // 4. Unique Hive Code validation / generation
     let hiveCode = (data.hiveCode || '').trim();
     if (!hiveCode) {
       hiveCode = await generateUniqueHiveCode();
@@ -178,29 +230,31 @@ router.post('/', async (req: Request, res: Response) => {
       }
     }
 
+    // 4. Create authoritative Hive record
     const hive = await prisma.hive.create({
       data: {
         id: data.id || undefined,
+        userId: user.id,
         name: data.name.trim(),
         hiveCode,
         apiaryLocation: data.apiaryLocation || 'Main Apiary',
         hiveType: data.hiveType || 'Langstroth',
         dateAdded: data.dateAdded ? new Date(data.dateAdded) : new Date(),
         queenStatus: data.queenStatus || 'Mated',
-        totalFrames: Number(data.totalFrames) || 10,
-        broodFrames: Number(data.broodFrames) || 6,
+        totalFrames: data.totalFrames !== undefined && data.totalFrames !== null && data.totalFrames !== '' ? Number(data.totalFrames) : 10,
+        broodFrames: data.broodFrames !== undefined && data.broodFrames !== null && data.broodFrames !== '' ? Number(data.broodFrames) : 0,
         colonyStrength: data.colonyStrength || 'Strong',
-        queenAgeMonths: Number(data.queenAgeMonths) || 12,
+        queenAgeMonths: data.queenAgeMonths !== undefined && data.queenAgeMonths !== null && data.queenAgeMonths !== '' ? Number(data.queenAgeMonths) : 0,
         beeBreed: data.beeBreed || 'Italian',
-        expectedProductionKg: Number(data.expectedProductionKg) || 35.0,
-        previousYearProductionKg: Number(data.previousYearProductionKg) || 25.0,
-        currentYearProductionKg: Number(data.currentYearProductionKg) || 28.0,
+        expectedProductionKg: data.expectedProductionKg !== undefined && data.expectedProductionKg !== null && data.expectedProductionKg !== '' ? Number(data.expectedProductionKg) : 0.0,
+        previousYearProductionKg: data.previousYearProductionKg !== undefined && data.previousYearProductionKg !== null && data.previousYearProductionKg !== '' ? Number(data.previousYearProductionKg) : 0.0,
+        currentYearProductionKg: data.currentYearProductionKg !== undefined && data.currentYearProductionKg !== null && data.currentYearProductionKg !== '' ? Number(data.currentYearProductionKg) : 0.0,
         honeyType: data.honeyType || 'Wildflower',
         lastInspectionDate: data.lastInspectionDate ? new Date(data.lastInspectionDate) : new Date(),
-        miteStatus: data.miteStatus || 'Low',
+        miteStatus: data.miteStatus || 'None',
         diseaseStatus: data.diseaseStatus || 'None',
         feedingRequired: Boolean(data.feedingRequired),
-        queenCondition: data.queenCondition || 'Excellent',
+        queenCondition: data.queenCondition || 'Good',
         overallHealth: data.overallHealth || 'Healthy',
         notes: data.notes || '',
       }
@@ -208,6 +262,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json({
       id: hive.id,
+      userId: hive.userId,
       name: hive.name,
       hiveCode: hive.hiveCode,
       apiaryLocation: hive.apiaryLocation,
@@ -251,6 +306,29 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Hive not found' });
     }
 
+    const rawUserId = data.userId || data.harvesterId || data.beekeeperId || (req.headers['x-user-id'] as string);
+    if (rawUserId) {
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: rawUserId.trim() },
+            { email: rawUserId.trim().toLowerCase() }
+          ]
+        },
+        include: {
+          harvesterVerification: true
+        }
+      });
+      if (user) {
+        if (!isUserProfileComplete(user)) {
+          return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+        }
+        if (user.role === 'HARVESTER' && !isHarvesterFullyVerified(user.harvesterVerification)) {
+          return res.status(403).json(HARVESTER_VERIFICATION_REQUIRED_RESPONSE);
+        }
+      }
+    }
+
     if (data.hiveCode && data.hiveCode !== existing.hiveCode) {
       const codeCheck = await prisma.hive.findUnique({ where: { hiveCode: data.hiveCode } });
       if (codeCheck && codeCheck.id !== id) {
@@ -288,6 +366,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     res.json({
       id: updated.id,
+      userId: updated.userId,
       name: updated.name,
       hiveCode: updated.hiveCode,
       apiaryLocation: updated.apiaryLocation,
@@ -324,6 +403,11 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
+    const existing = await prisma.hive.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Hive not found' });
+    }
+
     await prisma.hive.delete({ where: { id } });
     res.json({ success: true, message: 'Hive deleted successfully' });
   } catch (error: any) {
@@ -332,3 +416,4 @@ router.delete('/:id', async (req: Request, res: Response) => {
 });
 
 export default router;
+

@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,9 +10,18 @@ import 'features/authentication/auth_controller.dart';
 import 'features/hives/controllers/hive_controller.dart';
 import 'features/profile/controllers/user_controller.dart';
 import 'features/verification/controllers/verification_controller.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase initialization note: $e');
+  }
 
   runApp(
     MultiProvider(

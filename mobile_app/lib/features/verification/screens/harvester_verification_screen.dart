@@ -7,7 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../controllers/verification_controller.dart';
-import 'verification_certificate_screen.dart';
+// import 'verification_certificate_screen.dart';
 
 class HarvesterVerificationScreen extends StatefulWidget {
   const HarvesterVerificationScreen({super.key});
@@ -17,44 +17,122 @@ class HarvesterVerificationScreen extends StatefulWidget {
 }
 
 class _HarvesterVerificationScreenState extends State<HarvesterVerificationScreen> {
-  // Step 1 Form
-  String _docType = 'NATIONAL_ID';
-  final TextEditingController _docNumberController = TextEditingController();
+  // Step 1 Form (Aadhaar Card ONLY)
+  final TextEditingController _aadhaarNumberController = TextEditingController();
+  final TextEditingController _aadhaarOtpController = TextEditingController();
 
   // Step 2 Form
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
 
-  // Step 3 Form
+  // Step 3 Form (4 Exact Registration Authorities)
   final TextEditingController _registrationIdController = TextEditingController();
-  String _regType = 'STATE_REGISTRY';
+  String _selectedAuthority = 'STATE_AGRICULTURE';
 
-  // Step 4 Form
-  final TextEditingController _apiaryNameController = TextEditingController(text: 'Cascade High Mountain Apiary');
-  final TextEditingController _apiaryLocationController = TextEditingController(text: 'Cascade Valley, OR');
-  final TextEditingController _coordinatesController = TextEditingController(text: '44.0521° N, 121.3153° W');
+  static const Map<String, String> _registrationAuthorities = {
+    'STATE_AGRICULTURE': 'State Department of Agriculture',
+    'NATIONAL_HONEY_PRODUCERS': 'National Honey Producers',
+    'ORGANIC_CERTIFICATION_BOARD': 'Organic Certification Board',
+    'OTHER_LOCAL': 'Other / Local Registration',
+  };
+
+  // Step 4 Form (Simple State, District, Village/City Location)
+  String _selectedState = 'Uttar Pradesh';
+  final TextEditingController _districtController = TextEditingController();
+  final TextEditingController _villageCityController = TextEditingController();
+  final TextEditingController _apiaryNameController = TextEditingController();
+  final TextEditingController _coordinatesController = TextEditingController();
+
+  static const List<String> _indianStates = [
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chhattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+    'Delhi',
+    'Jammu & Kashmir',
+    'Ladakh',
+    'Other / Outside India',
+  ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserController>().user;
-      final harvesterId = user.bsid ?? 'HARV-2026-PRIMARY';
+      final harvesterId = (user.id != null && user.id!.isNotEmpty)
+          ? user.id!
+          : (user.beekeeperId ?? 'harvester');
       context.read<VerificationController>().loadVerification(harvesterId);
       if (user.phone.isNotEmpty) {
-        _phoneController.text = user.phone;
+        String digits = user.phone.replaceAll(RegExp(r'\D'), '');
+        if (digits.startsWith('91') && digits.length > 10) {
+          digits = digits.substring(2);
+        }
+        if (digits.length == 10) {
+          _phoneController.text = '${digits.substring(0, 5)} ${digits.substring(5)}';
+        } else {
+          _phoneController.text = digits;
+        }
+      }
+      if (user.organizationName != null && user.organizationName!.isNotEmpty) {
+        _apiaryNameController.text = user.organizationName!;
+      }
+      if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) {
+        final parts = user.facilityLocation!.split(',').map((p) => p.trim()).toList();
+        if (parts.length >= 3) {
+          _villageCityController.text = parts[0];
+          _districtController.text = parts[1];
+          if (_indianStates.contains(parts[2])) {
+            _selectedState = parts[2];
+          }
+        } else if (parts.length == 2) {
+          _villageCityController.text = parts[0];
+          if (_indianStates.contains(parts[1])) {
+            _selectedState = parts[1];
+          } else {
+            _districtController.text = parts[1];
+          }
+        } else {
+          _villageCityController.text = user.facilityLocation!;
+        }
       }
     });
   }
 
   @override
   void dispose() {
-    _docNumberController.dispose();
+    _aadhaarNumberController.dispose();
+    _aadhaarOtpController.dispose();
     _phoneController.dispose();
     _otpController.dispose();
     _registrationIdController.dispose();
+    _districtController.dispose();
+    _villageCityController.dispose();
     _apiaryNameController.dispose();
-    _apiaryLocationController.dispose();
     _coordinatesController.dispose();
     super.dispose();
   }
@@ -67,7 +145,55 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      appBar: AppBar(
+        backgroundColor: context.scaffoldBg,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Center(
+            child: _PillBackButton(onTap: () => Navigator.pop(context)),
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Harvester Verification',
+              style: GoogleFonts.manrope(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: context.textPrimaryColor,
+                letterSpacing: -0.3,
+              ),
+            ),
+            Text(
+              '5-Parameter Trust & Provenance Protocol',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: context.textSecondaryColor,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: context.textSecondaryColor),
+            tooltip: 'Refresh Verification Status',
+            onPressed: () {
+              final user = context.read<UserController>().user;
+              final harvesterId = (user.id != null && user.id!.isNotEmpty)
+                  ? user.id!
+                  : (user.beekeeperId ?? 'harvester');
+              verCtrl.loadVerification(harvesterId);
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: AppConstants.space20),
@@ -75,39 +201,6 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppConstants.space12),
-
-              // Header
-              Row(
-                children: [
-                  _PillBackButton(onTap: () => Navigator.pop(context)),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Harvester Verification',
-                          style: GoogleFonts.manrope(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: context.textPrimaryColor,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        Text(
-                          '5-Parameter Trust & Provenance Protocol',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: context.textSecondaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppConstants.space20),
 
               // Progress Overview Card
               Container(
@@ -187,172 +280,325 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space20),
 
-              // ── STEP 1: Government ID Verification ──
+              // ── STEP 1: Government ID Verification (Aadhaar Card ONLY) (COMMENTED OUT) ──
+              /*
               _buildStepCard(
                 stepNumber: 1,
                 title: 'Government ID Verification',
-                subtitle: 'Privacy-Preserving Credential Check',
+                subtitle: 'Aadhaar Card · Privacy-Preserving UIDAI OTP Protocol',
                 icon: Icons.badge_outlined,
                 isCompleted: ver.isStep1Complete,
-                statusText: ver.governmentIdVerified,
+                statusText: ver.governmentIdVerified == 'Verified' ? 'Aadhaar Verified ✓' : ver.governmentIdVerified,
                 content: ver.isStep1Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Masked ID Reference',
-                        value: ver.governmentIdReference ?? 'DOC-VERIFIED',
+                        label: 'Masked Aadhaar Reference',
+                        value: ver.governmentIdReference ?? 'AADHAAR-***XXXX',
                         subtext: 'Tamper-Evident SHA-256 Hash Stored Off-Chain',
+                        verifiedBadgeText: 'Aadhaar Verified ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Select Document Type',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            decoration: BoxDecoration(
-                              color: context.scaffoldBg,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: context.borderColor),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _docType,
-                                isExpanded: true,
-                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
-                                dropdownColor: context.surfaceColor,
-                                items: const [
-                                  DropdownMenuItem(value: 'NATIONAL_ID', child: Text('National Identity Card')),
-                                  DropdownMenuItem(value: 'PASSPORT', child: Text('Passport')),
-                                  DropdownMenuItem(value: 'DRIVERS_LICENSE', child: Text("Driver's License")),
-                                  DropdownMenuItem(value: 'BEEKEEPER_PERMIT', child: Text('State Apiculture Permit')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _docType = val);
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Document / License Number',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                          ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _docNumberController,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. DL-98421094',
-                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
-                              filled: true,
-                              fillColor: context.scaffoldBg,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _ActionButton(
-                            label: 'Verify Government ID',
-                            icon: Icons.check_circle_outline_rounded,
-                            isLoading: verCtrl.isLoading,
-                            onTap: () {
-                              final num = _docNumberController.text.trim();
-                              if (num.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter document number.')));
-                                return;
-                              }
-                              verCtrl.submitGovernmentId(docType: _docType, docNumber: num);
-                            },
-                          ),
-                        ],
-                      ),
-              ),
-
-              const SizedBox(height: AppConstants.space16),
-
-              // ── STEP 2: Mobile Number + OTP ──
-              _buildStepCard(
-                stepNumber: 2,
-                title: 'Mobile Number + OTP',
-                subtitle: 'Real-Time Backend OTP Generation & Validation',
-                icon: Icons.phone_android_rounded,
-                isCompleted: ver.isStep2Complete,
-                statusText: ver.mobileVerified,
-                content: ver.isStep2Complete
-                    ? _buildVerifiedStepInfo(
-                        label: 'Verified Phone',
-                        value: ver.mobileNumber ?? '+1 (555) 234-5678',
-                        subtext: 'Mobile identity confirmed with 2FA OTP',
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Business Mobile Number',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                          ),
-                          const SizedBox(height: 6),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: InputDecoration(
-                                    hintText: '+1 (555) 234-5678',
-                                    hintStyle: GoogleFonts.inter(color: context.textMutedColor),
-                                    filled: true,
-                                    fillColor: context.scaffoldBg,
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  ),
+                              Text(
+                                'Aadhaar Card Number',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.textPrimaryColor,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: verCtrl.canResendOtp && !verCtrl.isLoading
-                                    ? () {
-                                        final phone = _phoneController.text.trim();
-                                        if (phone.isEmpty) {
-                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter mobile number.')));
-                                          return;
-                                        }
-                                        verCtrl.sendMobileOtp(phone);
-                                      }
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: context.primarySoftColor,
-                                  foregroundColor: context.primaryDarkColor,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: context.primarySoftColor,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  verCtrl.otpCooldown > 0 ? '${verCtrl.otpCooldown}s' : 'Send OTP',
-                                  style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
+                                  '12-Digit UIDAI',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.primaryDarkColor,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '6-Digit Verification Code',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _aadhaarNumberController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 14,
+                            enabled: !verCtrl.aadhaarOtpSent && !verCtrl.isLoading,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[\d ]')),
+                              _AadhaarNumberFormatter(),
+                            ],
+                            decoration: InputDecoration(
+                              counterText: '',
+                              hintText: 'XXXX  XXXX  XXXX',
+                              prefixIcon: Icon(Icons.fingerprint_rounded, size: 20, color: context.textSecondaryColor),
+                              hintStyle: GoogleFonts.inter(
+                                color: context.textMutedColor,
+                                letterSpacing: 2.0,
+                              ),
+                              filled: true,
+                              fillColor: context.scaffoldBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                          if (!verCtrl.aadhaarOtpSent) ...[
+                            const SizedBox(height: 12),
+                            _ActionButton(
+                              label: 'Get Aadhaar OTP',
+                              icon: Icons.send_rounded,
+                              isLoading: verCtrl.isLoading,
+                              onTap: () {
+                                final raw = _aadhaarNumberController.text.replaceAll(' ', '').trim();
+                                if (raw.length != 12 || !RegExp(r'^\d{12}$').hasMatch(raw)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter a valid 12-digit Aadhaar number.')),
+                                  );
+                                  return;
+                                }
+                                verCtrl.sendAadhaarOtp(raw);
+                              },
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 12),
+                            // OTP Sent Info Banner
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: context.primarySoftColor.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.mark_email_read_outlined, size: 20, color: context.primaryDarkColor),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'OTP sent to your Aadhaar-linked mobile number.',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: context.textPrimaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (verCtrl.devAadhaarOtp != null && verCtrl.devAadhaarOtp!.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: context.surfaceColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: context.borderColor),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Dev Sandbox OTP: ',
+                                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: context.textSecondaryColor),
+                                          ),
+                                          SelectableText(
+                                            verCtrl.devAadhaarOtp!,
+                                            style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w800, color: context.primaryDarkColor),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '6-Digit Aadhaar OTP',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.textPrimaryColor,
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: verCtrl.isLoading ? null : () => verCtrl.resetAadhaarState(),
+                                  child: Text(
+                                    'Change Number',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.primaryDarkColor,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _aadhaarOtpController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 6,
+                                    autofocus: true,
+                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                    decoration: InputDecoration(
+                                      counterText: '',
+                                      hintText: 'Enter 6-digit OTP',
+                                      prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: context.textSecondaryColor),
+                                      hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                                      filled: true,
+                                      fillColor: context.scaffoldBg,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: verCtrl.canResendAadhaarOtp && !verCtrl.isLoading
+                                      ? () {
+                                          final raw = _aadhaarNumberController.text.replaceAll(' ', '').trim();
+                                          verCtrl.sendAadhaarOtp(raw);
+                                        }
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: context.primarySoftColor,
+                                    foregroundColor: context.primaryDarkColor,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  ),
+                                  child: Text(
+                                    verCtrl.aadhaarCooldown > 0 ? '${verCtrl.aadhaarCooldown}s' : 'Resend',
+                                    style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _ActionButton(
+                              label: 'Verify Aadhaar OTP',
+                              icon: Icons.check_circle_outline_rounded,
+                              isLoading: verCtrl.isLoading,
+                              onTap: () {
+                                final code = _aadhaarOtpController.text.trim();
+                                if (code.length != 6) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter the complete 6-digit Aadhaar OTP.')),
+                                  );
+                                  return;
+                                }
+                                verCtrl.verifyAadhaarOtp(code);
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+              const SizedBox(height: AppConstants.space16),
+              */
+
+              // ── STEP 2: Mobile Number + OTP ──
+              _buildStepCard(
+                stepNumber: 2,
+                title: 'Mobile Number Verification',
+                subtitle: '2Factor SMS Gateway · India DLT Compliant OTP',
+                icon: Icons.phone_android_rounded,
+                isCompleted: ver.isStep2Complete,
+                statusText: ver.mobileVerified == 'Verified' ? 'Mobile Verified ✓' : ver.mobileVerified,
+                content: ver.isStep2Complete
+                    ? _buildVerifiedStepInfo(
+                        label: 'Verified Phone Number',
+                        value: ver.mobileNumber ?? '+91 XXXXX XXXXX',
+                        subtext: 'Mobile identity confirmed with 2FA OTP Gateway',
+                        verifiedBadgeText: 'Mobile Number — Verified ✓',
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Mobile Number',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: context.primarySoftColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '+91 India Mobile',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.primaryDarkColor,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 6),
                           TextField(
-                            controller: _otpController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 6,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            maxLength: 11,
+                            enabled: !verCtrl.mobileOtpSent && !verCtrl.isLoading,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              _IndianPhoneNumberFormatter(),
+                            ],
                             decoration: InputDecoration(
                               counterText: '',
-                              hintText: 'Enter 6-digit code',
+                              prefixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(width: 14),
+                                  Icon(Icons.phone_outlined, size: 20, color: context.textSecondaryColor),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '+91',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textPrimaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    height: 18,
+                                    width: 1,
+                                    color: context.borderColor,
+                                  ),
+                                  const SizedBox(width: 10),
+                                ],
+                              ),
+                              hintText: '98765 43210',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
@@ -362,45 +608,299 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          _ActionButton(
-                            label: 'Validate Mobile OTP',
-                            icon: Icons.verified_user_outlined,
-                            isLoading: verCtrl.isLoading,
-                            onTap: () {
-                              final code = _otpController.text.trim();
-                              if (code.length != 6) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter 6-digit code.')));
-                                return;
-                              }
-                              verCtrl.verifyMobileOtp(code);
-                            },
-                          ),
+                          if (!verCtrl.mobileOtpSent) ...[
+                            const SizedBox(height: 12),
+                            _ActionButton(
+                              label: 'Send OTP',
+                              icon: Icons.send_rounded,
+                              isLoading: verCtrl.isLoading,
+                              onTap: () {
+                                final phone = _phoneController.text.trim();
+                                final digits = phone.replaceAll(RegExp(r'\D'), '');
+                                if (digits.length < 10) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter a valid 10-digit mobile number.')),
+                                  );
+                                  return;
+                                }
+                                verCtrl.sendMobileOtp(phone);
+                              },
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 12),
+                            // OTP Sent Banner
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: context.primarySoftColor.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.sms_outlined, size: 20, color: context.primaryDarkColor),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'OTP sent to ${verCtrl.pendingMobileNumber}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: context.textPrimaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (verCtrl.devOtp != null && verCtrl.devOtp!.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: context.surfaceColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: context.borderColor),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Dev Sandbox OTP: ',
+                                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: context.textSecondaryColor),
+                                          ),
+                                          SelectableText(
+                                            verCtrl.devOtp!,
+                                            style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w800, color: context.primaryDarkColor),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Enter OTP',
+                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                                ),
+                                GestureDetector(
+                                  onTap: verCtrl.isLoading ? null : () => verCtrl.resetMobileOtpState(),
+                                  child: Text(
+                                    'Change Number',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.primaryDarkColor,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _otpController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 6,
+                                    autofocus: true,
+                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                    decoration: InputDecoration(
+                                      counterText: '',
+                                      hintText: '_ _ _ _ _ _',
+                                      prefixIcon: Icon(Icons.pin_outlined, size: 20, color: context.textSecondaryColor),
+                                      hintStyle: GoogleFonts.inter(color: context.textMutedColor, letterSpacing: 3.0),
+                                      filled: true,
+                                      fillColor: context.scaffoldBg,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: verCtrl.canResendOtp && !verCtrl.isLoading
+                                      ? () {
+                                          final phone = _phoneController.text.trim();
+                                          verCtrl.sendMobileOtp(phone);
+                                        }
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: context.primarySoftColor,
+                                    foregroundColor: context.primaryDarkColor,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  ),
+                                  child: Text(
+                                    verCtrl.otpCooldown > 0 ? '${verCtrl.otpCooldown}s' : 'Resend OTP',
+                                    style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                              _ActionButton(
+                                label: 'Verify OTP',
+                                icon: Icons.verified_user_outlined,
+                                isLoading: verCtrl.isLoading,
+                                onTap: () async {
+                                  final code = _otpController.text.trim();
+                                  if (code.length != 6) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Please enter 6-digit OTP.')),
+                                    );
+                                    return;
+                                  }
+                                  final ok = await verCtrl.verifyMobileOtp(code);
+                                  if (ok && context.mounted) {
+                                    final userCtrl = context.read<UserController>();
+                                    userCtrl.reloadProfile();
+                                  }
+                                },
+                              ),
+                          ],
                         ],
                       ),
               ),
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 3: Beekeeper Registration ID ──
+              // ── STEP 3: Beekeeper Registration ──
               _buildStepCard(
                 stepNumber: 3,
-                title: 'Beekeeper Registration ID',
-                subtitle: 'Apiculture Association / Cooperative Accreditation',
+                title: 'Beekeeper Registration',
+                subtitle: 'Authority Accreditation & HoneyChain Beekeeper ID',
                 icon: Icons.workspace_premium_outlined,
                 isCompleted: ver.isStep3Complete,
-                statusText: ver.registrationVerified,
+                statusText: ver.step3DisplayStatus,
                 content: ver.isStep3Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Accreditation ID',
-                        value: ver.registrationId ?? 'BK-OR-8921',
-                        subtext: 'Registry Type: ${ver.registrationType ?? 'State Registry'}',
+                        label: 'Registration ID',
+                        value: ver.registrationId ?? 'Verified',
+                        subtext: 'Authority: ${_registrationAuthorities[ver.registrationType] ?? ver.registrationType ?? 'State Agriculture'}',
+                        verifiedBadgeText: 'Beekeeper Registration — Verified ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Unique HoneyChain Beekeeper ID Card
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: context.primarySoftColor.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: context.primaryColor.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(Icons.badge_outlined, size: 20, color: context.primaryDarkColor),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'HoneyChain Beekeeper ID',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: context.textSecondaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        context.watch<UserController>().user.beekeeperId ?? 'HC-BK-PENDING',
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          color: context.textPrimaryColor,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'HoneyChain internal ID (distinct from external authority ID)',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          color: context.textMutedColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Manual Verification Alert if previously submitted with manual authority
+                          if (ver.isStep3ManualReview) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Verification unavailable — manual verification required.',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.amber.shade900,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Registration ID "${ver.registrationId}" with ${_registrationAuthorities[ver.registrationType] ?? ver.registrationType} has been submitted for manual authority review.',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: context.textSecondaryColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+
+                          // Registration Authority Selection (Exactly 4 Options)
                           Text(
-                            'Accreditation Type',
+                            'Registration Authority',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
@@ -413,32 +913,39 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: _regType,
+                                value: _selectedAuthority,
                                 isExpanded: true,
                                 icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
                                 dropdownColor: context.surfaceColor,
-                                items: const [
-                                  DropdownMenuItem(value: 'STATE_REGISTRY', child: Text('State Department of Agriculture')),
-                                  DropdownMenuItem(value: 'COOPERATIVE', child: Text('National Honey Producers Cooperative')),
-                                  DropdownMenuItem(value: 'APICULTURE_BOARD', child: Text('Organic Apiary Certification Board')),
-                                ],
+                                items: _registrationAuthorities.entries.map((entry) {
+                                  return DropdownMenuItem<String>(
+                                    value: entry.key,
+                                    child: Text(
+                                      entry.value,
+                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  );
+                                }).toList(),
                                 onChanged: (val) {
-                                  if (val != null) setState(() => _regType = val);
+                                  if (val != null) setState(() => _selectedAuthority = val);
                                 },
                               ),
                             ),
                           ),
                           const SizedBox(height: 12),
+
+                          // Registration ID input
                           Text(
-                            'Registration / License ID',
+                            'Registration ID',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
                           TextField(
                             controller: _registrationIdController,
                             decoration: InputDecoration(
-                              hintText: 'e.g. BK-OR-8842',
+                              hintText: 'Enter your registration ID',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.badge_outlined, size: 20, color: context.textSecondaryColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
@@ -449,7 +956,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           ),
                           const SizedBox(height: 12),
                           _ActionButton(
-                            label: 'Verify Registration ID',
+                            label: 'Verify Registration',
                             icon: Icons.verified_outlined,
                             isLoading: verCtrl.isLoading,
                             onTap: () {
@@ -458,7 +965,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter registration ID.')));
                                 return;
                               }
-                              verCtrl.submitRegistrationId(registrationId: id, registrationType: _regType);
+                              verCtrl.submitRegistrationId(registrationId: id, registrationType: _selectedAuthority);
                             },
                           ),
                         ],
@@ -467,33 +974,72 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 4: Apiary Location Verification ──
+              // ── STEP 4: Location (State, District, Village/City) ──
               _buildStepCard(
                 stepNumber: 4,
-                title: 'Apiary Location Verification',
-                subtitle: 'Generalized Public Region & Secure GPS Registry',
+                title: 'Location',
+                subtitle: 'State, District & Village / City Registry',
                 icon: Icons.pin_drop_outlined,
                 isCompleted: ver.isStep4Complete,
-                statusText: ver.locationVerified,
+                statusText: ver.locationVerified == 'Verified' ? 'Location — Completed ✓' : ver.locationVerified,
                 content: ver.isStep4Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Public Apiary Region',
-                        value: ver.apiaryLocation ?? 'Cascade Valley, OR',
-                        subtext: 'Private GPS coordinates encrypted off-chain',
+                        label: 'Location',
+                        value: ver.apiaryLocation ?? 'Registered Apiary',
+                        subtext: 'State, District & Village registry confirmed',
+                        verifiedBadgeText: 'Location — Completed ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // State Dropdown
                           Text(
-                            'Apiary Name',
+                            'State',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: context.scaffoldBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: context.borderColor),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _indianStates.contains(_selectedState) ? _selectedState : _indianStates.first,
+                                isExpanded: true,
+                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
+                                dropdownColor: context.surfaceColor,
+                                items: _indianStates.map((state) {
+                                  return DropdownMenuItem<String>(
+                                    value: state,
+                                    child: Text(
+                                      state,
+                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _selectedState = val);
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // District Input
+                          Text(
+                            'District',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
                           TextField(
-                            controller: _apiaryNameController,
+                            controller: _districtController,
                             decoration: InputDecoration(
-                              hintText: 'e.g. Highland Valley Apiary #1',
+                              hintText: 'e.g. Gautam Buddh Nagar',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.location_city_outlined, size: 20, color: context.textSecondaryColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
@@ -503,16 +1049,63 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                             ),
                           ),
                           const SizedBox(height: 12),
+
+                          // Village / City Input
                           Text(
-                            'Public Region (Displayed publicly)',
+                            'Village / City',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
                           ),
                           const SizedBox(height: 6),
                           TextField(
-                            controller: _apiaryLocationController,
+                            controller: _villageCityController,
                             decoration: InputDecoration(
-                              hintText: 'e.g. Cascade Valley, Oregon',
+                              hintText: 'e.g. Greater Noida',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.home_work_outlined, size: 20, color: context.textSecondaryColor),
+                              filled: true,
+                              fillColor: context.scaffoldBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Apiary / Farm Name (Optional)
+                          Text(
+                            'Apiary / Farm Name (Optional)',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _apiaryNameController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Primary Apiary',
+                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.hive_outlined, size: 20, color: context.textSecondaryColor),
+                              filled: true,
+                              fillColor: context.scaffoldBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Optional GPS Coordinates
+                          Text(
+                            'Private GPS Coordinates (Optional)',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _coordinatesController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 28.4744, 77.5040 (Optional)',
+                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              prefixIcon: Icon(Icons.gps_fixed_rounded, size: 20, color: context.textSecondaryColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
@@ -523,19 +1116,26 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           ),
                           const SizedBox(height: 12),
                           _ActionButton(
-                            label: 'Register & Verify Location',
+                            label: 'Save & Complete Location',
                             icon: Icons.location_on_outlined,
                             isLoading: verCtrl.isLoading,
                             onTap: () {
-                              final name = _apiaryNameController.text.trim();
-                              final loc = _apiaryLocationController.text.trim();
-                              if (loc.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter public region.')));
+                              final village = _villageCityController.text.trim();
+                              final district = _districtController.text.trim();
+                              final state = _selectedState;
+                              if (village.isEmpty && district.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter village/city or district.')));
                                 return;
                               }
+                              final formattedLoc = [village, district, state]
+                                  .where((s) => s.isNotEmpty)
+                                  .join(', ');
+                              final name = _apiaryNameController.text.trim().isNotEmpty
+                                  ? _apiaryNameController.text.trim()
+                                  : 'Primary Apiary';
                               verCtrl.submitApiaryLocation(
                                 apiaryName: name,
-                                apiaryLocation: loc,
+                                apiaryLocation: formattedLoc,
                                 apiaryCoordinates: _coordinatesController.text.trim(),
                               );
                             },
@@ -546,7 +1146,8 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 5: Blockchain Verification Record ──
+              // ── STEP 5: Blockchain Verification Record (COMMENTED OUT - Final QR generated at Packaging) ──
+              /*
               _buildStepCard(
                 stepNumber: 5,
                 title: 'Blockchain Verification ID',
@@ -560,7 +1161,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                         children: [
                           _buildVerifiedStepInfo(
                             label: 'Harvester Verification ID',
-                            value: ver.verificationId ?? 'HV-2026-PRIMARY',
+                            value: ver.verificationId ?? 'Pending Sync',
                             subtext: 'Network: ${ver.blockchainNetwork ?? 'HoneyChain Provenance Ledger'}',
                           ),
                           const SizedBox(height: 14),
@@ -604,6 +1205,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                         ],
                       ),
               ),
+              */
 
               const SizedBox(height: 120),
             ],
@@ -717,6 +1319,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
     required String label,
     required String value,
     required String subtext,
+    String? verifiedBadgeText,
   }) {
     return Container(
       width: double.infinity,
@@ -729,13 +1332,35 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: context.textSecondaryColor,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.textSecondaryColor,
+                ),
+              ),
+              if (verifiedBadgeText != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: context.successBgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.successColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    verifiedBadgeText,
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: context.successColor,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 2),
           Text(
@@ -769,6 +1394,71 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
   }
 }
 
+// ignore: unused_element
+class _AadhaarNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length > 12) {
+      return oldValue;
+    }
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < digitsOnly.length; i++) {
+      if (i > 0 && i % 4 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(digitsOnly[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class _IndianPhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('91') && digits.length > 10) {
+      digits = digits.substring(2);
+    }
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    if (digits.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < digits.length; i++) {
+      if (i == 5) {
+        buffer.write(' ');
+      }
+      buffer.write(digits[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class _ActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -780,6 +1470,7 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    // ignore: unused_element_parameter
     this.disabled = false,
     this.isLoading = false,
   });

@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 
@@ -39,6 +40,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
   }
 
   void _submitReport() async {
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     if (!_formKey.currentState!.validate()) return;
 
     final moisture = double.tryParse(_moistureController.text) ?? 17.5;
@@ -47,7 +49,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
     final contaminants = _contaminantsController.text.trim().isNotEmpty ? _contaminantsController.text.trim() : 'None';
 
     final workflowCtrl = context.read<WorkflowController>();
-    await workflowCtrl.submitLabReport(
+    final success = await workflowCtrl.submitLabReport(
       requestId: widget.request.id,
       batchId: widget.request.batchId,
       moisture: moisture,
@@ -58,6 +60,17 @@ class _LabReportScreenState extends State<LabReportScreen> {
     );
 
     if (!mounted) return;
+
+    if (!success) {
+      if (workflowCtrl.isProfileIncompleteError) {
+        ProfileGuard.showIncompleteProfileDialog(context);
+      } else if (workflowCtrl.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(workflowCtrl.errorMessage!), backgroundColor: AppConstants.error),
+        );
+      }
+      return;
+    }
 
     final isPassed = score >= 70 && moisture <= 20;
 
@@ -88,19 +101,23 @@ class _LabReportScreenState extends State<LabReportScreen> {
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(dialogCtx);
-                await workflowCtrl.sendToPackaging(
+                final sent = await workflowCtrl.sendToPackaging(
                   requestId: widget.request.id,
                   batchId: widget.request.batchId,
                   notes: 'Lab verified Grade A purity. Dispatched for packaging.',
                 );
                 if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Batch successfully approved and forwarded to Packaging!'),
-                      backgroundColor: AppConstants.success,
-                    ),
-                  );
+                  if (sent) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Batch successfully approved and forwarded to Packaging!'),
+                        backgroundColor: AppConstants.success,
+                      ),
+                    );
+                  } else if (workflowCtrl.isProfileIncompleteError) {
+                    ProfileGuard.showIncompleteProfileDialog(context);
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: context.colors.primary),

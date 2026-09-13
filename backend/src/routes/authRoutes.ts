@@ -11,6 +11,21 @@ function issueUniqueCode(prefix: string, bytes: number = 4): string {
   return `${prefix}-2026-${hex}`;
 }
 
+// Helper to generate unique collision-resistant HoneyChain Beekeeper ID (HC-BK-XXXXXXXX)
+export async function generateUniqueBeekeeperId(): Promise<string> {
+  let isTaken = true;
+  let code = '';
+  while (isTaken) {
+    const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
+    code = `HC-BK-${hex}`;
+    const found = await prisma.user.findUnique({ where: { beekeeperId: code } });
+    if (!found) {
+      isTaken = false;
+    }
+  }
+  return code;
+}
+
 /**
  * POST /api/auth/register
  * Register a new user account in PostgreSQL
@@ -37,6 +52,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const passwordHash = password ? crypto.createHash('sha256').update(password).digest('hex') : null;
+    const beekeeperId = await generateUniqueBeekeeperId();
 
     const user = await prisma.user.create({
       data: {
@@ -44,7 +60,8 @@ router.post('/register', async (req: Request, res: Response) => {
         email: cleanEmail,
         phone: phone ? phone.trim() : null,
         passwordHash,
-        role: role || 'HARVESTER'
+        role: role || 'HARVESTER',
+        beekeeperId,
       }
     });
 
@@ -57,6 +74,7 @@ router.post('/register', async (req: Request, res: Response) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        beekeeperId: user.beekeeperId,
         bsid: user.bsid,
         bspPass: user.bspPass
       }
@@ -78,7 +96,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const cleanIdentifier = emailOrPhone.trim();
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: {
         OR: [
           { email: cleanIdentifier.toLowerCase() },
@@ -99,6 +117,14 @@ router.post('/login', async (req: Request, res: Response) => {
       }
     }
 
+    if (!user.beekeeperId) {
+      const beekeeperId = await generateUniqueBeekeeperId();
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { beekeeperId }
+      });
+    }
+
     res.json({
       success: true,
       message: 'Authentication successful.',
@@ -108,6 +134,7 @@ router.post('/login', async (req: Request, res: Response) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        beekeeperId: user.beekeeperId,
         bsid: user.bsid,
         bspPass: user.bspPass
       }
@@ -116,6 +143,70 @@ router.post('/login', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: error?.message || String(error) });
   }
 });
+
+/**
+ * POST /api/auth/google
+ * Authenticate or register a Google user in PostgreSQL and return their profile
+ */
+router.post('/google', async (req: Request, res: Response) => {
+  try {
+    const { name, email, phone } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required for Google authentication.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    let user = await prisma.user.findFirst({
+      where: { email: cleanEmail }
+    });
+
+    if (!user) {
+      const beekeeperId = await generateUniqueBeekeeperId();
+      user = await prisma.user.create({
+        data: {
+          name: (name || 'Google User').trim(),
+          email: cleanEmail,
+          phone: phone ? phone.trim() : null,
+          role: 'HARVESTER',
+          beekeeperId,
+        }
+      });
+    } else {
+      if (name && (!user.name || user.name.toLowerCase() === 'google user' || user.name.toLowerCase() === 'unknown')) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { name: name.trim() }
+        });
+      }
+      if (!user.beekeeperId) {
+        const beekeeperId = await generateUniqueBeekeeperId();
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { beekeeperId }
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Google authentication successful.',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        role: user.role,
+        beekeeperId: user.beekeeperId,
+        bsid: user.bsid,
+        bspPass: user.bspPass
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+import { isUserProfileComplete, normalizeUserRole } from '../services/profileService';
 
 /**
  * GET /api/profile
@@ -125,34 +216,46 @@ router.post('/login', async (req: Request, res: Response) => {
 router.get('/profile', async (req: Request, res: Response) => {
   try {
     const userId = (req.query.userId as string) || (req.query.id as string);
+    const roleParam = req.query.role as string;
     let user;
 
     if (userId) {
-      user = await prisma.user.findUnique({ where: { id: userId } });
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: userId },
+            { name: userId },
+            { email: userId }
+          ]
+        }
+      });
     }
 
-    if (!user) {
-      // Find primary harvester user or default
+    if (!user && roleParam) {
+      const normalizedRole = normalizeUserRole(roleParam);
       user = await prisma.user.findFirst({
-        where: { role: 'HARVESTER' },
+        where: { role: normalizedRole },
         orderBy: { createdAt: 'asc' }
       });
     }
 
     if (!user) {
-      // Auto-create default initial harvester
-      user = await prisma.user.create({
-        data: {
-          id: 'user-default-harvester',
-          name: 'HoneyChain Apiary Manager',
-          email: 'operations@honeychain.io',
-          phone: '+1 (555) 234-5678',
-          role: 'HARVESTER',
-          bsid: 'BSID-2026-A1B2C3D4',
-          bspPass: 'BSP-2026-E5F6'
-        }
+      return res.status(404).json({
+        success: false,
+        error: 'USER_NOT_FOUND',
+        message: 'User profile not found.'
       });
     }
+
+    if (!user.beekeeperId) {
+      const beekeeperId = await generateUniqueBeekeeperId();
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { beekeeperId }
+      });
+    }
+
+    const isComplete = isUserProfileComplete(user);
 
     res.json({
       success: true,
@@ -160,10 +263,16 @@ router.get('/profile', async (req: Request, res: Response) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        phone: user.phone || '+1 (555) 234-5678',
+        phone: user.phone || '',
         role: user.role,
+        organizationName: user.organizationName || null,
+        facilityLocation: user.facilityLocation || null,
+        licenseNumber: user.licenseNumber || null,
+        designation: user.designation || null,
+        beekeeperId: user.beekeeperId,
         bsid: user.bsid,
-        bspPass: user.bspPass
+        bspPass: user.bspPass,
+        isProfileComplete: isComplete
       }
     });
   } catch (error: any) {
@@ -173,16 +282,43 @@ router.get('/profile', async (req: Request, res: Response) => {
 
 /**
  * PUT /api/profile
- * Update profile details (name, email, phone)
+ * Update profile details (name, email, phone, organization, location, license, role)
  */
 router.put('/profile', async (req: Request, res: Response) => {
   try {
-    const { userId, name, email, phone } = req.body;
+    const {
+      userId,
+      name,
+      email,
+      phone,
+      role,
+      organizationName,
+      facilityLocation,
+      licenseNumber,
+      designation
+    } = req.body;
 
     let user;
     if (userId) {
-      user = await prisma.user.findUnique({ where: { id: userId } });
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: userId },
+            { name: userId },
+            { email: userId }
+          ]
+        }
+      });
     }
+
+    if (!user && role) {
+      const normalizedRole = normalizeUserRole(role);
+      user = await prisma.user.findFirst({
+        where: { role: normalizedRole },
+        orderBy: { createdAt: 'asc' }
+      });
+    }
+
     if (!user) {
       user = await prisma.user.findFirst({
         where: { role: 'HARVESTER' },
@@ -194,14 +330,26 @@ router.put('/profile', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'User profile not found.' });
     }
 
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name.trim();
+    if (email !== undefined) updateData.email = email.trim().toLowerCase();
+    if (phone !== undefined) updateData.phone = phone.trim();
+    if (role !== undefined) updateData.role = normalizeUserRole(role);
+    if (organizationName !== undefined) updateData.organizationName = organizationName.trim();
+    if (facilityLocation !== undefined) updateData.facilityLocation = facilityLocation.trim();
+    if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber.trim();
+    if (designation !== undefined) updateData.designation = designation.trim();
+
+    if (!user.beekeeperId) {
+      updateData.beekeeperId = await generateUniqueBeekeeperId();
+    }
+
     const updated = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        ...(name ? { name: name.trim() } : {}),
-        ...(email ? { email: email.trim().toLowerCase() } : {}),
-        ...(phone ? { phone: phone.trim() } : {})
-      }
+      data: updateData
     });
+
+    const isComplete = isUserProfileComplete(updated);
 
     res.json({
       success: true,
@@ -212,8 +360,14 @@ router.put('/profile', async (req: Request, res: Response) => {
         email: updated.email,
         phone: updated.phone,
         role: updated.role,
+        organizationName: updated.organizationName || null,
+        facilityLocation: updated.facilityLocation || null,
+        licenseNumber: updated.licenseNumber || null,
+        designation: updated.designation || null,
+        beekeeperId: updated.beekeeperId,
         bsid: updated.bsid,
-        bspPass: updated.bspPass
+        bspPass: updated.bspPass,
+        isProfileComplete: isComplete
       }
     });
   } catch (error: any) {

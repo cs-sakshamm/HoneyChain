@@ -1,182 +1,83 @@
-import { PrismaClient } from '@prisma/client';
-import * as crypto from 'crypto';
-
-const prisma = new PrismaClient();
-
-const OTP_EXPIRY_MINUTES = 5;
-const OTP_COOLDOWN_SECONDS = 60;
-const MAX_ATTEMPTS = 3;
+import { SmsProviderFactory } from './sms';
 
 export class OtpService {
   /**
-   * Hash OTP with SHA-256
+   * Sanitize and normalize mobile number to standard format (+[country][number])
+   * Supports standard Indian mobile numbers (10 digits -> +91XXXXXXXXXX) and international E.164
    */
-  private hashOtp(otp: string): string {
-    return crypto.createHash('sha256').update(otp).digest('hex');
+  public sanitizeMobile(mobileRaw: string): string {
+    if (!mobileRaw) return '';
+    let cleaned = mobileRaw.replace(/[^\d+]/g, '').trim();
+
+    // If starts with 91 and length is 12 digits (e.g. 919876543210), add +
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+      cleaned = `+${cleaned}`;
+    } else if (cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned)) {
+      // 10-digit Indian mobile number
+      cleaned = `+91${cleaned}`;
+    } else if (!cleaned.startsWith('+')) {
+      cleaned = `+${cleaned}`;
+    }
+
+    return cleaned;
   }
 
   /**
-   * Sanitize mobile number format
+   * Validate E.164 compliance
    */
-  public sanitizeMobile(mobile: string): string {
-    return mobile.replace(/[^0-9+]/g, '').trim();
+  public isValidE164(mobile: string): boolean {
+    return /^\+[1-9]\d{7,14}$/.test(mobile);
   }
 
   /**
-   * Send / Generate OTP for mobile verification
+   * Send OTP via configured SMS Gateway (2Factor / MSG91 / Sandbox)
    */
   async sendOtp(mobileRaw: string): Promise<{
     success: boolean;
+    sessionId?: string;
     message: string;
     cooldownSeconds: number;
     expiresInSeconds: number;
     devOtp?: string;
   }> {
     const mobile = this.sanitizeMobile(mobileRaw);
-    if (!mobile || mobile.length < 8) {
+    if (!mobile || !this.isValidE164(mobile)) {
       return {
         success: false,
-        message: 'Invalid mobile number format. Please provide a valid phone number.',
+        message: 'Invalid mobile number format. Please provide a valid mobile number (e.g. +91 98765 43210).',
         cooldownSeconds: 0,
         expiresInSeconds: 0
       };
     }
 
-    const now = new Date();
-
-    // Check existing active cooldown
-    const existingOtp = await prisma.mobileOtp.findFirst({
-      where: {
-        mobile,
-        cooldownUntil: { gt: now }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    if (existingOtp) {
-      const remainingCooldown = Math.max(
-        0,
-        Math.ceil((existingOtp.cooldownUntil.getTime() - now.getTime()) / 1000)
-      );
-      return {
-        success: false,
-        message: `Please wait ${remainingCooldown}s before requesting a new OTP.`,
-        cooldownSeconds: remainingCooldown,
-        expiresInSeconds: Math.max(0, Math.ceil((existingOtp.expiresAt.getTime() - now.getTime()) / 1000))
-      };
-    }
-
-    // Generate cryptographically secure 6-digit OTP
-    const rawOtp = crypto.randomInt(100000, 999999).toString();
-    const otpHash = this.hashOtp(rawOtp);
-
-    const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MINUTES * 60 * 1000);
-    const cooldownUntil = new Date(now.getTime() + OTP_COOLDOWN_SECONDS * 1000);
-
-    // Invalidate old unverified OTPs for this number
-    await prisma.mobileOtp.deleteMany({
-      where: {
-        mobile,
-        verified: false
-      }
-    });
-
-    // Store new hashed OTP
-    await prisma.mobileOtp.create({
-      data: {
-        mobile,
-        otpHash,
-        expiresAt,
-        cooldownUntil,
-        attempts: 0,
-        verified: false
-      }
-    });
-
-    console.log(`[OTP Service] OTP generated for ${mobile}: [${rawOtp}] (Expires in ${OTP_EXPIRY_MINUTES}m)`);
-
-    return {
-      success: true,
-      message: `Verification code sent to ${mobile}. Valid for ${OTP_EXPIRY_MINUTES} minutes.`,
-      cooldownSeconds: OTP_COOLDOWN_SECONDS,
-      expiresInSeconds: OTP_EXPIRY_MINUTES * 60,
-      devOtp: rawOtp // Useful for developer / demo verification environment
-    };
+    const provider = SmsProviderFactory.getProvider();
+    const result = await provider.sendOtp(mobile);
+    return result;
   }
 
   /**
-   * Verify entered OTP
+   * Verify entered OTP via configured SMS Gateway
    */
-  async verifyOtp(mobileRaw: string, enteredOtp: string): Promise<{
+  async verifyOtp(mobileRaw: string, enteredOtp: string, sessionId?: string): Promise<{
     success: boolean;
     message: string;
+    sessionId?: string;
   }> {
     const mobile = this.sanitizeMobile(mobileRaw);
     const cleanOtp = (enteredOtp || '').trim();
 
-    if (!mobile || cleanOtp.length !== 6) {
+    if (!mobile || cleanOtp.length !== 6 || !/^\d{6}$/.test(cleanOtp)) {
       return {
         success: false,
-        message: 'Please enter a valid 6-digit verification code.'
+        message: 'Please enter a valid 6-digit numeric verification code.'
       };
     }
 
-    const now = new Date();
-
-    const otpRecord = await prisma.mobileOtp.findFirst({
-      where: {
-        mobile,
-        verified: false
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    if (!otpRecord) {
-      return {
-        success: false,
-        message: 'No active verification code found for this mobile number. Please request a new code.'
-      };
-    }
-
-    if (otpRecord.expiresAt < now) {
-      return {
-        success: false,
-        message: 'Verification code has expired. Please request a new code.'
-      };
-    }
-
-    if (otpRecord.attempts >= MAX_ATTEMPTS) {
-      return {
-        success: false,
-        message: 'Too many incorrect attempts. This code is invalidated. Please request a new code.'
-      };
-    }
-
-    const hashedInput = this.hashOtp(cleanOtp);
-    if (hashedInput !== otpRecord.otpHash) {
-      const remaining = MAX_ATTEMPTS - (otpRecord.attempts + 1);
-      await prisma.mobileOtp.update({
-        where: { id: otpRecord.id },
-        data: { attempts: { increment: 1 } }
-      });
-
-      return {
-        success: false,
-        message: `Incorrect verification code. ${remaining > 0 ? `${remaining} attempt(s) remaining.` : 'Code invalidated.'}`
-      };
-    }
-
-    // Mark as verified
-    await prisma.mobileOtp.update({
-      where: { id: otpRecord.id },
-      data: { verified: true }
-    });
-
-    return {
-      success: true,
-      message: 'Mobile number verified successfully.'
-    };
+    const provider = SmsProviderFactory.getProvider();
+    const result = await provider.verifyOtp(mobile, cleanOtp, sessionId);
+    return result;
   }
 }
 
 export const otpService = new OtpService();
+

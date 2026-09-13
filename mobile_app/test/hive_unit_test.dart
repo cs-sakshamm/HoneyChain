@@ -41,9 +41,10 @@ void main() {
       expect(hive.nextInspectionDate, equals(DateTime(2026, 9, 15)));
     });
 
-    test('Serializes to and deserializes from JSON correctly', () {
+    test('Serializes to and deserializes from JSON correctly with userId', () {
       final original = Hive(
         id: 'test_json',
+        userId: 'user_beekeeper_123',
         name: 'JSON Hive',
         hiveCode: 'H-123',
         apiaryLocation: 'East Field',
@@ -73,12 +74,76 @@ void main() {
       final reconstructed = Hive.fromJson(jsonMap);
 
       expect(reconstructed.id, equals(original.id));
+      expect(reconstructed.userId, equals('user_beekeeper_123'));
       expect(reconstructed.name, equals(original.name));
       expect(reconstructed.hiveCode, equals(original.hiveCode));
       expect(reconstructed.expectedProductionKg, equals(original.expectedProductionKg));
       expect(reconstructed.currentYearProductionKg, equals(original.currentYearProductionKg));
       expect(reconstructed.feedingRequired, isTrue);
       expect(reconstructed.isHealthy, isFalse);
+    });
+
+    test('Two hives have distinct IDs and owner associations', () {
+      final now = DateTime(2025, 1, 1);
+      final hiveA = Hive(
+        id: 'hive-uuid-1',
+        userId: 'beekeeper-uuid-A',
+        name: 'Hive 1',
+        hiveCode: 'H-AAA111',
+        apiaryLocation: 'North Hill',
+        hiveType: 'Langstroth',
+        dateAdded: now,
+        queenStatus: 'Mated',
+        totalFrames: 10,
+        broodFrames: 6,
+        colonyStrength: 'Strong',
+        queenAgeMonths: 12,
+        beeBreed: 'Italian',
+        expectedProductionKg: 35.0,
+        previousYearProductionKg: 25.0,
+        currentYearProductionKg: 28.0,
+        honeyType: 'Wildflower',
+        lastInspectionDate: now,
+        miteStatus: 'Low',
+        diseaseStatus: 'None',
+        feedingRequired: false,
+        queenCondition: 'Excellent',
+        overallHealth: 'Healthy',
+        notes: '',
+        updatedAt: now,
+      );
+
+      final hiveB = Hive(
+        id: 'hive-uuid-2',
+        userId: 'beekeeper-uuid-B',
+        name: 'Hive 2',
+        hiveCode: 'H-BBB222',
+        apiaryLocation: 'South Valley',
+        hiveType: 'Langstroth',
+        dateAdded: now,
+        queenStatus: 'Mated',
+        totalFrames: 10,
+        broodFrames: 6,
+        colonyStrength: 'Strong',
+        queenAgeMonths: 12,
+        beeBreed: 'Italian',
+        expectedProductionKg: 35.0,
+        previousYearProductionKg: 25.0,
+        currentYearProductionKg: 28.0,
+        honeyType: 'Wildflower',
+        lastInspectionDate: now,
+        miteStatus: 'Low',
+        diseaseStatus: 'None',
+        feedingRequired: false,
+        queenCondition: 'Excellent',
+        overallHealth: 'Healthy',
+        notes: '',
+        updatedAt: now,
+      );
+
+      expect(hiveA.id, isNot(equals(hiveB.id)));
+      expect(hiveA.hiveCode, isNot(equals(hiveB.hiveCode)));
+      expect(hiveA.userId, isNot(equals(hiveB.userId)));
     });
   });
 }

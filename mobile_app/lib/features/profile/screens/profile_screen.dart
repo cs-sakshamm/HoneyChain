@@ -5,16 +5,16 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../authentication/auth_controller.dart';
+import '../../authentication/widgets/google_logo_icon.dart';
 import '../../verification/controllers/verification_controller.dart';
 import '../../verification/screens/harvester_verification_screen.dart';
-import '../../verification/screens/public_verification_lookup_screen.dart';
 import '../../verification/screens/verification_certificate_screen.dart';
 import '../controllers/user_controller.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'language_setting_screen.dart';
-import 'notifications_screen.dart';
 import 'theme_setting_screen.dart';
 
 /// Profile page — polished card-based layout, pill actions, both themes.
@@ -99,18 +99,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: context.primarySoftColor,
-                      child: Text(
-                        user.initials,
-                        style: GoogleFonts.manrope(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: context.primaryDarkColor,
-                        ),
-                      ),
-                    ),
+                    const UserAvatar(size: 80),
                     const SizedBox(height: AppConstants.space16),
                     Text(
                       user.name.isEmpty ? 'Unknown User' : user.name,
@@ -121,26 +110,121 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
+                    // Role badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                       decoration: BoxDecoration(
                         color: context.primarySoftColor,
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: context.borderColor),
                       ),
                       child: Text(
-                        context.tr('role_operator'),
+                        user.role.replaceAll('_', ' ').toUpperCase(),
                         style: GoogleFonts.manrope(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: context.primaryDarkColor,
+                          color: context.textPrimaryColor,
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+
+                    // Google Account Connected Badge if authenticated with Google
+                    if (user.authProvider == 'google' || context.watch<AuthController>().currentUser != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: context.surfaceColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const GoogleLogoIcon(size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Google Connected Account',
+                              style: GoogleFonts.manrope(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Profile Completion Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: complete
+                            ? context.successBgColor
+                            : context.warningBgColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: complete
+                              ? context.successColor.withValues(alpha: 0.3)
+                              : context.warningColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            complete ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                            size: 14,
+                            color: complete ? context.successColor : context.warningColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            complete ? 'Profile Complete ✓' : 'Profile Incomplete ⚠️',
+                            style: GoogleFonts.manrope(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: complete ? context.successColor : context.warningColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: AppConstants.space20),
                     // Account info rows
                     _infoRow(context, Icons.alternate_email_rounded, user.email.isEmpty ? 'No email' : user.email),
                     const SizedBox(height: 10),
-                    _infoRow(context, Icons.call_rounded, user.phone.isEmpty ? 'No phone' : user.phone),
+                    _infoRow(
+                      context,
+                      Icons.call_rounded,
+                      user.phone.isEmpty
+                          ? (user.authProvider == 'google' ? 'Google Account (No phone linked)' : 'No phone')
+                          : user.phone,
+                    ),
+
+                    if (user.beekeeperId != null && user.beekeeperId!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.badge_outlined, 'Beekeeper ID: ${user.beekeeperId!}'),
+                    ],
+                    if (user.id != null && user.id!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.fingerprint_rounded, 'User ID: ${user.id!}'),
+                    ],
+                    if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.business_rounded, user.organizationName!),
+                    ],
+                    if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.location_on_outlined, user.facilityLocation!),
+                    ],
+                    if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _infoRow(context, Icons.verified_outlined, user.licenseNumber!),
+                    ],
+
                     const SizedBox(height: AppConstants.space20),
                     _PillAction(
                       label: context.tr('edit_profile'),
@@ -175,7 +259,9 @@ class ProfileScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              context.tr('profile_incomplete_title'),
+                              context.tr('profile_incomplete_title') != 'profile_incomplete_title'
+                                  ? context.tr('profile_incomplete_title')
+                                  : 'Please Complete Your Profile First',
                               style: GoogleFonts.manrope(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -184,7 +270,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Complete your profile to grant permissions and participate in workflows.',
+                              'Complete your profile and required verification details before you can continue with this request.',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 color: context.textPrimaryColor,
@@ -227,7 +313,7 @@ class ProfileScreen extends StatelessWidget {
                           : '${context.watch<VerificationController>().verification.completedStepsCount}/5 Steps',
                       badgeColor: context.watch<VerificationController>().verification.isFullyVerified
                           ? context.successColor
-                          : context.primaryDarkColor,
+                          : context.textPrimaryColor,
                       badgeBg: context.watch<VerificationController>().verification.isFullyVerified
                           ? context.successBgColor
                           : context.primarySoftColor,
@@ -243,30 +329,6 @@ class ProfileScreen extends StatelessWidget {
                             MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
                           );
                         }
-                      },
-                    ),
-                    Divider(height: 1, indent: 56, color: context.borderColor),
-                    _buildSettingsTile(
-                      context,
-                      title: 'Public QR Verifier',
-                      icon: Icons.qr_code_scanner_rounded,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const PublicVerificationLookupScreen()),
-                        );
-                      },
-                    ),
-                    Divider(height: 1, indent: 56, color: context.borderColor),
-                    _buildSettingsTile(
-                      context,
-                      title: context.tr('notifications'),
-                      icon: Icons.notifications_none_rounded,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                        );
                       },
                     ),
                     Divider(height: 1, indent: 56, color: context.borderColor),
@@ -370,8 +432,9 @@ class ProfileScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: context.primarySoftColor,
                   shape: BoxShape.circle,
+                  border: Border.all(color: context.borderColor),
                 ),
-                child: Icon(icon, size: 20, color: context.primaryDarkColor),
+                child: Icon(icon, size: 20, color: context.textPrimaryColor),
               ),
               const SizedBox(width: AppConstants.space16),
               Expanded(

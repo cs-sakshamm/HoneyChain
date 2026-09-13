@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../authentication/auth_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
@@ -14,11 +15,54 @@ import 'start_harvesting_screen.dart';
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
 
-  String _greeting(BuildContext context) {
+  String _timeBasedGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return context.tr('greeting_morning');
-    if (hour < 17) return context.tr('greeting_afternoon');
-    return context.tr('greeting_evening');
+    if (hour >= 5 && hour < 12) {
+      return 'Good Morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good Afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      return 'Good Evening';
+    } else {
+      return 'Good Night';
+    }
+  }
+
+  Widget _buildHeroImage(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      height: 165,
+      margin: const EdgeInsets.only(bottom: AppConstants.space20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.12) : context.borderColor,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.asset(
+          'assets/images/beekeeping_hero.jpg',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: context.primarySoftColor,
+              alignment: Alignment.center,
+              child: Icon(Icons.hive_rounded, size: 48, color: context.colors.primary),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -27,8 +71,9 @@ class HomeDashboardScreen extends StatelessWidget {
     final user = authController.currentUser;
     final hiveController = context.watch<HiveController>();
 
-    final userDisplayName = user?.displayName ?? 'Harvester';
-    final userFirstName = userDisplayName.split(' ').first;
+    final userDisplayName = user?.displayName?.trim() ?? '';
+    final greeting = _timeBasedGreeting();
+    final greetingDisplay = userDisplayName.isNotEmpty ? '$greeting, $userDisplayName 👋' : '$greeting 👋';
     
     // Sort hives to show most recently updated first
     final List<Hive> sortedHives = List.from(hiveController.hives);
@@ -51,25 +96,28 @@ class HomeDashboardScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header
+                      // 1. Natural Professional Beekeeping Hero Image
+                      _buildHeroImage(context),
+
+                      // 2. Dynamic Time-Based Greeting
                       Text(
-                        '${_greeting(context)}, $userFirstName',
+                        greetingDisplay,
                         style: GoogleFonts.manrope(
-                          fontSize: 26,
+                          fontSize: 22,
                           fontWeight: FontWeight.w800,
                           color: context.textPrimaryColor,
-                          letterSpacing: -0.5,
+                          letterSpacing: -0.4,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Overview of your apiaries and honey collection.',
                         style: GoogleFonts.inter(
-                          fontSize: 14,
+                          fontSize: 13,
                           color: context.textSecondaryColor,
                         ),
                       ),
-                      const SizedBox(height: AppConstants.space32),
+                      const SizedBox(height: AppConstants.space24),
 
                       // Quick Stats / Overview
                       Row(
@@ -105,6 +153,7 @@ class HomeDashboardScreen extends StatelessWidget {
                               icon: Icons.add_rounded,
                               isPrimary: false,
                               onTap: () {
+                                if (!ProfileGuard.checkOrPrompt(context)) return;
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (context) => const AddEditHiveScreen()),
@@ -120,6 +169,7 @@ class HomeDashboardScreen extends StatelessWidget {
                               icon: Icons.play_arrow_rounded,
                               isPrimary: true,
                               onTap: () {
+                                if (!ProfileGuard.checkOrPrompt(context)) return;
                                 if (primaryHive != null) {
                                   Navigator.push(
                                     context,
@@ -208,7 +258,16 @@ class HomeDashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 24, color: context.primaryDarkColor),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: context.primarySoftColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: Icon(icon, size: 20, color: context.textPrimaryColor),
+          ),
           const SizedBox(height: 12),
           Text(
             value,
@@ -248,14 +307,14 @@ class HomeDashboardScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: isPrimary ? context.primarySoftColor : context.textPrimaryColor),
+              Icon(icon, size: 18, color: isPrimary ? Colors.white : context.textPrimaryColor),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: GoogleFonts.manrope(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: isPrimary ? context.primarySoftColor : context.textPrimaryColor,
+                  color: isPrimary ? Colors.white : context.textPrimaryColor,
                 ),
               ),
             ],

@@ -1,38 +1,44 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../constants/app_constants.dart';
-import '../theme/app_theme.dart';
-import 'pill_back_button.dart';
-import '../../features/hives/screens/add_edit_hive_screen.dart';
-import '../../features/profile/screens/notifications_screen.dart';
+import 'package:provider/provider.dart';
 
-/// Pinterest-Inspired Top Navigation Bar
-/// - Left: Text Logo with modern bold typography
-/// - Right: Add Icon (+) and Inbox Icon (Chat bubble with red notification dot)
-/// - Layout: Sticky, full-width, frosted blur background with subtle bottom border
+import '../constants/app_constants.dart';
+import '../controllers/workflow_controller.dart';
+import '../theme/app_theme.dart';
+import '../../features/profile/controllers/user_controller.dart';
+import '../../features/profile/screens/notifications_screen.dart';
+import 'app_logo.dart';
+import 'pill_back_button.dart';
+
+/// Clean, Pinterest-Inspired Top Navigation / Header for HoneyChain Mobile
+/// - Left: HoneyChain geometric logo + "HoneyChain" text (GoogleFonts.shareTech)
+/// - Right: Inbox/Message Action Button (active only with real unread messages)
+/// - Theme-aware: Seamlessly adapts to Light & Dark themes with subtle frosted blur
 class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showBackButton;
   final String? titleText;
-  final String? logoText;
-  final VoidCallback? onAddPressed;
-  final VoidCallback? onInboxPressed;
-  final bool hasUnreadInbox;
+  final VoidCallback? onAddTap;
+  final VoidCallback? onInboxTap;
+  final VoidCallback? onNotificationTap;
+  final bool? hasUnreadNotifications;
+  final bool showActions;
   final List<Widget>? extraActions;
 
   const GlobalAppBar({
     super.key,
     this.showBackButton = false,
     this.titleText,
-    this.logoText,
-    this.onAddPressed,
-    this.onInboxPressed,
-    this.hasUnreadInbox = true,
+    this.onAddTap,
+    this.onInboxTap,
+    this.onNotificationTap,
+    this.hasUnreadNotifications,
+    this.showActions = true,
     this.extraActions,
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(60.0);
+  Size get preferredSize => const Size.fromHeight(56.0);
 
   @override
   Widget build(BuildContext context) {
@@ -40,8 +46,23 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
     final isSubPage = (showBackButton || canPop) && titleText != null;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Real dynamic unread message / notification state
+    bool unreadState = false;
+    if (hasUnreadNotifications != null) {
+      unreadState = hasUnreadNotifications!;
+    } else {
+      try {
+        final workflow = context.watch<WorkflowController>();
+        final user = context.watch<UserController>().user;
+        final incoming = workflow.incomingRequests(user.role);
+        unreadState = incoming.isNotEmpty;
+      } catch (_) {
+        unreadState = false;
+      }
+    }
+
     final headerBg = isDark
-        ? const Color(0xFF121212).withValues(alpha: 0.85)
+        ? const Color(0xFF09090B).withValues(alpha: 0.90)
         : context.surfaceColor.withValues(alpha: 0.92);
 
     return ClipRect(
@@ -56,103 +77,79 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           decoration: BoxDecoration(
             color: headerBg,
-            border: Border(
-              bottom: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : context.borderColor.withValues(alpha: 0.7),
-                width: 1.0,
-              ),
-            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Left Section: Subpage title OR Text Logo
-              isSubPage
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const PillBackButton(),
-                        const SizedBox(width: 12),
-                        Text(
-                          titleText!,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: context.textPrimaryColor,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          logoText ?? AppConstants.appName,
-                          style: GoogleFonts.manrope(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: context.textPrimaryColor,
-                            letterSpacing: -0.6,
-                          ),
-                        ),
-                        if (titleText != null) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            '• $titleText',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: context.textSecondaryColor,
+              // Left Section: Logo + Name OR Back Button + Title
+              Expanded(
+                child: isSubPage
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const PillBackButton(),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              titleText!,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.manrope(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: context.textPrimaryColor,
+                                letterSpacing: -0.3,
+                              ),
                             ),
                           ),
                         ],
-                      ],
-                    ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const AppLogo(
+                            size: 26,
+                            showWordmark: true,
+                          ),
+                          if (titleText != null) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                '• $titleText',
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: context.textSecondaryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
 
-              // Right Section: Add (+) and Inbox (Chat bubble) Buttons
+              // Right Section: Inbox / Message Button (ONLY, "+" icon removed)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (extraActions != null) ...extraActions!,
-
-                  // 1. Add / Create (+) Button
-                  _NavIconButton(
-                    icon: Icons.add_rounded,
-                    tooltip: 'Create / Add',
-                    onTap: onAddPressed ??
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AddEditHiveScreen(),
-                            ),
-                          );
-                        },
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  // 2. Inbox / Messages Button with Red Notification Dot
-                  _NavIconButton(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    tooltip: 'Inbox and Notifications',
-                    hasBadge: hasUnreadInbox,
-                    badgeColor: const Color(0xFFEF4444),
-                    onTap: onInboxPressed ??
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const NotificationsScreen(),
-                            ),
-                          );
-                        },
-                  ),
+                  if (showActions)
+                    _TopNavActionButton(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      tooltip: 'Inbox / Messages',
+                      hasBadge: unreadState,
+                      onTap: onInboxTap ??
+                          onNotificationTap ??
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const NotificationsScreen(),
+                              ),
+                            );
+                          },
+                    ),
                 ],
               ),
             ],
@@ -163,27 +160,42 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-class _NavIconButton extends StatelessWidget {
+/// Accessible, Pinterest-inspired circular action button with theme-aware styling
+class _TopNavActionButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
   final bool hasBadge;
-  final Color badgeColor;
 
-  const _NavIconButton({
+  const _TopNavActionButton({
     required this.icon,
     required this.tooltip,
     required this.onTap,
     this.hasBadge = false,
-    this.badgeColor = const Color(0xFFEF4444),
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final btnBg = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : const Color(0xFF09090B).withValues(alpha: 0.05);
+    final btnBg = hasBadge
+        ? (isDark
+            ? AppConstants.honeyAccent.withValues(alpha: 0.20)
+            : context.primarySoftColor)
+        : (isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : const Color(0xFF09090B).withValues(alpha: 0.05));
+
+    final iconColor = hasBadge
+        ? (isDark ? AppConstants.honeyAccent : context.primaryDarkColor)
+        : context.textPrimaryColor;
+
+    final borderColor = hasBadge
+        ? (isDark
+            ? AppConstants.honeyAccent.withValues(alpha: 0.40)
+            : context.primaryColor.withValues(alpha: 0.35))
+        : (isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : context.borderColor.withValues(alpha: 0.6));
 
     return Tooltip(
       message: tooltip,
@@ -191,17 +203,15 @@ class _NavIconButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(21),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               color: btnBg,
               shape: BoxShape.circle,
               border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : context.borderColor.withValues(alpha: 0.6),
+                color: borderColor,
                 width: 1.0,
               ),
             ),
@@ -212,7 +222,7 @@ class _NavIconButton extends StatelessWidget {
                 Icon(
                   icon,
                   size: 21,
-                  color: context.textPrimaryColor,
+                  color: iconColor,
                 ),
                 if (hasBadge)
                   Positioned(
@@ -222,10 +232,10 @@ class _NavIconButton extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: badgeColor,
+                        color: AppConstants.honeyAccent,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isDark ? const Color(0xFF121212) : Colors.white,
+                          color: isDark ? const Color(0xFF09090B) : Colors.white,
                           width: 1.5,
                         ),
                       ),

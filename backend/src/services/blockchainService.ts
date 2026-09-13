@@ -23,7 +23,7 @@ class BlockchainService {
   private contract: ethers.Contract;
 
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(PROVIDER_URL);
+    this.provider = new ethers.JsonRpcProvider(PROVIDER_URL, undefined, { staticNetwork: true });
     this.wallet = new ethers.Wallet(PRIVATE_KEY, this.provider);
     this.contract = new ethers.Contract(CONTRACT_ADDRESS, contractAbi, this.wallet);
   }

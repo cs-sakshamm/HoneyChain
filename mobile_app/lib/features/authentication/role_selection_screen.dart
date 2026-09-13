@@ -9,6 +9,7 @@ import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/honeycomb_painter.dart';
+import '../profile/controllers/user_controller.dart';
 import 'auth_controller.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
@@ -230,6 +231,22 @@ class _RoleCard extends StatelessWidget {
     return AppCard(
       onTap: () {
         context.read<AuthController>().setRole(item.role);
+        String roleStr = 'HARVESTER';
+        switch (item.role) {
+          case UserRole.harvester:
+            roleStr = 'HARVESTER';
+            break;
+          case UserRole.collectionProcessing:
+            roleStr = 'COLLECTOR_PROCESSOR';
+            break;
+          case UserRole.labTesting:
+            roleStr = 'LAB';
+            break;
+          case UserRole.packaging:
+            roleStr = 'PACKAGING';
+            break;
+        }
+        context.read<UserController>().switchRole(roleStr);
       },
       child: SingleChildScrollView(
         child: Column(
@@ -240,11 +257,14 @@ class _RoleCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: context.primarySoftColor,
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor,
+                ),
               ),
               child: Icon(
                 item.icon,
-                size: 36,
-                color: isDark ? Colors.white : Colors.black,
+                size: 32,
+                color: context.textPrimaryColor,
               ),
             ),
             const SizedBox(height: 20),

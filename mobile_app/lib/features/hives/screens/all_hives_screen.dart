@@ -7,7 +7,7 @@ import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
-import '../../profile/controllers/user_controller.dart';
+import '../../../core/utils/profile_guard.dart';
 import 'add_edit_hive_screen.dart';
 import 'hive_details_screen.dart';
 
@@ -16,13 +16,7 @@ class AllHivesScreen extends StatelessWidget {
   const AllHivesScreen({super.key});
 
   void _openAddHive(BuildContext context) {
-    final userCtrl = context.read<UserController>();
-    if (!userCtrl.user.isProfileComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.tr('complete_profile_first'))),
-      );
-      return;
-    }
+    if (!ProfileGuard.checkOrPrompt(context)) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddEditHiveScreen()),

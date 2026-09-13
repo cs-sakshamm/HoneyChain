@@ -1,33 +1,46 @@
-﻿import '../theme/app_theme.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
 
-/// Professional, minimal SaaS Logo & Typeset Wordmark for HoneyChain
-class AppLogo extends StatelessWidget {
+/// Centralized, Reusable HoneyChain Brand Logo & Premium Wordmark
+/// Features modern, clean, Pinterest-inspired geometric sans-serif typography
+/// with finely tuned kerning, balanced visual weight, and perfect vertical alignment.
+class HoneyChainLogo extends StatelessWidget {
   final double size;
   final bool showWordmark;
   final bool isDark;
   final String? subtitle;
+  final TextStyle? textStyle;
+  final MainAxisSize mainAxisSize;
+  final Color? color;
 
-  const AppLogo({
+  const HoneyChainLogo({
     super.key,
-    this.size = 26.0,
+    this.size = 28.0,
     this.showWordmark = true,
     this.isDark = false,
     this.subtitle,
+    this.textStyle,
+    this.mainAxisSize = MainAxisSize.min,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final themeIsDark = isDark || Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = context.colors.primary;
+    final textColor = color ?? context.textPrimaryColor;
+    final subtitleColor = context.textSecondaryColor;
+
+    // Geometric Hexagon + Chain Node Brand Mark
     final mark = SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _HoneyChainLogoPainter(
-          primaryColor: context.colors.primary,
-          secondaryColor: context.textPrimaryColor,
+          primaryColor: primaryColor,
+          secondaryColor: themeIsDark ? Colors.white : context.textPrimaryColor,
         ),
       ),
     );
@@ -36,38 +49,41 @@ class AppLogo extends StatelessWidget {
       return mark;
     }
 
-    final textColor = context.textPrimaryColor;
-    final subtitleColor = context.textSecondaryColor;
-
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: mainAxisSize,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         mark,
-        SizedBox(width: size * 0.35),
+        SizedBox(width: size * 0.32),
         Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              AppConstants.appName,
-              style: GoogleFonts.manrope(
-                fontSize: size * 0.65,
-                fontWeight: FontWeight.w700,
+              'HoneyChain',
+              style: (textStyle ?? GoogleFonts.shareTech()).copyWith(
+                fontSize: textStyle?.fontSize ?? (size >= 26 ? 22.0 : size * 0.75),
+                fontWeight: textStyle?.fontWeight ?? FontWeight.w600,
                 color: textColor,
-                letterSpacing: -0.4,
-                height: 1.1,
+                letterSpacing: textStyle?.letterSpacing ?? 0.5,
+                height: 1.0,
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 2),
               Text(
                 subtitle!,
-                style: GoogleFonts.inter(
+                style: GoogleFonts.shareTech(
                   fontSize: size * 0.32,
                   fontWeight: FontWeight.w400,
                   color: subtitleColor,
+                  letterSpacing: 0.1,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ],
           ],
@@ -76,6 +92,9 @@ class AppLogo extends StatelessWidget {
     );
   }
 }
+
+/// Backward-compatible alias for existing codebase usages
+typedef AppLogo = HoneyChainLogo;
 
 class _HoneyChainLogoPainter extends CustomPainter {
   final Color primaryColor;
@@ -96,7 +115,7 @@ class _HoneyChainLogoPainter extends CustomPainter {
     final Paint fillPaint = Paint()..style = PaintingStyle.fill;
     final Paint strokePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.5, w * 0.08)
+      ..strokeWidth = math.max(1.6, w * 0.085)
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 

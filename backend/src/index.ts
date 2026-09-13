@@ -12,6 +12,7 @@ import hiveRoutes from './routes/hiveRoutes';
 import verificationRoutes from './routes/verificationRoutes';
 import workflowRoutes from './routes/workflowRoutes';
 import { verificationService } from './services/verificationService';
+import { isUserProfileComplete, PROFILE_INCOMPLETE_RESPONSE, HARVESTER_VERIFICATION_REQUIRED_RESPONSE, isHarvesterFullyVerified } from './services/profileService';
 
 const app = express();
 app.use(cors());
@@ -24,7 +25,7 @@ const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY || '0xac0974bec39a17e36ba
 const PROVIDER_URL = process.env.BLOCKCHAIN_PROVIDER_URL || 'http://127.0.0.1:8545';
 const contractAddress = process.env.CONTRACT_ADDRESS || '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
-const provider = new ethers.JsonRpcProvider(PROVIDER_URL);
+const provider = new ethers.JsonRpcProvider(PROVIDER_URL, undefined, { staticNetwork: true });
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 const contractAbi = [
@@ -81,6 +82,9 @@ async function ensureUserExists(userIdOrName: string, defaultRole: string = 'HAR
         { name: userIdOrName },
         { email: userIdOrName }
       ]
+    },
+    include: {
+      harvesterVerification: true
     }
   });
 
@@ -91,6 +95,9 @@ async function ensureUserExists(userIdOrName: string, defaultRole: string = 'HAR
         name: userIdOrName,
         email: `${safeId}@honeychain.io`,
         role: defaultRole
+      },
+      include: {
+        harvesterVerification: true
       }
     });
   }
@@ -120,6 +127,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', authRoutes); // Exposes /api/profile and /api/profile/identity
 app.use('/api/hives', hiveRoutes);
 app.use('/api/verification', verificationRoutes);
+app.use('/api', verificationRoutes); // Exposes /api/verify/harvester/:verificationId directly
 app.use('/api', workflowRoutes); // Exposes /api/requests, /api/batches, /api/lab-reports, /api/packaging
 
 // ── 1. Create Harvest & Batch ──
@@ -127,6 +135,12 @@ app.post('/api/harvests', async (req, res) => {
   const { harvesterId, hiveId, quantity, location, notes } = req.body;
   try {
     const actorUser = await ensureUserExists(harvesterId || 'Harvester', 'HARVESTER');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+    if (actorUser.role === 'HARVESTER' && !isHarvesterFullyVerified(actorUser.harvesterVerification)) {
+      return res.status(403).json(HARVESTER_VERIFICATION_REQUIRED_RESPONSE);
+    }
 
     const harvest = await prisma.harvest.create({
       data: {
@@ -156,6 +170,9 @@ app.post('/api/chain-requests', async (req, res) => {
   const { batchId, requesterId } = req.body;
   try {
     const actorUser = await ensureUserExists(requesterId || 'Requester', 'COLLECTION_PROCESSING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const request = await prisma.chainRequest.create({
       data: { batchId, status: "REQUESTED" }
@@ -177,6 +194,9 @@ app.post('/api/processing', async (req, res) => {
     }
 
     const actorUser = await ensureUserExists(processorId || 'Processor', 'COLLECTION_PROCESSING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const record = await prisma.processingRecord.create({
       data: {
@@ -203,6 +223,9 @@ app.post('/api/lab-reports', async (req, res) => {
   const { batchId, labId, testResults, qualityScore, moistureContent, purityGrade, notes } = req.body;
   try {
     const actorUser = await ensureUserExists(labId || 'Lab Officer', 'LAB_TESTING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const report = await prisma.labReport.create({
       data: {
@@ -237,6 +260,9 @@ app.post('/api/packaging', async (req, res) => {
     }
 
     const actorUser = await ensureUserExists(packagerId || 'Packager', 'PACKAGING');
+    if (!isUserProfileComplete(actorUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
 
     const record = await prisma.packagingRecord.create({
       data: {
@@ -357,7 +383,7 @@ app.get('/api/verify', async (req, res) => {
         bsid: batch.harvest?.harvester?.bsid || null,
         verificationStatus: batch.harvest?.harvester?.harvesterVerification?.verificationStatus || 'Verified',
         location: batch.harvest?.location || 'Cascade Valley, OR',
-        hiveCode: batch.harvest?.hive?.hiveCode || 'HC-HIVE-01',
+        hiveCode: batch.harvest?.hive?.hiveCode || 'N/A',
         honeyType: batch.harvest?.hive?.honeyType || 'Wildflower',
         quantityKg: batch.harvest?.quantity || 0,
         harvestDate: batch.harvest?.createdAt || batch.createdAt
