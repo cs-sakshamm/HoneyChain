@@ -49,9 +49,6 @@ class HoneyChainLogo extends StatelessWidget {
       return mark;
     }
 
-    final fontSize = size * 0.68;
-    final letterSpacing = -fontSize * 0.035; // Fine-tuned optical kerning
-
     return Row(
       mainAxisSize: mainAxisSize,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -63,30 +60,14 @@ class HoneyChainLogo extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Honey',
-                    style: (textStyle ?? GoogleFonts.shareTech()).copyWith(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                      letterSpacing: letterSpacing,
-                      height: 1.0,
-                    ),
-                  ),
-                  TextSpan(
-                    text: 'Chain',
-                    style: (textStyle ?? GoogleFonts.shareTech()).copyWith(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w400,
-                      color: textColor,
-                      letterSpacing: letterSpacing,
-                      height: 1.0,
-                    ),
-                  ),
-                ],
+            Text(
+              'HoneyChain',
+              style: (textStyle ?? GoogleFonts.shareTech()).copyWith(
+                fontSize: textStyle?.fontSize ?? (size >= 26 ? 22.0 : size * 0.75),
+                fontWeight: textStyle?.fontWeight ?? FontWeight.w600,
+                color: textColor,
+                letterSpacing: textStyle?.letterSpacing ?? 0.5,
+                height: 1.0,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,

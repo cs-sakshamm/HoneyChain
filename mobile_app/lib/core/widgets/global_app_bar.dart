@@ -1,17 +1,19 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+
 import '../constants/app_constants.dart';
+import '../controllers/workflow_controller.dart';
 import '../theme/app_theme.dart';
-import '../utils/profile_guard.dart';
+import '../../features/profile/controllers/user_controller.dart';
+import '../../features/profile/screens/notifications_screen.dart';
 import 'app_logo.dart';
 import 'pill_back_button.dart';
-import '../../features/hives/screens/add_edit_hive_screen.dart';
-import '../../features/profile/screens/notifications_screen.dart';
 
 /// Clean, Pinterest-Inspired Top Navigation / Header for HoneyChain Mobile
-/// - Left: HoneyChain geometric logo + "HoneyChain" text (or Back button + Title on subpages)
-/// - Right: Clickable Plus (+) Action Button + Inbox/Message Action Button (with unread badge)
+/// - Left: HoneyChain geometric logo + "HoneyChain" text (GoogleFonts.shareTech)
+/// - Right: Inbox/Message Action Button (active only with real unread messages)
 /// - Theme-aware: Seamlessly adapts to Light & Dark themes with subtle frosted blur
 class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showBackButton;
@@ -19,7 +21,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onAddTap;
   final VoidCallback? onInboxTap;
   final VoidCallback? onNotificationTap;
-  final bool hasUnreadNotifications;
+  final bool? hasUnreadNotifications;
   final bool showActions;
   final List<Widget>? extraActions;
 
@@ -30,7 +32,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onAddTap,
     this.onInboxTap,
     this.onNotificationTap,
-    this.hasUnreadNotifications = true,
+    this.hasUnreadNotifications,
     this.showActions = true,
     this.extraActions,
   });
@@ -43,6 +45,21 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
     final canPop = ModalRoute.of(context)?.canPop ?? false;
     final isSubPage = (showBackButton || canPop) && titleText != null;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Real dynamic unread message / notification state
+    bool unreadState = false;
+    if (hasUnreadNotifications != null) {
+      unreadState = hasUnreadNotifications!;
+    } else {
+      try {
+        final workflow = context.watch<WorkflowController>();
+        final user = context.watch<UserController>().user;
+        final incoming = workflow.incomingRequests(user.role);
+        unreadState = incoming.isNotEmpty;
+      } catch (_) {
+        unreadState = false;
+      }
+    }
 
     final headerBg = isDark
         ? const Color(0xFF09090B).withValues(alpha: 0.90)
@@ -112,33 +129,16 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
               ),
 
-              // Right Section: Plus (+) Button + Inbox / Message Button
+              // Right Section: Inbox / Message Button (ONLY, "+" icon removed)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (extraActions != null) ...extraActions!,
-                  if (showActions) ...[
-                    // 1. Plus (+) Action Button -> opens Add/Create Page
-                    _TopNavActionButton(
-                      icon: Icons.add_rounded,
-                      tooltip: 'Create / Add',
-                      onTap: onAddTap ??
-                          () {
-                            if (!ProfileGuard.checkOrPrompt(context)) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AddEditHiveScreen(),
-                              ),
-                            );
-                          },
-                    ),
-                    const SizedBox(width: 8),
-                    // 2. Inbox / Message Action Button -> opens Inbox / Messages Page
+                  if (showActions)
                     _TopNavActionButton(
                       icon: Icons.chat_bubble_outline_rounded,
                       tooltip: 'Inbox / Messages',
-                      hasBadge: hasUnreadNotifications,
+                      hasBadge: unreadState,
                       onTap: onInboxTap ??
                           onNotificationTap ??
                           () {
@@ -150,7 +150,6 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
                             );
                           },
                     ),
-                  ],
                 ],
               ),
             ],
@@ -178,9 +177,25 @@ class _TopNavActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final btnBg = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : const Color(0xFF09090B).withValues(alpha: 0.05);
+    final btnBg = hasBadge
+        ? (isDark
+            ? AppConstants.honeyAccent.withValues(alpha: 0.20)
+            : context.primarySoftColor)
+        : (isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : const Color(0xFF09090B).withValues(alpha: 0.05));
+
+    final iconColor = hasBadge
+        ? (isDark ? AppConstants.honeyAccent : context.primaryDarkColor)
+        : context.textPrimaryColor;
+
+    final borderColor = hasBadge
+        ? (isDark
+            ? AppConstants.honeyAccent.withValues(alpha: 0.40)
+            : context.primaryColor.withValues(alpha: 0.35))
+        : (isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : context.borderColor.withValues(alpha: 0.6));
 
     return Tooltip(
       message: tooltip,
@@ -196,9 +211,7 @@ class _TopNavActionButton extends StatelessWidget {
               color: btnBg,
               shape: BoxShape.circle,
               border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : context.borderColor.withValues(alpha: 0.6),
+                color: borderColor,
                 width: 1.0,
               ),
             ),
@@ -209,7 +222,7 @@ class _TopNavActionButton extends StatelessWidget {
                 Icon(
                   icon,
                   size: 21,
-                  color: context.textPrimaryColor,
+                  color: iconColor,
                 ),
                 if (hasBadge)
                   Positioned(
