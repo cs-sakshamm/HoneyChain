@@ -7,7 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../controllers/verification_controller.dart';
-import 'verification_certificate_screen.dart';
+// import 'verification_certificate_screen.dart';
 
 class HarvesterVerificationScreen extends StatefulWidget {
   const HarvesterVerificationScreen({super.key});
@@ -1146,7 +1146,8 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 5: Blockchain Verification Record ──
+              // ── STEP 5: Blockchain Verification Record (COMMENTED OUT - Final QR generated at Packaging) ──
+              /*
               _buildStepCard(
                 stepNumber: 5,
                 title: 'Blockchain Verification ID',
@@ -1204,6 +1205,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                         ],
                       ),
               ),
+              */
 
               const SizedBox(height: 120),
             ],
@@ -1468,6 +1470,7 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    // ignore: unused_element_parameter
     this.disabled = false,
     this.isLoading = false,
   });
