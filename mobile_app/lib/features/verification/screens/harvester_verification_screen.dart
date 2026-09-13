@@ -1392,6 +1392,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
   }
 }
 
+// ignore: unused_element
 class _AadhaarNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
