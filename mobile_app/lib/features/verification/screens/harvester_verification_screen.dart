@@ -280,7 +280,8 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space20),
 
-              // ── STEP 1: Government ID Verification (Aadhaar Card ONLY) ──
+              // ── STEP 1: Government ID Verification (Aadhaar Card ONLY) (COMMENTED OUT) ──
+              /*
               _buildStepCard(
                 stepNumber: 1,
                 title: 'Government ID Verification',
@@ -517,8 +518,8 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                         ],
                       ),
               ),
-
               const SizedBox(height: AppConstants.space16),
+              */
 
               // ── STEP 2: Mobile Number + OTP ──
               _buildStepCard(
