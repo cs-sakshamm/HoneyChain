@@ -37,7 +37,7 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
   }
 
   void _showRejectSampleDialog(BuildContext context, WorkflowRequest req) {
-    final reasonCtrl = TextEditingController(text: 'Sample damaged, contaminated or unsealable upon arrival');
+    final reasonCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(

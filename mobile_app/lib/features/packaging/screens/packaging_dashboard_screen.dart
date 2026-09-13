@@ -38,10 +38,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
   }
 
   void _showFinalizePackagingDialog(BuildContext context, WorkflowRequest req) {
-    final qtyCtrl = TextEditingController(text: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg.toStringAsFixed(1) : '15.0');
-    final countCtrl = TextEditingController(text: '30');
-    final sizeCtrl = TextEditingController(text: '500g Glass Jar (Tamper-evident sealed)');
-    final notesCtrl = TextEditingController(text: 'Packaged, sealed, and assigned batch QR verification tag.');
+    final qtyCtrl = TextEditingController(text: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg.toStringAsFixed(1) : '');
+    final countCtrl = TextEditingController();
+    final sizeCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
 
     showDialog(
       context: context,

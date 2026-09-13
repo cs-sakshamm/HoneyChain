@@ -39,7 +39,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
   }
 
   void _showRejectDialog(BuildContext context, WorkflowRequest req) {
-    final reasonCtrl = TextEditingController(text: 'Does not meet batch collection criteria');
+    final reasonCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -54,7 +54,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
             TextField(
               controller: reasonCtrl,
               decoration: InputDecoration(
-                hintText: 'Rejection reason...',
+                hintText: 'Enter rejection reason...',
                 filled: true,
                 fillColor: context.scaffoldBg,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
@@ -82,10 +82,10 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
   }
 
   void _showSendToLabDialog(BuildContext context, WorkflowRequest req) {
-    final methodCtrl = TextEditingController(text: 'Centrifugal cold extraction, 80-mesh filtration');
-    final facilityCtrl = TextEditingController(text: 'Processing Unit #1');
-    final moistureCtrl = TextEditingController(text: '17.2');
-    final notesCtrl = TextEditingController(text: 'Extracted and filtered honey batch ready for laboratory quality testing.');
+    final methodCtrl = TextEditingController();
+    final facilityCtrl = TextEditingController();
+    final moistureCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
 
     showDialog(
       context: context,

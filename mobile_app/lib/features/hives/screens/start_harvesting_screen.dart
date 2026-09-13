@@ -60,7 +60,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
 
   void _showFinishConfirmation() {
     _timer?.cancel();
-    final quantityCtrl = TextEditingController(text: '15.0');
+    final quantityCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
 
     showDialog(
