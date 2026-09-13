@@ -99,13 +99,17 @@ class UserAvatar extends StatelessWidget {
     bool isDark,
   ) {
     // 1. Photo URL (Google photo or custom profile photo)
-    if (photoUrl != null && photoUrl.trim().isNotEmpty && photoUrl.startsWith('http')) {
+    if (photoUrl != null && photoUrl.trim().isNotEmpty && photoUrl.trim().startsWith('http')) {
       return Image.network(
-        photoUrl,
+        photoUrl.trim(),
         width: size,
         height: size,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
+          return _buildInitialOrIcon(context, initial, isDark);
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
           return _buildInitialOrIcon(context, initial, isDark);
         },
       );
