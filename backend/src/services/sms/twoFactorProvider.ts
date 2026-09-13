@@ -1,4 +1,4 @@
-﻿import { ISmsOtpProvider, SmsOtpSendResponse, SmsOtpVerifyResponse } from './types';
+import { ISmsOtpProvider, SmsOtpSendResponse, SmsOtpVerifyResponse } from './types';
 
 export class TwoFactorOtpProvider implements ISmsOtpProvider {
   public readonly providerName = '2Factor (SMS OTP Gateway)';
@@ -10,10 +10,11 @@ export class TwoFactorOtpProvider implements ISmsOtpProvider {
   private baseUrl = 'https://2factor.in/API/V1';
 
   constructor() {
-    this.apiKey = process.env.OTP_API_KEY || process.env.TWOFACTOR_API_KEY;
-    this.senderId = process.env.OTP_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'HNYCHN';
-    this.templateName = process.env.OTP_TEMPLATE_NAME || process.env.TWOFACTOR_TEMPLATE_NAME;
-    this.isSandbox = process.env.OTP_ENVIRONMENT === 'sandbox' || process.env.NODE_ENV !== 'production';
+    this.apiKey = process.env.MOBILE_OTP_API_KEY || process.env.OTP_API_KEY || process.env.TWOFACTOR_API_KEY;
+    this.senderId = process.env.MOBILE_OTP_SENDER_ID || process.env.OTP_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'HNYCHN';
+    this.templateName = process.env.MOBILE_OTP_TEMPLATE_NAME || process.env.OTP_TEMPLATE_NAME || process.env.TWOFACTOR_TEMPLATE_NAME;
+    this.baseUrl = process.env.MOBILE_OTP_BASE_URL || 'https://2factor.in/API/V1';
+    this.isSandbox = process.env.OTP_ENVIRONMENT === 'sandbox' || (process.env.NODE_ENV !== 'production' && !this.apiKey);
   }
 
   public get isConfigured(): boolean {
@@ -25,8 +26,14 @@ export class TwoFactorOtpProvider implements ISmsOtpProvider {
       throw new Error('SMS OTP provider credentials (2Factor) and DLT onboarding are required before production OTP dispatch can be activated.');
     }
 
-    // Clean mobile number (e.g. +919876543210 -> 9876543210 or formatted)
-    const cleanMobile = mobile.replace(/[^\d]/g, '');
+    // Clean mobile number to exactly 10 digits for 2Factor India SMS gateway
+    let cleanMobile = mobile.replace(/[^\d]/g, '');
+    if (cleanMobile.startsWith('91') && cleanMobile.length === 12) {
+      cleanMobile = cleanMobile.substring(2);
+    }
+    if (cleanMobile.length !== 10) {
+      throw new Error('Please enter a valid 10-digit Indian mobile number.');
+    }
 
     try {
       const endpoint = this.templateName
@@ -58,7 +65,10 @@ export class TwoFactorOtpProvider implements ISmsOtpProvider {
       throw new Error('SMS OTP provider credentials (2Factor) and DLT onboarding are required before production OTP dispatch can be activated.');
     }
 
-    const cleanMobile = mobile.replace(/[^\d]/g, '');
+    let cleanMobile = mobile.replace(/[^\d]/g, '');
+    if (cleanMobile.startsWith('91') && cleanMobile.length === 12) {
+      cleanMobile = cleanMobile.substring(2);
+    }
     const cleanOtp = enteredOtp.trim();
 
     try {

@@ -172,14 +172,19 @@ async function runTests() {
     console.log(`TEST SUMMARY: ${passedTests} passed, ${failedTests} failed`);
     console.log(`========================================\n`);
 
+    await prisma.$disconnect();
     if (failedTests > 0) {
       process.exit(1);
+    } else {
+      process.exit(0);
     }
   } catch (error) {
     console.error('Test execution error:', error);
+    await prisma.$disconnect();
     process.exit(1);
   }
 }
 
 runTests();
+
 

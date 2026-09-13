@@ -38,8 +38,8 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
   // Step 4 Form (Simple State, District, Village/City Location)
   String _selectedState = 'Uttar Pradesh';
-  final TextEditingController _districtController = TextEditingController(text: 'Gautam Buddh Nagar');
-  final TextEditingController _villageCityController = TextEditingController(text: 'Greater Noida');
+  final TextEditingController _districtController = TextEditingController();
+  final TextEditingController _villageCityController = TextEditingController();
   final TextEditingController _apiaryNameController = TextEditingController();
   final TextEditingController _coordinatesController = TextEditingController();
 
@@ -93,9 +93,9 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
           digits = digits.substring(2);
         }
         if (digits.length == 10) {
-          _phoneController.text = '+91 ${digits.substring(0, 5)} ${digits.substring(5)}';
+          _phoneController.text = '${digits.substring(0, 5)} ${digits.substring(5)}';
         } else {
-          _phoneController.text = user.phone;
+          _phoneController.text = digits;
         }
       }
       if (user.organizationName != null && user.organizationName!.isNotEmpty) {
@@ -379,20 +379,49 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.mark_email_read_outlined, size: 20, color: context.primaryDarkColor),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'OTP sent to your Aadhaar-linked mobile number.',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: context.textPrimaryColor,
+                                  Row(
+                                    children: [
+                                      Icon(Icons.mark_email_read_outlined, size: 20, color: context.primaryDarkColor),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'OTP sent to your Aadhaar-linked mobile number.',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: context.textPrimaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (verCtrl.devAadhaarOtp != null && verCtrl.devAadhaarOtp!.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: context.surfaceColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: context.borderColor),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Dev Sandbox OTP: ',
+                                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: context.textSecondaryColor),
+                                          ),
+                                          SelectableText(
+                                            verCtrl.devAadhaarOtp!,
+                                            style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w800, color: context.primaryDarkColor),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -435,7 +464,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                     decoration: InputDecoration(
                                       counterText: '',
                                       hintText: 'Enter 6-digit OTP',
-                                      prefixIcon: Icon(Icons.shield_outlined, size: 20, color: context.textSecondaryColor),
+                                      prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: context.textSecondaryColor),
                                       hintStyle: GoogleFonts.inter(color: context.textMutedColor),
                                       filled: true,
                                       fillColor: context.scaffoldBg,
@@ -537,15 +566,38 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           TextField(
                             controller: _phoneController,
                             keyboardType: TextInputType.phone,
-                            maxLength: 15,
+                            maxLength: 11,
                             enabled: !verCtrl.mobileOtpSent && !verCtrl.isLoading,
                             inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
                               _IndianPhoneNumberFormatter(),
                             ],
                             decoration: InputDecoration(
                               counterText: '',
-                              hintText: '+91 XXXXX XXXXX',
-                              prefixIcon: Icon(Icons.phone_outlined, size: 20, color: context.textSecondaryColor),
+                              prefixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(width: 14),
+                                  Icon(Icons.phone_outlined, size: 20, color: context.textSecondaryColor),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '+91',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textPrimaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    height: 18,
+                                    width: 1,
+                                    color: context.borderColor,
+                                  ),
+                                  const SizedBox(width: 10),
+                                ],
+                              ),
+                              hintText: '98765 43210',
                               hintStyle: GoogleFonts.inter(color: context.textMutedColor),
                               filled: true,
                               fillColor: context.scaffoldBg,
@@ -583,20 +635,49 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.sms_outlined, size: 20, color: context.primaryDarkColor),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'OTP sent to ${verCtrl.pendingMobileNumber}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: context.textPrimaryColor,
+                                  Row(
+                                    children: [
+                                      Icon(Icons.sms_outlined, size: 20, color: context.primaryDarkColor),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'OTP sent to ${verCtrl.pendingMobileNumber}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: context.textPrimaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (verCtrl.devOtp != null && verCtrl.devOtp!.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: context.surfaceColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: context.borderColor),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Dev Sandbox OTP: ',
+                                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: context.textSecondaryColor),
+                                          ),
+                                          SelectableText(
+                                            verCtrl.devOtp!,
+                                            style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w800, color: context.primaryDarkColor),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -1359,7 +1440,6 @@ class _IndianPhoneNumberFormatter extends TextInputFormatter {
     }
 
     final buffer = StringBuffer();
-    buffer.write('+91 ');
     for (int i = 0; i < digits.length; i++) {
       if (i == 5) {
         buffer.write(' ');

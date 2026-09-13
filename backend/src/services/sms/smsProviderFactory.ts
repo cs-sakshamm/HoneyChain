@@ -1,4 +1,4 @@
-﻿import { ISmsOtpProvider, SmsOtpSendResponse, SmsOtpVerifyResponse } from './types';
+import { ISmsOtpProvider, SmsOtpSendResponse, SmsOtpVerifyResponse } from './types';
 import { SandboxSmsProvider } from './sandboxSmsProvider';
 import { TwoFactorOtpProvider } from './twoFactorProvider';
 import { Msg91OtpProvider } from './msg91Provider';
@@ -10,7 +10,14 @@ export class SmsProviderFactory {
   private static currentProviderType?: string;
 
   public static getProvider(): ISmsOtpProvider {
-    const configuredType = (process.env.OTP_PROVIDER || 'sandbox').toLowerCase().trim() as SmsProviderType;
+    let configuredType = (process.env.OTP_PROVIDER || '').toLowerCase().trim() as SmsProviderType;
+    if (!configuredType) {
+      if (process.env.MOBILE_OTP_API_KEY || process.env.OTP_API_KEY || process.env.TWOFACTOR_API_KEY) {
+        configuredType = '2factor';
+      } else {
+        configuredType = 'sandbox';
+      }
+    }
     const isProduction = process.env.NODE_ENV === 'production' || process.env.OTP_ENVIRONMENT === 'production';
 
     // Return cached if provider type hasn't changed

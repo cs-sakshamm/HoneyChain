@@ -1,4 +1,4 @@
-﻿import { SmsProviderFactory, SandboxSmsProvider, TwoFactorOtpProvider, Msg91OtpProvider } from './services/sms';
+import { SmsProviderFactory, SandboxSmsProvider, TwoFactorOtpProvider, Msg91OtpProvider } from './services/sms';
 import { verificationService } from './services/verificationService';
 import { otpService } from './services/otpService';
 import { PrismaClient } from '@prisma/client';
@@ -27,8 +27,12 @@ async function runSmsProviderTests() {
 
     // 1. Provider Factory Default
     console.log('--- 1. Provider Factory & Default Sandbox ---');
-    SmsProviderFactory.resetProvider();
+    const savedApiKey = process.env.MOBILE_OTP_API_KEY || process.env.OTP_API_KEY;
     delete process.env.OTP_PROVIDER;
+    delete process.env.MOBILE_OTP_API_KEY;
+    delete process.env.OTP_API_KEY;
+    delete process.env.TWOFACTOR_API_KEY;
+    SmsProviderFactory.resetProvider();
     const defaultProvider = SmsProviderFactory.getProvider();
     assert(defaultProvider instanceof SandboxSmsProvider, 'Default provider is SandboxSmsProvider');
     assert(defaultProvider.isConfigured === true, 'Sandbox provider is always configured for dev/test');
