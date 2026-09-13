@@ -124,97 +124,9 @@ function main() {
             }
         });
         console.log(`✓ Seeded Supply Chain Partner Users (Processor, Lab, Packager) with full profile details`);
-        // 3. Seed Initial Hives into PostgreSQL
-        const now = new Date();
-        const sampleHives = [
-            {
-                id: 'hive_sample_1',
-                userId: harvesterUser.id,
-                name: 'Hive Alpha',
-                hiveCode: 'H-001',
-                apiaryLocation: 'Main Apiary',
-                hiveType: 'Langstroth',
-                dateAdded: new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000),
-                queenStatus: 'Mated',
-                totalFrames: 10,
-                broodFrames: 6,
-                colonyStrength: 'Strong',
-                queenAgeMonths: 12,
-                beeBreed: 'Italian',
-                expectedProductionKg: 35.0,
-                previousYearProductionKg: 25.0,
-                currentYearProductionKg: 28.0,
-                honeyType: 'Wildflower',
-                lastInspectionDate: new Date(2026, 8, 8),
-                miteStatus: 'Low',
-                diseaseStatus: 'None',
-                feedingRequired: false,
-                queenCondition: 'Excellent',
-                overallHealth: 'Healthy',
-                notes: 'Strong brood pattern observed across 6 frames. Honey supers filled consistently. Regular inspection logged clean.',
-            },
-            {
-                id: 'hive_sample_2',
-                userId: harvesterUser.id,
-                name: 'Hive Beta',
-                hiveCode: 'H-002',
-                apiaryLocation: 'North Meadow Apiary',
-                hiveType: 'Langstroth',
-                dateAdded: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000),
-                queenStatus: 'Mated',
-                totalFrames: 10,
-                broodFrames: 4,
-                colonyStrength: 'Moderate',
-                queenAgeMonths: 18,
-                beeBreed: 'Carniolan',
-                expectedProductionKg: 30.0,
-                previousYearProductionKg: 22.0,
-                currentYearProductionKg: 18.0,
-                honeyType: 'Clover',
-                lastInspectionDate: new Date(2026, 8, 4),
-                miteStatus: 'Medium',
-                diseaseStatus: 'None',
-                feedingRequired: true,
-                queenCondition: 'Good',
-                overallHealth: 'Needs Attention',
-                notes: 'Slightly lower brood density. Mite count slightly elevated; organic oxalic acid treatment scheduled.',
-            },
-            {
-                id: 'hive_sample_3',
-                userId: harvesterUser.id,
-                name: 'Hive Gamma',
-                hiveCode: 'H-003',
-                apiaryLocation: 'Riverbank Apiary',
-                hiveType: 'Flow Hive',
-                dateAdded: new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000),
-                queenStatus: 'Re-queened',
-                totalFrames: 8,
-                broodFrames: 5,
-                colonyStrength: 'Strong',
-                queenAgeMonths: 6,
-                beeBreed: 'Buckfast',
-                expectedProductionKg: 40.0,
-                previousYearProductionKg: 32.0,
-                currentYearProductionKg: 36.0,
-                honeyType: 'Acacia',
-                lastInspectionDate: new Date(2026, 8, 2),
-                miteStatus: 'Low',
-                diseaseStatus: 'None',
-                feedingRequired: false,
-                queenCondition: 'Excellent',
-                overallHealth: 'Healthy',
-                notes: 'Recently re-queened with pure Buckfast stock. High foraging activity and calm temperament.',
-            }
-        ];
-        for (const hiveData of sampleHives) {
-            yield prisma.hive.upsert({
-                where: { hiveCode: hiveData.hiveCode },
-                update: hiveData,
-                create: hiveData
-            });
-        }
-        console.log(`✓ Seeded ${sampleHives.length} Hives in PostgreSQL`);
+        // 3. (Optional) No dummy hives are seeded - hives are created genuine by beekeepers
         // 4. Seed Harvester Verification Record
+        const now = new Date();
         yield prisma.harvesterVerification.upsert({
             where: { harvesterId: harvesterUser.id },
             update: {},
@@ -247,40 +159,7 @@ function main() {
             }
         });
         console.log(`✓ Seeded Harvester Verification (ID: HV-2026-F98B2A1C)`);
-        // 5. Seed Initial Harvest & Batch
-        const existingBatch = yield prisma.batch.findUnique({ where: { id: 'HC-BATCH-2026-001' } });
-        if (!existingBatch) {
-            const harvest = yield prisma.harvest.create({
-                data: {
-                    id: 'harvest-seed-001',
-                    harvesterId: harvesterUser.id,
-                    hiveId: 'hive_sample_1',
-                    quantity: 28.5,
-                    unit: 'kg',
-                    location: 'Cascade Valley, OR',
-                    status: 'HARVESTED',
-                    notes: 'High clarity, low moisture raw wildflower harvest.'
-                }
-            });
-            const batch = yield prisma.batch.create({
-                data: {
-                    id: 'HC-BATCH-2026-001',
-                    harvestId: harvest.id,
-                    status: 'HARVESTED'
-                }
-            });
-            yield prisma.provenanceEvent.create({
-                data: {
-                    batchId: batch.id,
-                    eventType: 'HARVEST_CREATED',
-                    actorId: harvesterUser.id,
-                    dataHash: crypto.createHash('sha256').update(JSON.stringify(harvest)).digest('hex'),
-                    status: 'CONFIRMED',
-                    network: 'HoneyChain Provenance Ledger'
-                }
-            });
-            console.log(`✓ Seeded Initial Batch: ${batch.id}`);
-        }
+        // 5. No dummy harvest/batch seeded - workflow requests are created genuine by users
         console.log('✅ PostgreSQL database seeding completed successfully!');
     });
 }
