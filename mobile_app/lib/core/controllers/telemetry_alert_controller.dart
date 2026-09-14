@@ -32,14 +32,14 @@ class TelemetryAlertController extends ChangeNotifier {
 
   static String _resolveApiUrl() {
     if (kIsWeb) {
-      return '/api';
+      return '${AppConstants.backendBaseUrl}/api';
     }
     try {
       if (Platform.isAndroid) {
         return 'http://10.0.2.2:3000/api';
       }
     } catch (_) {}
-    return '/api';
+    return '${AppConstants.backendBaseUrl}/api';
   }
 
   /// Starts real-time monitoring of live hive telemetry alerts
@@ -75,33 +75,36 @@ class TelemetryAlertController extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true && data['alerts'] is List) {
-          final incoming = (data['alerts'] as List)
-              .map((a) => HiveAlertModel.fromJson(a as Map<String, dynamic>))
-              .toList();
+        final bodyText = response.body.trim();
+        if (bodyText.startsWith('{') || bodyText.startsWith('[')) {
+          final data = json.decode(bodyText);
+          if (data['success'] == true && data['alerts'] is List) {
+            final incoming = (data['alerts'] as List)
+                .map((a) => HiveAlertModel.fromJson(a as Map<String, dynamic>))
+                .toList();
 
-          _alerts = incoming;
+            _alerts = incoming;
 
-          // Find the newest unacknowledged critical alert not yet dismissed in current session
-          final unhandled = incoming.where(
-            (a) => a.isCritical && a.isActive && !_acknowledgedAlertIds.contains(a.id),
-          ).toList();
+            // Find the newest unacknowledged critical alert not yet dismissed in current session
+            final unhandled = incoming.where(
+              (a) => a.isCritical && a.isActive && !_acknowledgedAlertIds.contains(a.id),
+            ).toList();
 
-          if (unhandled.isNotEmpty) {
-            final nextAlert = unhandled.first;
-            if (_activeUnacknowledgedAlert?.id != nextAlert.id) {
-              _activeUnacknowledgedAlert = nextAlert;
-              _isAlertPopupOpen = true;
+            if (unhandled.isNotEmpty) {
+              final nextAlert = unhandled.first;
+              if (_activeUnacknowledgedAlert?.id != nextAlert.id) {
+                _activeUnacknowledgedAlert = nextAlert;
+                _isAlertPopupOpen = true;
 
-              // Trigger loud 3-4 consecutive alert beeps
-              AudioAlertService.instance.playCriticalAlertBeeps(count: 4);
-              notifyListeners();
-            }
-          } else {
-            if (_activeUnacknowledgedAlert != null && !_isAlertPopupOpen) {
-              _activeUnacknowledgedAlert = null;
-              notifyListeners();
+                // Trigger loud 3-4 consecutive alert beeps
+                AudioAlertService.instance.playCriticalAlertBeeps(count: 4);
+                notifyListeners();
+              }
+            } else {
+              if (_activeUnacknowledgedAlert != null && !_isAlertPopupOpen) {
+                _activeUnacknowledgedAlert = null;
+                notifyListeners();
+              }
             }
           }
         }

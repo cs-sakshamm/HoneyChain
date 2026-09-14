@@ -899,16 +899,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: GoogleFonts.manrope(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: context.textPrimaryColor,
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.manrope(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: context.textPrimaryColor,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
