@@ -1,5 +1,6 @@
 import { verificationService } from './services/verificationService';
 import { otpService } from './services/otpService';
+import { SmsProviderFactory } from './services/sms';
 import { blockchainService } from './services/blockchainService';
 import { PrismaClient } from '@prisma/client';
 import { isUserProfileComplete, isHarvesterFullyVerified } from './services/profileService';
@@ -7,6 +8,9 @@ import { isUserProfileComplete, isHarvesterFullyVerified } from './services/prof
 const prisma = new PrismaClient();
 
 async function runTests() {
+  process.env.OTP_ENVIRONMENT = 'sandbox';
+  process.env.OTP_PROVIDER = 'sandbox';
+  SmsProviderFactory.resetProvider();
   console.log('=== Starting Harvester Verification System Automated Tests ===\n');
 
   const testHarvesterId = `test-harv-${Date.now()}`;

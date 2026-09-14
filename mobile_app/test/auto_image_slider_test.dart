@@ -17,46 +17,71 @@ void main() {
   });
 
   group('RoleImages Data Separation & Integrity Tests', () {
-    test('Harvester role returns at least 6 relevant beekeeping images', () {
+    test('Harvester role returns exactly 5 unique relevant beekeeping images', () {
       final images = RoleImages.getImagesForRole('HARVESTER');
-      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.length, equals(5));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/beekeeping_hero.jpg'), isTrue);
+      final uniqueUrls = images.map((i) => i.url).toSet();
+      expect(uniqueUrls.length, equals(5));
     });
 
-    test('Collection & Processing role returns at least 6 relevant processing images', () {
+    test('Collection & Processing role returns exactly 5 unique relevant processing images', () {
       final images = RoleImages.getImagesForRole('COLLECTOR_PROCESSOR');
-      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.length, equals(5));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/collection_processing_hero.jpg'), isTrue);
+      final uniqueUrls = images.map((i) => i.url).toSet();
+      expect(uniqueUrls.length, equals(5));
     });
 
-    test('Lab Tester role returns at least 6 relevant lab testing images', () {
+    test('Lab Tester role returns exactly 5 unique relevant lab testing images', () {
       final images = RoleImages.getImagesForRole('LAB_TESTER');
-      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.length, equals(5));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/lab_testing_hero.jpg'), isTrue);
+      final uniqueUrls = images.map((i) => i.url).toSet();
+      expect(uniqueUrls.length, equals(5));
     });
 
-    test('Packaging role returns at least 6 relevant packaging images', () {
+    test('Packaging role returns exactly 5 unique relevant packaging images', () {
       final images = RoleImages.getImagesForRole('PACKAGING');
-      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.length, equals(5));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/packaging_hero.jpg'), isTrue);
+      final uniqueUrls = images.map((i) => i.url).toSet();
+      expect(uniqueUrls.length, equals(5));
     });
 
-    test('No watermelon references exist in role image datasets', () {
+    test('All 20 role images across all 4 roles are completely unique (no duplicates)', () {
       final allRoles = ['HARVESTER', 'COLLECTOR_PROCESSOR', 'LAB_TESTER', 'PACKAGING'];
+      final allUrls = <String>[];
+      for (final role in allRoles) {
+        final images = RoleImages.getImagesForRole(role);
+        expect(images.length, equals(5));
+        for (final item in images) {
+          allUrls.add(item.url);
+        }
+      }
+      expect(allUrls.length, equals(20));
+      expect(allUrls.toSet().length, equals(20));
+    });
+
+    test('No bird, watermelon, tomato or unrelated imagery exist in role datasets', () {
+      final allRoles = ['HARVESTER', 'COLLECTOR_PROCESSOR', 'LAB_TESTER', 'PACKAGING'];
+      final forbidden = ['watermelon', 'tomato', 'bird', 'avian', 'parrot', 'fruit'];
       for (final role in allRoles) {
         final images = RoleImages.getImagesForRole(role);
         for (final item in images) {
-          expect(item.url.toLowerCase().contains('watermelon'), isFalse);
-          expect(item.label.toLowerCase().contains('watermelon'), isFalse);
-          expect(item.localAssetFallback.toLowerCase().contains('watermelon'), isFalse);
+          for (final word in forbidden) {
+            expect(item.url.toLowerCase().contains(word), isFalse, reason: 'URL must not contain $word');
+            expect(item.label.toLowerCase().contains(word), isFalse, reason: 'Label must not contain $word');
+            expect(item.localAssetFallback.toLowerCase().contains(word), isFalse, reason: 'Fallback must not contain $word');
+          }
         }
       }
     });
