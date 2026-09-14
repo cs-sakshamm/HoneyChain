@@ -395,7 +395,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
             AppTextField(
               controller: _nameController,
               labelText: 'Full Name of Lab Tester',
-              hintText: 'e.g. Dr. Rajesh Sharma',
+              hintText: 'Enter your full name',
               prefixIcon: Icon(Icons.person_outline_rounded, size: 20, color: context.textSecondaryColor),
             ),
             const SizedBox(height: 14),
@@ -406,7 +406,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                   child: AppTextField(
                     controller: _mobileController,
                     labelText: 'Mobile Number',
-                    hintText: '+91 9876543210',
+                    hintText: 'e.g. 98765 43210',
                     prefixIcon: Icon(Icons.phone_android_rounded, size: 20, color: context.textSecondaryColor),
                     keyboardType: TextInputType.phone,
                   ),
@@ -464,7 +464,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                     child: AppTextField(
                       controller: _otpController,
                       labelText: 'Enter 6-Digit OTP',
-                      hintText: '123456',
+                      hintText: 'Enter 6-digit OTP',
                       prefixIcon: Icon(Icons.lock_clock_outlined, size: 20, color: context.textSecondaryColor),
                       keyboardType: TextInputType.number,
                     ),
@@ -592,7 +592,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
             AppTextField(
               controller: _labAddressController,
               labelText: 'Laboratory Address / Location',
-              hintText: 'Plot 14, Industrial Biotech Zone, Sector 62',
+              hintText: 'Enter your complete address',
               prefixIcon: Icon(Icons.location_on_outlined, size: 20, color: context.textSecondaryColor),
             ),
             const SizedBox(height: 14),

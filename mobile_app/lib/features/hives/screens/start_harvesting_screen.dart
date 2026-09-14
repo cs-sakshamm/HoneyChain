@@ -91,7 +91,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                   controller: quantityCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    hintText: 'e.g. 15.5',
+                    hintText: 'Enter quantity in kg',
                     filled: true,
                     fillColor: context.scaffoldBg,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),

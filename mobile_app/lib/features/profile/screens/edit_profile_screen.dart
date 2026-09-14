@@ -128,40 +128,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     String nameLabel = 'Full Name *';
     String nameHint = 'Enter your full name';
-    String orgLabel = 'Organization / Business Name *';
-    String orgHint = 'e.g. Cascade Processing Facility';
-    String locLabel = 'Processing Location *';
-    String locHint = 'e.g. Bend Industrial Park, OR';
+    String orgLabel = 'Organization / Collection Centre Name *';
+    String orgHint = 'Enter collection centre name';
+    String locLabel = 'Processing Location / Address *';
+    String locHint = 'Enter your complete address';
     String licLabel = 'FSSAI Registration / License Number *';
-    String licHint = 'e.g. FSSAI-PROC-2026-9812';
+    String licHint = 'e.g. FSSAI-2026-98124';
 
     if (isLb) {
       nameLabel = 'Authorized Person Name *';
-      nameHint = 'e.g. Dr. Evelyn Vance';
+      nameHint = 'Enter your full name';
       orgLabel = 'Laboratory Name *';
-      orgHint = 'e.g. Pacific Pure Apiculture Labs';
-      locLabel = 'Laboratory Address *';
-      locHint = 'e.g. Corvallis Tech Campus, OR';
+      orgHint = 'e.g. Apex Quality Food Testing Lab';
+      locLabel = 'Laboratory Complete Address *';
+      locHint = 'Enter your complete address';
       licLabel = 'Laboratory Registration / Accreditation Number *';
-      licHint = 'e.g. LAB-ACCRED-2026-4402';
+      licHint = 'e.g. NABL-LAB-2026-HQ88';
     } else if (isPkg) {
       nameLabel = 'Authorized Person Name *';
-      nameHint = 'e.g. Marcus Sterling';
-      orgLabel = 'Company / Packaging Unit Name *';
-      orgHint = 'e.g. Artisan Honey Packaging Co.';
-      locLabel = 'Packaging Facility Location *';
-      locHint = 'e.g. Portland Logistics Hub, OR';
+      nameHint = 'Enter your full name';
+      orgLabel = 'Company / Packaging Facility Name *';
+      orgHint = 'e.g. HoneyChain Eco Packaging Facility';
+      locLabel = 'Packaging Facility Complete Address *';
+      locHint = 'Enter your complete address';
       licLabel = 'FSSAI Registration / License Number *';
-      licHint = 'e.g. FSSAI-PKG-2026-1184';
+      licHint = 'e.g. PKG-FSSAI-2026-B99';
     } else if (isCol) {
       nameLabel = 'Full Name *';
-      nameHint = 'e.g. Cascade Facility Manager';
-      orgLabel = 'Organization / Business Name *';
-      orgHint = 'e.g. Cascade Processing Ltd.';
-      locLabel = 'Collection / Processing Location *';
-      locHint = 'e.g. Bend Industrial Park, OR';
+      nameHint = 'Enter your full name';
+      orgLabel = 'Organization / Collection Centre Name *';
+      orgHint = 'Enter collection centre name';
+      locLabel = 'Collection / Processing Location Address *';
+      locHint = 'Enter your complete address';
       licLabel = 'FSSAI Registration / License Number *';
-      licHint = 'e.g. FSSAI-PROC-2026-9812';
+      licHint = 'e.g. FSSAI-2026-98124';
     }
 
     return Scaffold(
@@ -297,7 +297,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             _buildInputField(
                               context,
                               label: 'Email *',
-                              hint: 'email@example.com',
+                              hint: 'Enter your email address',
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               validator: (val) {
@@ -310,7 +310,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             _buildInputField(
                               context,
                               label: 'Mobile Number *',
-                              hint: '+1 (555) 234-5678',
+                              hint: 'e.g. 98765 43210',
                               controller: _phoneController,
                               keyboardType: TextInputType.phone,
                               validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter phone number' : null,

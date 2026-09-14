@@ -397,7 +397,7 @@ class _PackagingVerificationScreenState extends State<PackagingVerificationScree
                   child: AppTextField(
                     controller: _mobileController,
                     labelText: 'Mobile Number',
-                    hintText: '+91 9876543210',
+                    hintText: 'e.g. 98765 43210',
                     prefixIcon: Icon(Icons.phone_android_rounded, size: 20, color: context.textSecondaryColor),
                     keyboardType: TextInputType.phone,
                   ),
@@ -455,7 +455,7 @@ class _PackagingVerificationScreenState extends State<PackagingVerificationScree
                     child: AppTextField(
                       controller: _otpController,
                       labelText: 'Enter 6-Digit OTP',
-                      hintText: '123456',
+                      hintText: 'Enter 6-digit OTP',
                       prefixIcon: Icon(Icons.lock_clock_outlined, size: 20, color: context.textSecondaryColor),
                       keyboardType: TextInputType.number,
                     ),
@@ -581,7 +581,7 @@ class _PackagingVerificationScreenState extends State<PackagingVerificationScree
             AppTextField(
               controller: _locationController,
               labelText: 'Packaging Plant Address',
-              hintText: 'Unit 8, Organic Food Processing Park',
+              hintText: 'Enter your complete address',
               prefixIcon: Icon(Icons.location_on_outlined, size: 20, color: context.textSecondaryColor),
             ),
             const SizedBox(height: 14),

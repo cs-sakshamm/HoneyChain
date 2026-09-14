@@ -389,7 +389,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     Expanded(
                       child: _buildTextField(
                         label: '${context.tr('hive_code')} *',
-                        hint: 'e.g. HIVE-A1B2C3',
+                        hint: 'e.g. HIVE_001',
                         controller: _hiveCodeController,
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
