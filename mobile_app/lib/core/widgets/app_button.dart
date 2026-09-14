@@ -1,0 +1,166 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
+
+enum AppButtonVariant {
+  primary,
+  secondary,
+  outlined,
+  text,
+}
+
+/// Production Button Component for HoneyChain
+class AppButton extends StatelessWidget {
+  final String text;
+  final VoidCallback? onPressed;
+  final AppButtonVariant variant;
+  final bool isLoading;
+  final Widget? icon;
+  final double? width;
+  final double height;
+
+  const AppButton({
+    super.key,
+    required this.text,
+    required this.onPressed,
+    this.variant = AppButtonVariant.primary,
+    this.isLoading = false,
+    this.icon,
+    this.width,
+    this.height = AppConstants.buttonHeight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDisabled = onPressed == null || isLoading;
+
+    switch (variant) {
+      case AppButtonVariant.primary:
+        return SizedBox(
+          width: width ?? double.infinity,
+          height: height,
+          child: ElevatedButton(
+            onPressed: isDisabled ? null : onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.colors.primary,
+              foregroundColor: context.colors.onPrimary,
+              disabledBackgroundColor: context.borderColor,
+              disabledForegroundColor: context.textMutedColor,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
+            ),
+            child: _buildChild(context.colors.onPrimary),
+          ),
+        );
+
+      case AppButtonVariant.secondary:
+        return SizedBox(
+          width: width ?? double.infinity,
+          height: height,
+          child: ElevatedButton(
+            onPressed: isDisabled ? null : onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.surfaceColor,
+              foregroundColor: context.textPrimaryColor,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                side: BorderSide(color: context.textPrimaryColor, width: 1.5),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
+            ),
+            child: _buildChild(context.textPrimaryColor),
+          ),
+        );
+
+      case AppButtonVariant.outlined:
+        return SizedBox(
+          width: width ?? double.infinity,
+          height: height,
+          child: OutlinedButton(
+            onPressed: isDisabled ? null : onPressed,
+            style: OutlinedButton.styleFrom(
+              backgroundColor: context.surfaceColor,
+              foregroundColor: context.textPrimaryColor,
+              side: BorderSide(color: context.borderColor, width: 1.0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppConstants.space16),
+            ),
+            child: _buildChild(context.textPrimaryColor),
+          ),
+        );
+
+      case AppButtonVariant.text:
+        return TextButton(
+          onPressed: isDisabled ? null : onPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: context.textPrimaryColor,
+            padding: const EdgeInsets.symmetric(horizontal: AppConstants.space8, vertical: AppConstants.space4),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: isLoading
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(context.textPrimaryColor),
+                  ),
+                )
+              : Text(
+                  text,
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+        );
+    }
+  }
+
+  Widget _buildChild(Color textColor) {
+    if (isLoading) {
+      return SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.2,
+          valueColor: AlwaysStoppedAnimation<Color>(textColor),
+        ),
+      );
+    }
+
+    if (icon != null) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          icon!,
+          const SizedBox(width: AppConstants.space8),
+          Text(
+            text,
+            style: GoogleFonts.manrope(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Text(
+      text,
+      style: GoogleFonts.manrope(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
