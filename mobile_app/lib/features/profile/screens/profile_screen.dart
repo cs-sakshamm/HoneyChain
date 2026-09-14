@@ -5,11 +5,23 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
+import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../authentication/auth_controller.dart';
 import '../../authentication/widgets/google_logo_icon.dart';
+import '../../collection/screens/collection_dashboard_screen.dart';
+import '../../hives/controllers/hive_controller.dart';
+import '../../hives/screens/add_edit_hive_screen.dart';
+import '../../hives/screens/start_harvesting_screen.dart';
+import '../../lab/screens/lab_dashboard_screen.dart';
+import '../../packaging/screens/packaging_dashboard_screen.dart';
 import '../../verification/controllers/verification_controller.dart';
+import '../../verification/screens/collector_verification_screen.dart';
 import '../../verification/screens/harvester_verification_screen.dart';
+import '../../verification/screens/lab_verification_screen.dart';
+import '../../verification/screens/packaging_verification_screen.dart';
 import '../../verification/screens/verification_certificate_screen.dart';
 import '../controllers/user_controller.dart';
 import 'change_password_screen.dart';
@@ -17,10 +29,27 @@ import 'edit_profile_screen.dart';
 import 'language_setting_screen.dart';
 import 'theme_setting_screen.dart';
 
-/// Profile page — polished card-based layout, pill actions, both themes.
-/// The old notification ON/OFF toggle has been removed by design.
-class ProfileScreen extends StatelessWidget {
+/// Profile page — polished card-based layout, role-aware accounts, and multi-role switcher.
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<UserController>().user;
+      final userId = user.id ?? user.email;
+      context.read<UserController>().fetchRoleAccounts();
+      if (userId.isNotEmpty) {
+        context.read<VerificationController>().loadVerificationStatus(role: user.role, userId: userId);
+      }
+    });
+  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -61,9 +90,19 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildRoleHero(BuildContext context, String role) {
+    return AutoImageSlider(
+      role: role,
+      height: 160,
+      borderRadius: 24,
+      margin: const EdgeInsets.only(bottom: AppConstants.space20),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userCtrl = context.watch<UserController>();
+    final verCtrl = context.watch<VerificationController>();
     final user = userCtrl.user;
     final complete = user.isProfileComplete;
 
@@ -76,17 +115,10 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: AppConstants.space24),
-              Text(
-                context.tr('profile'),
-                style: GoogleFonts.manrope(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: context.textPrimaryColor,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: AppConstants.space24),
+              const SizedBox(height: AppConstants.space16),
+
+              // ── 1. Role-Specific Landscape Wallpaper / Hero ──
+              _buildRoleHero(context, user.role),
 
               // ── Profile card ──
               Container(
@@ -193,7 +225,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
 
                     const SizedBox(height: AppConstants.space20),
-                    // Account info rows
+                    // Role-specific Account info rows
                     _infoRow(context, Icons.alternate_email_rounded, user.email.isEmpty ? 'No email' : user.email),
                     const SizedBox(height: 10),
                     _infoRow(
@@ -204,25 +236,58 @@ class ProfileScreen extends StatelessWidget {
                           : user.phone,
                     ),
 
-                    if (user.beekeeperId != null && user.beekeeperId!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      _infoRow(context, Icons.badge_outlined, 'Beekeeper ID: ${user.beekeeperId!}'),
-                    ],
-                    if (user.id != null && user.id!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      _infoRow(context, Icons.fingerprint_rounded, 'User ID: ${user.id!}'),
-                    ],
-                    if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      _infoRow(context, Icons.business_rounded, user.organizationName!),
-                    ],
-                    if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      _infoRow(context, Icons.location_on_outlined, user.facilityLocation!),
-                    ],
-                    if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      _infoRow(context, Icons.verified_outlined, user.licenseNumber!),
+                    if (user.role == 'HARVESTER') ...[
+                      if (user.beekeeperId != null && user.beekeeperId!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.badge_outlined, 'Beekeeper ID: ${user.beekeeperId!}'),
+                      ],
+                      if (user.bsid != null && user.bsid!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.fingerprint_rounded, 'BSID: ${user.bsid!}'),
+                      ],
+                    ] else if (user.role.contains('COLLECT') || user.role.contains('PROCESS')) ...[
+                      if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.business_rounded, 'Center: ${user.organizationName!}'),
+                      ],
+                      if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.location_on_outlined, 'Location: ${user.facilityLocation!}'),
+                      ],
+                      if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.verified_outlined, 'License: ${user.licenseNumber!}'),
+                      ],
+                    ] else if (user.role.contains('LAB')) ...[
+                      if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.science_outlined, 'Laboratory: ${user.organizationName!}'),
+                      ],
+                      if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.location_on_outlined, 'Lab Address: ${user.facilityLocation!}'),
+                      ],
+                      if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.verified_outlined, 'Accreditation: ${user.licenseNumber!}'),
+                      ],
+                      if (user.designation != null && user.designation!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.person_outline_rounded, 'Role: ${user.designation!}'),
+                      ],
+                    ] else if (user.role.contains('PKG') || user.role.contains('PACKAG')) ...[
+                      if (user.organizationName != null && user.organizationName!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.inventory_2_outlined, 'Packaging Unit: ${user.organizationName!}'),
+                      ],
+                      if (user.facilityLocation != null && user.facilityLocation!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.location_on_outlined, 'Facility: ${user.facilityLocation!}'),
+                      ],
+                      if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _infoRow(context, Icons.verified_outlined, 'FSSAI License: ${user.licenseNumber!}'),
+                      ],
                     ],
 
                     const SizedBox(height: AppConstants.space20),
@@ -239,6 +304,16 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
               ),
+
+              const SizedBox(height: AppConstants.space20),
+
+              // ── 3. Role-Specific Verification Checklist Card ──
+              _buildRoleVerificationChecklistCard(context, user.role, verCtrl, userCtrl),
+
+              const SizedBox(height: AppConstants.space20),
+
+              // ── 4. Prioritized Role Operations & Workflow Action Buttons ──
+              _buildPrioritizedActionsCard(context, user.role),
 
               // ── Profile completion banner ──
               if (!complete) ...[
@@ -270,7 +345,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Complete your profile and required verification details before you can continue with this request.',
+                              'Complete your profile and required verification details before you can continue with role operations.',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 color: context.textPrimaryColor,
@@ -283,6 +358,11 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+
+              const SizedBox(height: AppConstants.space24),
+
+              // ── Your HoneyChain Accounts (Role Switcher) ──
+              _buildRoleAccountsCard(context, userCtrl, context.read<AuthController>()),
 
               const SizedBox(height: AppConstants.space24),
 
@@ -304,33 +384,98 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildSettingsTile(
-                      context,
-                      title: 'Harvester Verification',
-                      icon: Icons.verified_user_outlined,
-                      trailingBadge: context.watch<VerificationController>().verification.isFullyVerified
-                          ? 'Verified ✓'
-                          : '${context.watch<VerificationController>().verification.completedStepsCount}/5 Steps',
-                      badgeColor: context.watch<VerificationController>().verification.isFullyVerified
-                          ? context.successColor
-                          : context.textPrimaryColor,
-                      badgeBg: context.watch<VerificationController>().verification.isFullyVerified
-                          ? context.successBgColor
-                          : context.primarySoftColor,
-                      onTap: () {
-                        if (context.read<VerificationController>().verification.isFullyVerified) {
+                    // Role-specific Verification Tile
+                    if (user.role.toUpperCase().contains('COLLECT') || user.role.toUpperCase().contains('PROCESS'))
+                      _buildSettingsTile(
+                        context,
+                        title: 'Collector Verification',
+                        icon: Icons.verified_user_outlined,
+                        trailingBadge: context.watch<VerificationController>().collectorVerification.isFullyVerified
+                            ? 'Verified ✓'
+                            : '${context.watch<VerificationController>().collectorVerification.completedStepsCount}/3 Steps',
+                        badgeColor: context.watch<VerificationController>().collectorVerification.isFullyVerified
+                            ? context.successColor
+                            : context.textPrimaryColor,
+                        badgeBg: context.watch<VerificationController>().collectorVerification.isFullyVerified
+                            ? context.successBgColor
+                            : context.primarySoftColor,
+                        onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
+                            MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()),
                           );
-                        } else {
+                        },
+                      )
+                    else if (user.role.toUpperCase().contains('LAB'))
+                      _buildSettingsTile(
+                        context,
+                        title: 'Lab Verification',
+                        icon: Icons.science_outlined,
+                        trailingBadge: context.watch<VerificationController>().labVerification.isFullyVerified
+                            ? 'Verified ✓'
+                            : '${context.watch<VerificationController>().labVerification.completedStepsCount}/3 Steps',
+                        badgeColor: context.watch<VerificationController>().labVerification.isFullyVerified
+                            ? context.successColor
+                            : context.textPrimaryColor,
+                        badgeBg: context.watch<VerificationController>().labVerification.isFullyVerified
+                            ? context.successBgColor
+                            : context.primarySoftColor,
+                        onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
+                            MaterialPageRoute(builder: (context) => const LabVerificationScreen()),
                           );
-                        }
-                      },
-                    ),
+                        },
+                      )
+                    else if (user.role.toUpperCase().contains('PKG') || user.role.toUpperCase().contains('PACKAG'))
+                      _buildSettingsTile(
+                        context,
+                        title: 'Packaging Verification',
+                        icon: Icons.inventory_2_outlined,
+                        trailingBadge: context.watch<VerificationController>().packagingVerification.isFullyVerified
+                            ? 'Verified ✓'
+                            : '${context.watch<VerificationController>().packagingVerification.completedStepsCount}/3 Steps',
+                        badgeColor: context.watch<VerificationController>().packagingVerification.isFullyVerified
+                            ? context.successColor
+                            : context.textPrimaryColor,
+                        badgeBg: context.watch<VerificationController>().packagingVerification.isFullyVerified
+                            ? context.successBgColor
+                            : context.primarySoftColor,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()),
+                          );
+                        },
+                      )
+                    else
+                      _buildSettingsTile(
+                        context,
+                        title: 'Harvester Verification',
+                        icon: Icons.verified_user_outlined,
+                        trailingBadge: context.watch<VerificationController>().verification.isFullyVerified
+                            ? 'Verified ✓'
+                            : '${context.watch<VerificationController>().verification.completedStepsCount}/3 Steps',
+                        badgeColor: context.watch<VerificationController>().verification.isFullyVerified
+                            ? context.successColor
+                            : context.textPrimaryColor,
+                        badgeBg: context.watch<VerificationController>().verification.isFullyVerified
+                            ? context.successBgColor
+                            : context.primarySoftColor,
+                        onTap: () {
+                          if (context.read<VerificationController>().verification.isFullyVerified) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
+                            );
+                          }
+                        },
+                      ),
                     Divider(height: 1, indent: 56, color: context.borderColor),
                     _buildSettingsTile(
                       context,
@@ -388,6 +533,212 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRoleAccountsCard(
+    BuildContext context,
+    UserController userCtrl,
+    AuthController authCtrl,
+  ) {
+    final currentRole = userCtrl.user.role;
+    final accounts = userCtrl.roleAccounts;
+
+    final roles = [
+      {
+        'role': 'HARVESTER',
+        'title': 'Harvester Account',
+        'desc': 'Hive monitoring & honey harvesting',
+        'icon': Icons.agriculture_rounded,
+        'userRole': UserRole.harvester,
+      },
+      {
+        'role': 'COLLECTOR_PROCESSOR',
+        'title': 'Collection & Processing',
+        'desc': 'Batch intake & honey processing',
+        'icon': Icons.local_shipping_rounded,
+        'userRole': UserRole.collectionProcessing,
+      },
+      {
+        'role': 'LAB',
+        'title': 'Lab Tester Account',
+        'desc': 'Sample analysis & official reports',
+        'icon': Icons.science_rounded,
+        'userRole': UserRole.labTesting,
+      },
+      {
+        'role': 'PACKAGING',
+        'title': 'Packaging Manager',
+        'desc': 'Batch packaging & QR traceability',
+        'icon': Icons.inventory_2_rounded,
+        'userRole': UserRole.packaging,
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Your HoneyChain Accounts',
+              style: GoogleFonts.manrope(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: context.textPrimaryColor,
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.refresh_rounded, size: 18, color: context.textSecondaryColor),
+              onPressed: () => userCtrl.fetchRoleAccounts(),
+              tooltip: 'Refresh accounts',
+            ),
+          ],
+        ),
+        const SizedBox(height: AppConstants.space12),
+        Container(
+          padding: const EdgeInsets.all(AppConstants.space16),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Column(
+            children: roles.map((rInfo) {
+              final roleKey = rInfo['role'] as String;
+              final title = rInfo['title'] as String;
+              final icon = rInfo['icon'] as IconData;
+              final userRole = rInfo['userRole'] as UserRole;
+
+              final isCurrent = currentRole.toUpperCase().trim() == roleKey;
+              final existingAcc = accounts.where((a) => a.role == roleKey).firstOrNull;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isCurrent ? context.primarySoftColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isCurrent
+                          ? context.honeyAccent.withValues(alpha: 0.4)
+                          : context.borderColor.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: context.primarySoftColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, size: 18, color: context.textPrimaryColor),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            if (isCurrent)
+                              Text(
+                                'Active Account',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.honeyAccent,
+                                ),
+                              )
+                            else if (existingAcc != null)
+                              Text(
+                                existingAcc.isVerified
+                                    ? 'Verified (3/3) ✓'
+                                    : 'Profile: ${existingAcc.completedSteps}/3 Steps',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: existingAcc.isVerified ? context.successColor : context.warningColor,
+                                ),
+                              )
+                            else
+                              Text(
+                                'Not Created',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: context.textMutedColor,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (isCurrent)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: context.honeyAccent.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Current',
+                            style: GoogleFonts.manrope(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimaryColor,
+                            ),
+                          ),
+                        )
+                      else
+                        InkWell(
+                          onTap: () async {
+                            authCtrl.setRole(userRole);
+                            await userCtrl.switchAccountRole(roleKey);
+                            if (context.mounted) {
+                              context.read<VerificationController>().loadVerificationStatus(role: roleKey);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Switched to $title'),
+                                  backgroundColor: AppConstants.primaryDark,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: existingAcc != null ? context.primarySoftColor : context.surfaceColor,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: context.borderColor),
+                            ),
+                            child: Text(
+                              existingAcc != null ? 'Switch' : '+ Register',
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -472,6 +823,509 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  /// Detailed Verification Checklist Card customized per role
+  Widget _buildRoleVerificationChecklistCard(
+    BuildContext context,
+    String role,
+    VerificationController verCtrl,
+    UserController userCtrl,
+  ) {
+    final r = role.toUpperCase();
+    final user = userCtrl.user;
+
+    String title;
+    bool isFullyVerified;
+    List<Map<String, dynamic>> items;
+    VoidCallback onVerifyTap;
+
+    if (r.contains('COLLECT') || r.contains('PROCESS')) {
+      title = 'Collector Profile Verification';
+      final collVer = verCtrl.collectorVerification;
+      isFullyVerified = collVer.isFullyVerified;
+      items = [
+        {'title': 'Facility Name & Location', 'done': collVer.isStep2BusinessComplete},
+        {'title': 'License / Registration', 'done': collVer.isStep3KycComplete},
+        {'title': 'Mobile OTP Verification', 'done': collVer.isStep1IdentityComplete},
+        {'title': 'Verified', 'done': isFullyVerified, 'final': true},
+      ];
+      onVerifyTap = () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()),
+          );
+    } else if (r.contains('LAB')) {
+      title = 'Lab Tester Profile Verification';
+      final labVer = verCtrl.labVerification;
+      isFullyVerified = labVer.isFullyVerified;
+      items = [
+        {'title': 'Laboratory Name & Address', 'done': labVer.isStep2LabDetailsComplete},
+        {'title': 'Accreditation & Scope', 'done': labVer.isStep3KycComplete},
+        {'title': 'Mobile OTP Verification', 'done': labVer.isStep1IdentityComplete},
+        {'title': 'Verified', 'done': isFullyVerified, 'final': true},
+      ];
+      onVerifyTap = () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const LabVerificationScreen()),
+          );
+    } else if (r.contains('PKG') || r.contains('PACKAG')) {
+      title = 'Packaging Profile Verification';
+      final pkgVer = verCtrl.packagingVerification;
+      isFullyVerified = pkgVer.isFullyVerified;
+      items = [
+        {'title': 'Packaging Unit & Address', 'done': pkgVer.isStep2FacilityComplete},
+        {'title': 'FSSAI License & Scope', 'done': pkgVer.isStep3KycComplete},
+        {'title': 'Mobile OTP Verification', 'done': pkgVer.isStep1IdentityComplete},
+        {'title': 'Verified', 'done': isFullyVerified, 'final': true},
+      ];
+      onVerifyTap = () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()),
+          );
+    } else {
+      title = 'Harvester Profile Verification';
+      final harvVer = verCtrl.verification;
+      isFullyVerified = harvVer.isFullyVerified;
+      items = [
+        {'title': 'Full Name', 'done': user.name.trim().isNotEmpty},
+        {'title': 'Mobile OTP', 'done': harvVer.isStep2Complete},
+        {'title': 'Required Profile Details', 'done': harvVer.isStep3Complete && harvVer.isStep4Complete},
+        {'title': 'Verified', 'done': isFullyVerified, 'final': true},
+      ];
+      onVerifyTap = () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
+          );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppConstants.space20),
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isFullyVerified ? context.successColor.withValues(alpha: 0.35) : context.borderColor,
+          width: isFullyVerified ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.manrope(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: context.textPrimaryColor,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isFullyVerified ? context.successBgColor : context.primarySoftColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  isFullyVerified ? 'Verified ✓' : 'Action Required',
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isFullyVerified ? context.successColor : context.primaryDarkColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...items.map((item) {
+            final isDone = item['done'] as bool;
+            final itemTitle = item['title'] as String;
+            final isFinal = item['final'] == true;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                children: [
+                  Icon(
+                    isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                    size: 18,
+                    color: isDone
+                        ? context.successColor
+                        : (isFinal ? context.textMutedColor : context.warningColor),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      itemTitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: isFinal ? FontWeight.w700 : FontWeight.w500,
+                        color: isDone ? context.textPrimaryColor : (isFinal ? context.textMutedColor : context.textPrimaryColor),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isDone
+                          ? context.successBgColor
+                          : (isFinal ? context.surfaceColor : context.warningBgColor),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDone
+                            ? context.successColor.withValues(alpha: 0.3)
+                            : (isFinal ? context.borderColor : context.warningColor.withValues(alpha: 0.3)),
+                      ),
+                    ),
+                    child: Text(
+                      isDone ? 'Done ✓' : 'Missing',
+                      style: GoogleFonts.manrope(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isDone
+                            ? context.successColor
+                            : (isFinal ? context.textMutedColor : context.warningColor),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (!isFullyVerified) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: onVerifyTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.colors.primary,
+                  foregroundColor: context.colors.onPrimary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.verified_user_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Complete Role Verification',
+                      style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Prioritized Role Operations Card ordered by exact operational flow
+  Widget _buildPrioritizedActionsCard(BuildContext context, String role) {
+    final r = role.toUpperCase();
+
+    if (r.contains('COLLECT') || r.contains('PROCESS')) {
+      return _buildActionGroup(
+        context,
+        title: 'Collection & Processing Operations',
+        actions: [
+          _RoleActionItem(
+            title: '1. New Requests',
+            subtitle: 'Review & accept incoming harvester drop-offs',
+            icon: Icons.inbox_rounded,
+            primary: true,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CollectionDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '2. Accepted Requests',
+            subtitle: 'View accepted batches ready for intake & testing',
+            icon: Icons.check_circle_outline_rounded,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CollectionDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '3. Find Nearest Quality Lab',
+            subtitle: 'Forward processed batch to nearest accredited lab',
+            icon: Icons.science_outlined,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CollectionDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '4. Completed Batches',
+            subtitle: 'Audited log of successfully forwarded batches',
+            icon: Icons.done_all_rounded,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CollectionDashboardScreen()));
+            },
+          ),
+        ],
+      );
+    } else if (r.contains('LAB')) {
+      return _buildActionGroup(
+        context,
+        title: 'Quality Testing Laboratory Operations',
+        actions: [
+          _RoleActionItem(
+            title: '1. Requested Lab Tests',
+            subtitle: 'Accept incoming honey samples for quality analysis',
+            icon: Icons.science_rounded,
+            primary: true,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const LabDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '2. Accepted Samples',
+            subtitle: 'Conduct spectrometry & 6-parameter analysis',
+            icon: Icons.biotech_rounded,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const LabDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '3. Enter Lab Results & Report',
+            subtitle: 'Submit moisture, HMF, diastase, and purity scores',
+            icon: Icons.post_add_rounded,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const LabDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '4. Send to Packaging Centre',
+            subtitle: 'Forward passed batches to nearest certified packaging unit',
+            icon: Icons.local_shipping_outlined,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const LabDashboardScreen()));
+            },
+          ),
+        ],
+      );
+    } else if (r.contains('PKG') || r.contains('PACKAG')) {
+      return _buildActionGroup(
+        context,
+        title: 'Packaging & QR Operations',
+        actions: [
+          _RoleActionItem(
+            title: '1. Requested Batches',
+            subtitle: 'Intake tested honey batches from accredited labs',
+            icon: Icons.inventory_2_rounded,
+            primary: true,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const PackagingDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '2. Accepted Batches',
+            subtitle: 'Queue cleanroom bottling line & jar sterilization',
+            icon: Icons.task_alt_rounded,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const PackagingDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '3. Package Batch & Blockchain Seal',
+            subtitle: 'Finalize packaging units and commit to ledger',
+            icon: Icons.all_inbox_rounded,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const PackagingDashboardScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '4. View Final QR Traceability',
+            subtitle: 'Generate customer-facing verified authenticity QR',
+            icon: Icons.qr_code_rounded,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const PackagingDashboardScreen()));
+            },
+          ),
+        ],
+      );
+    } else {
+      return _buildActionGroup(
+        context,
+        title: 'Harvester Operations',
+        actions: [
+          _RoleActionItem(
+            title: '1. Add Hive',
+            subtitle: 'Register new colony & automatically match nearest centre',
+            icon: Icons.add_circle_outline_rounded,
+            primary: true,
+            onTap: () {
+              if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const AddEditHiveScreen()));
+            },
+          ),
+          _RoleActionItem(
+            title: '2. View My Hives',
+            subtitle: 'Monitor hive health, flora sources, and production',
+            icon: Icons.hive_rounded,
+            onTap: () {
+              // Hive tab / overview
+            },
+          ),
+          _RoleActionItem(
+            title: '3. Start Harvesting',
+            subtitle: 'Record raw harvest weight & dispatch to collection hub',
+            icon: Icons.agriculture_rounded,
+            onTap: () {
+              if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+              final hives = context.read<HiveController>().hives;
+              if (hives.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => StartHarvestingScreen(hive: hives.first),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please add a hive before harvesting.')),
+                );
+              }
+            },
+          ),
+          _RoleActionItem(
+            title: '4. My Workflow Requests',
+            subtitle: 'Track live 5-stage batch progress & audit timeline',
+            icon: Icons.timeline_rounded,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    backgroundColor: context.scaffoldBg,
+                    appBar: AppBar(
+                      title: Text('My Workflow Requests', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+                      backgroundColor: context.surfaceColor,
+                      elevation: 0,
+                    ),
+                    body: const MyRequestsView(userRole: 'HARVESTER'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildActionGroup(
+    BuildContext context, {
+    required String title,
+    required List<_RoleActionItem> actions,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.manrope(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: context.textPrimaryColor,
+          ),
+        ),
+        const SizedBox(height: AppConstants.space12),
+        Container(
+          padding: const EdgeInsets.all(AppConstants.space12),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Column(
+            children: actions.map((act) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Material(
+                  color: act.primary ? context.primarySoftColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    onTap: act.onTap,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: act.primary
+                                  ? context.colors.primary.withValues(alpha: 0.15)
+                                  : context.primarySoftColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              act.icon,
+                              size: 20,
+                              color: act.primary ? context.colors.primary : context.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  act.title,
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.textPrimaryColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  act.subtitle,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: context.textSecondaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textMutedColor),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RoleActionItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool primary;
+
+  _RoleActionItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+    this.primary = false,
+  });
 }
 
 /// Filled pill button used for primary profile actions.

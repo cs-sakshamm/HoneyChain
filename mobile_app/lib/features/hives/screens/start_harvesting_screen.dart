@@ -127,6 +127,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
                 final qty = double.tryParse(quantityCtrl.text.trim()) ?? 0.0;
                 if (qty <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(

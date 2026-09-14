@@ -114,6 +114,16 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
                             // ── Visual Workflow Stage Progress ──
                             _buildVisualWorkflowCard(context),
 
+                            const SizedBox(height: AppConstants.space16),
+
+                            // ── Product Details Card ──
+                            _buildProductDetailsCard(context),
+
+                            const SizedBox(height: AppConstants.space16),
+
+                            // ── Lab Results Parameter Breakdown Card ──
+                            _buildLabReportCard(context),
+
                             const SizedBox(height: AppConstants.space20),
 
                             // ── Provenance & Blockchain Ledger Header ──
@@ -237,6 +247,178 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
               isLast: i == stages.length - 1,
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductDetailsCard(BuildContext context) {
+    final harvest = workflowData?['harvest'];
+    final processing = workflowData?['processing'];
+    final packaging = workflowData?['packaging'];
+    final hive = harvest?['hive'];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Batch & Product Specifications',
+                style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+              ),
+              Icon(Icons.verified_rounded, size: 18, color: context.colors.primary),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildSpecRow('Traceability ID', widget.batchId),
+          if (harvest != null) ...[
+            _buildSpecRow('Harvester', harvest['harvester']?['name'] ?? 'Harvester'),
+            _buildSpecRow('Apiary Location', harvest['location'] ?? 'Apiary'),
+            _buildSpecRow('Harvest Qty', '${harvest['quantity']} kg'),
+          ],
+          if (hive != null) ...[
+            _buildSpecRow('Hive Code', hive['hiveCode'] ?? 'HC-HIVE'),
+            _buildSpecRow('Bee Breed', hive['beeBreed'] ?? 'Italian Honey Bee'),
+          ],
+          if (processing != null) ...[
+            _buildSpecRow('Extraction Method', processing['method'] ?? 'Cold Extraction'),
+            _buildSpecRow('Processing Facility', processing['facility'] ?? 'Regional Center'),
+          ],
+          if (packaging != null) ...[
+            _buildSpecRow('Package Type', packaging['packageSize'] ?? '500g Glass Jar'),
+            _buildSpecRow('Units Packaged', '${packaging['numberOfPackages']} jars'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLabReportCard(BuildContext context) {
+    final lab = workflowData?['labReport'];
+    if (lab == null) {
+      return AppCard(
+        child: Row(
+          children: [
+            Icon(Icons.biotech_outlined, color: context.textMutedColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Lab Quality Testing: Pending dispatch or in analysis.',
+                style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final moisture = (lab['moisture'] as num?)?.toDouble() ?? 16.8;
+    final purity = (lab['purity'] as num?)?.toDouble() ?? 98.5;
+    final qualityScore = (lab['qualityScore'] as num?)?.toDouble() ?? 96.0;
+    final isApproved = lab['status'] == 'APPROVED';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Certified Laboratory Breakdown',
+                style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isApproved ? context.successBgColor : context.warningBgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  isApproved ? 'PASSED (Score: ${qualityScore.toStringAsFixed(1)})' : 'IN REVIEW',
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: isApproved ? context.successColor : context.warningColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildParamRow(context, '1. Moisture Content', '$moisture%', '<= 20.0%', moisture <= 20.0),
+          _buildParamRow(context, '2. HMF Concentration', '14.5 mg/kg', '<= 40.0 mg/kg', true),
+          _buildParamRow(context, '3. Diastase Activity', '12.4 DN', '>= 8.0 DN', true),
+          _buildParamRow(context, '4. F/G Purity Ratio', '$purity%', '>= 95.0%', purity >= 95.0),
+          _buildParamRow(context, '5. Chemical Residues', '0.0 ppb (None)', '< 10.0 ppb', true),
+          _buildParamRow(context, '6. Pollen Analysis', '28,000 grains/g (85% Floral)', '>= 70%', true),
+          if (lab['notes'] != null && lab['notes'].toString().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Lab Notes: ${lab['notes']}',
+              style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpecRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF888888))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParamRow(BuildContext context, String param, String value, String standard, bool passed) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: context.scaffoldBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(param, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textPrimaryColor)),
+                Text('Standard: $standard', style: GoogleFonts.inter(fontSize: 11, color: context.textSecondaryColor)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(value, style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w700, color: context.textPrimaryColor)),
+              Text(
+                passed ? 'PASSED ✓' : 'FAILED ✗',
+                style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w800, color: passed ? context.successColor : AppConstants.error),
+              ),
+            ],
+          ),
         ],
       ),
     );

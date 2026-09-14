@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../controllers/user_controller.dart';
 
 /// Form screen to Edit User Profile
@@ -21,6 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+  late TextEditingController _avatarUrlController;
 
   // Role-specific controllers
   late TextEditingController _organizationController;
@@ -37,6 +39,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController(text: user.name);
     _emailController = TextEditingController(text: user.email);
     _phoneController = TextEditingController(text: user.phone);
+    _avatarUrlController = TextEditingController(text: user.avatarUrl ?? '');
     _organizationController = TextEditingController(text: user.organizationName ?? '');
     _locationController = TextEditingController(text: user.facilityLocation ?? '');
     _licenseController = TextEditingController(text: user.licenseNumber ?? '');
@@ -48,6 +51,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _avatarUrlController.dispose();
     _organizationController.dispose();
     _locationController.dispose();
     _licenseController.dispose();
@@ -88,6 +92,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       email: _emailController.text,
       phone: _phoneController.text,
       role: user.role,
+      avatarUrl: _avatarUrlController.text,
       organizationName: !isHarv ? _organizationController.text : null,
       facilityLocation: !isHarv ? _locationController.text : null,
       licenseNumber: !isHarv ? _licenseController.text : null,
@@ -193,6 +198,74 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: AppConstants.space8),
+
+                      // Avatar Management Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppConstants.space16),
+                        decoration: BoxDecoration(
+                          color: context.surfaceColor,
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            const UserAvatar(size: 64),
+                            const SizedBox(width: AppConstants.space16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                                        ? 'Custom Avatar'
+                                        : (user.googlePhotoUrl != null && user.googlePhotoUrl!.isNotEmpty
+                                            ? 'Google Profile Picture'
+                                            : 'Initials Placeholder'),
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textPrimaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                                        ? 'Custom photo takes priority over Google profile.'
+                                        : (user.googlePhotoUrl != null && user.googlePhotoUrl!.isNotEmpty
+                                            ? 'Synced automatically from your Google account.'
+                                            : 'Add a custom photo URL or sign in with Google.'),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: context.textSecondaryColor,
+                                    ),
+                                  ),
+                                  if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _avatarUrlController.clear();
+                                        });
+                                      },
+                                      child: Text(
+                                        'Revert to Google Photo',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppConstants.honeyAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.space16),
+
                       // Section 1: Personal & Contact Information
                       Container(
                         padding: const EdgeInsets.all(AppConstants.space16),

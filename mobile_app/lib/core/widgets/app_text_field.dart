@@ -21,6 +21,7 @@ class AppTextField extends StatelessWidget {
   final FocusNode? focusNode;
   final bool enabled;
   final bool autofocus;
+  final int maxLines;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
 
@@ -40,6 +41,7 @@ class AppTextField extends StatelessWidget {
     this.focusNode,
     this.enabled = true,
     this.autofocus = false,
+    this.maxLines = 1,
     this.textInputAction,
     this.onFieldSubmitted,
   });
@@ -67,6 +69,7 @@ class AppTextField extends StatelessWidget {
           enabled: enabled,
           autofocus: autofocus,
           obscureText: obscureText,
+          maxLines: obscureText ? 1 : maxLines,
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           onFieldSubmitted: onFieldSubmitted,

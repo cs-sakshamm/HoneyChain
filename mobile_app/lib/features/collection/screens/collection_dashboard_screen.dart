@@ -5,16 +5,19 @@ import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
-import '../../../core/widgets/my_requests_view.dart';
+import '../../../core/widgets/auto_image_slider.dart';
 import '../../../core/widgets/status_badge.dart';
 import 'batch_timeline_screen.dart';
 import 'harvester_detail_screen.dart';
+import 'nearest_centres_screen.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/localization/localization_service.dart';
-import '../../../core/utils/profile_guard.dart';
 import '../../profile/controllers/user_controller.dart';
+import '../../verification/controllers/verification_controller.dart';
+import '../../verification/screens/collector_verification_screen.dart';
 
 class CollectionDashboardScreen extends StatefulWidget {
   const CollectionDashboardScreen({super.key});
@@ -29,7 +32,14 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<UserController>().user;
+      final userId = user.id ?? user.email;
+      if (userId.isNotEmpty) {
+        context.read<VerificationController>().loadCollectorVerification(userId);
+      }
+    });
   }
 
   @override
@@ -39,11 +49,13 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
   }
 
   void _showRejectDialog(BuildContext context, WorkflowRequest req) {
+    if (!ProfileGuard.checkCollectorVerificationOrPrompt(context)) return;
     final reasonCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: context.surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Reject Harvest Batch', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -57,7 +69,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                 hintText: 'Enter rejection reason...',
                 filled: true,
                 fillColor: context.scaffoldBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
               ),
               maxLines: 2,
             ),
@@ -66,14 +78,16 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogCtx);
-              context.read<WorkflowController>().rejectRequest(req.id, reason: reasonCtrl.text.trim());
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Request rejected & recorded.'), backgroundColor: AppConstants.error),
-              );
+              await context.read<WorkflowController>().rejectRequest(req.id, actorRole: 'COLLECTOR_PROCESSOR', reason: reasonCtrl.text.trim());
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Request rejected & recorded.'), backgroundColor: AppConstants.error),
+                );
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error),
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             child: const Text('Confirm Reject'),
           ),
         ],
@@ -82,15 +96,17 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
   }
 
   void _showSendToLabDialog(BuildContext context, WorkflowRequest req) {
-    final methodCtrl = TextEditingController();
-    final facilityCtrl = TextEditingController();
-    final moistureCtrl = TextEditingController();
-    final notesCtrl = TextEditingController();
+    if (!ProfileGuard.checkCollectorVerificationOrPrompt(context)) return;
+    final methodCtrl = TextEditingController(text: 'Centrifugal Cold Extraction & Multi-mesh Filtration');
+    final facilityCtrl = TextEditingController(text: 'HoneyChain Regional Processing Hub');
+    final moistureCtrl = TextEditingController(text: '17.2');
+    final notesCtrl = TextEditingController(text: 'Processed under 35°C raw honey standards.');
 
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: context.surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Process & Send to Lab', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
         content: SingleChildScrollView(
           child: Column(
@@ -174,7 +190,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: context.colors.primary),
+            style: ElevatedButton.styleFrom(backgroundColor: context.colors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             child: const Text('Dispatch to Lab'),
           ),
         ],
@@ -182,9 +198,22 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
     );
   }
 
+  Widget _buildHeroImage(BuildContext context) {
+    return const AutoImageSlider(
+      role: 'COLLECTOR_PROCESSOR',
+      height: 155,
+      borderRadius: 20,
+      margin: EdgeInsets.only(bottom: AppConstants.space16),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final requests = context.watch<WorkflowController>().pendingCollectionRequests;
+    final workflowCtrl = context.watch<WorkflowController>();
+    final newRequests = workflowCtrl.collectionNewRequests;
+    final acceptedRequests = workflowCtrl.collectionAcceptedRequests;
+    final rejectedRequests = workflowCtrl.collectionRejectedRequests;
+    final completedRequests = workflowCtrl.collectionCompletedRequests;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -194,10 +223,11 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildHeroImage(context),
                   Text(
                     context.tr('collection_processing') == 'collection_processing'
                         ? 'Collection & Processing'
@@ -220,16 +250,19 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                   const SizedBox(height: 12),
                   TabBar(
                     controller: _tabController,
-                    isScrollable: false,
+                    isScrollable: true,
                     labelColor: context.colors.primary,
                     unselectedLabelColor: context.textSecondaryColor,
                     indicatorColor: context.colors.primary,
                     indicatorWeight: 3,
+                    tabAlignment: TabAlignment.start,
                     labelStyle: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
                     unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
                     tabs: [
-                      Tab(text: 'Incoming (${requests.length})'),
-                      const Tab(text: 'All Requests & History'),
+                      Tab(text: 'New Requests (${newRequests.length})'),
+                      Tab(text: 'Accepted (${acceptedRequests.length})'),
+                      Tab(text: 'Rejected (${rejectedRequests.length})'),
+                      Tab(text: 'Completed (${completedRequests.length})'),
                     ],
                   ),
                 ],
@@ -239,20 +272,17 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  // Tab 1: Pending incoming harvests
-                  requests.isEmpty
-                      ? _buildEmptyState(context)
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
-                          itemCount: requests.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
-                          itemBuilder: (context, index) {
-                            final req = requests[index];
-                            return _buildIncomingRequestCard(context, req);
-                          },
-                        ),
-                  // Tab 2: Full MyRequestsView
-                  const MyRequestsView(userRole: 'COLLECTOR_PROCESSOR'),
+                  // Tab 0: New Requests
+                  _buildRequestListView(context, newRequests, 'No new pending requests', 'New harvest batches sent by harvesters will appear here.', showAcceptReject: true),
+
+                  // Tab 1: Accepted Requests
+                  _buildRequestListView(context, acceptedRequests, 'No accepted requests', 'Harvest batches you have accepted will appear here ready for extraction.', showSendToLab: true),
+
+                  // Tab 2: Rejected Requests
+                  _buildRequestListView(context, rejectedRequests, 'No rejected requests', 'Harvest batches that were rejected will appear here for audit history.', isRejectedTab: true),
+
+                  // Tab 3: Completed Processing
+                  _buildRequestListView(context, completedRequests, 'No completed batches', 'Batches that have finished processing and were sent to testing labs will appear here.', isCompletedTab: true),
                 ],
               ),
             ),
@@ -262,37 +292,306 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inbox_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
-          const SizedBox(height: AppConstants.space16),
-          Text(
-            context.tr('no_pending_requests') == 'no_pending_requests' ? 'No pending requests' : context.tr('no_pending_requests'),
-            style: GoogleFonts.manrope(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: context.textPrimaryColor,
-            ),
+  Widget _buildRequestListView(
+    BuildContext context,
+    List<WorkflowRequest> requests,
+    String emptyTitle,
+    String emptySubtitle, {
+    bool showAcceptReject = false,
+    bool showSendToLab = false,
+    bool isRejectedTab = false,
+    bool isCompletedTab = false,
+  }) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 0),
+            child: _buildVerificationBanner(context),
           ),
-          const SizedBox(height: AppConstants.space8),
-          Text(
-            'New harvest batches sent by harvesters will appear here.',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: context.textSecondaryColor,
-            ),
+        ),
+        requests.isEmpty
+            ? SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildEmptyState(context, emptyTitle, emptySubtitle),
+              )
+            : SliverPadding(
+                padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final req = requests[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppConstants.space16),
+                        child: _buildRequestCard(
+                          context,
+                          req,
+                          showAcceptReject: showAcceptReject,
+                          showSendToLab: showSendToLab,
+                          isRejectedTab: isRejectedTab,
+                          isCompletedTab: isCompletedTab,
+                        ),
+                      );
+                    },
+                    childCount: requests.length,
+                  ),
+                ),
+              ),
+      ],
+    );
+  }
+
+  Widget _buildVerificationBanner(BuildContext context) {
+    final verCtrl = context.watch<VerificationController>();
+    final collectorVer = verCtrl.collectorVerification;
+    final isFullyVerified = collectorVer.isFullyVerified;
+    final count = collectorVer.completedStepsCount;
+    final double progress = (count / 3.0).clamp(0.0, 1.0);
+    final int percentage = (progress * 100).round();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final String statusBadgeText;
+    final Color statusColor;
+    final Color statusBgColor;
+
+    if (isFullyVerified || count == 3) {
+      statusBadgeText = 'Profile Verified (3 of 3)';
+      statusColor = context.successColor;
+      statusBgColor = context.successBgColor;
+    } else if (count == 0) {
+      statusBadgeText = 'Profile Setup (0 of 3)';
+      statusColor = context.warningColor;
+      statusBgColor = context.warningBgColor;
+    } else {
+      statusBadgeText = 'Partially Verified ($count of 3)';
+      statusColor = context.colors.primary;
+      statusBgColor = context.primarySoftColor;
+    }
+
+    final String supportingText;
+    if (isFullyVerified) {
+      supportingText = 'Profile Verified — Collection & Processing access enabled.';
+    } else {
+      supportingText = 'Complete profile verification to start collection & processing activities.';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppConstants.space16),
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isFullyVerified
+              ? context.successColor.withValues(alpha: 0.5)
+              : (isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isFullyVerified
+                ? context.successColor.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      isFullyVerified ? Icons.verified_user_rounded : Icons.shield_outlined,
+                      size: 20,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Profile Verification',
+                        style: GoogleFonts.manrope(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimaryColor,
+                          letterSpacing: -0.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  statusBadgeText,
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor.withValues(alpha: 0.5),
+                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '$percentage%',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: statusColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              _buildMiniCheck(context, 'Identity', collectorVer.isStep1IdentityComplete),
+              _buildMiniCheck(context, 'Business', collectorVer.isStep2BusinessComplete),
+              _buildMiniCheck(context, 'License & KYC', collectorVer.isStep3KycComplete),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  supportingText,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: context.textSecondaryColor,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isFullyVerified ? context.successBgColor : context.primarySoftColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isFullyVerified ? context.successColor.withValues(alpha: 0.4) : context.borderColor,
+                    ),
+                  ),
+                  child: Text(
+                    isFullyVerified ? 'View Badge ✓' : 'Verify Profile →',
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isFullyVerified ? context.successColor : context.textPrimaryColor,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildIncomingRequestCard(BuildContext context, WorkflowRequest req) {
-    final isPending = req.status == RequestStatus.pending;
-    final isAccepted = req.status == RequestStatus.accepted;
+  Widget _buildMiniCheck(BuildContext context, String title, bool isDone) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          size: 14,
+          color: isDone ? context.successColor : context.textMutedColor,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: isDone ? FontWeight.w600 : FontWeight.w400,
+            color: isDone ? context.successColor : context.textSecondaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, String title, String subtitle) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.space24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
+            const SizedBox(height: AppConstants.space16),
+            Text(
+              title,
+              style: GoogleFonts.manrope(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: context.textPrimaryColor,
+              ),
+            ),
+            const SizedBox(height: AppConstants.space8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: context.textSecondaryColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRequestCard(
+    BuildContext context,
+    WorkflowRequest req, {
+    bool showAcceptReject = false,
+    bool showSendToLab = false,
+    bool isRejectedTab = false,
+    bool isCompletedTab = false,
+  }) {
+    final verCtrl = context.watch<VerificationController>();
+    final isCollectorVerified = verCtrl.collectorVerification.isFullyVerified;
 
     return AppCard(
       onTap: () {
@@ -374,47 +673,112 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
             ],
           ),
           const SizedBox(height: AppConstants.space12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppConstants.space12, vertical: AppConstants.space8),
-            decoration: BoxDecoration(
-              color: context.scaffoldBg,
-              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-              border: Border.all(color: context.borderColor),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Harvest Quantity:',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: context.textSecondaryColor,
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppConstants.space12, vertical: AppConstants.space8),
+                decoration: BoxDecoration(
+                  color: context.scaffoldBg,
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                  border: Border.all(color: context.borderColor),
                 ),
-                const SizedBox(width: AppConstants.space8),
-                Text(
-                  '${req.estimatedQuantityKg.toStringAsFixed(1)} kg',
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: context.textPrimaryColor,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Quantity:',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: context.textSecondaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: AppConstants.space8),
+                    Text(
+                      '${req.estimatedQuantityKg.toStringAsFixed(1)} kg',
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (req.notes != null && req.notes!.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    req.notes!,
+                    style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
-            ),
+            ],
           ),
-          const SizedBox(height: AppConstants.space16),
-          if (isPending)
+          if (isRejectedTab) ...[
+            const SizedBox(height: AppConstants.space12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppConstants.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppConstants.error.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.cancel_outlined, size: 16, color: AppConstants.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Rejection Reason: ${req.notes ?? "Batch quality specifications not met."}',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppConstants.error),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (showAcceptReject) ...[
+            const SizedBox(height: AppConstants.space16),
+            if (!isCollectorVerified) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: AppConstants.space12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: context.warningBgColor,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: context.warningColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_person_outlined, size: 16, color: context.warningColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Complete your profile verification to accept requests.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: context.warningColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      if (!ProfileGuard.checkOrPrompt(context)) return;
                       _showRejectDialog(context, req);
                     },
                     style: OutlinedButton.styleFrom(
-                       foregroundColor: AppConstants.error,
+                      foregroundColor: AppConstants.error,
                       side: const BorderSide(color: AppConstants.error),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -431,7 +795,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      if (!ProfileGuard.checkOrPrompt(context)) return;
+                      if (!ProfileGuard.checkCollectorVerificationOrPrompt(context)) return;
                       await context.read<WorkflowController>().acceptRequest(req.id);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -440,8 +804,8 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: context.colors.primary,
-                      foregroundColor: context.colors.onPrimary,
+                      backgroundColor: isCollectorVerified ? context.colors.primary : context.borderColor,
+                      foregroundColor: isCollectorVerified ? context.colors.onPrimary : context.textMutedColor,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -449,34 +813,89 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                       ),
                     ),
                     child: Text(
-                      'Accept Batch',
-                      style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
+                      'Accept Request',
+                      style: GoogleFonts.manrope(
+                        fontWeight: FontWeight.w700,
+                        color: isCollectorVerified ? context.colors.onPrimary : context.textMutedColor,
+                      ),
                     ),
                   ),
                 ),
               ],
-            )
-          else if (isAccepted)
+            ),
+          ] else if (showSendToLab) ...[
+            const SizedBox(height: AppConstants.space16),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (!ProfileGuard.checkCollectorVerificationOrPrompt(context)) return;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NearestCentresScreen(
+                            targetRole: 'LAB',
+                            batchId: req.batchId,
+                            requestId: req.id,
+                            quantity: req.estimatedQuantityKg,
+                            originLocation: req.location,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.near_me_rounded, size: 18),
+                    label: const Text('Nearest Lab Testing'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: context.colors.primary,
+                      foregroundColor: context.colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      _showSendToLabDialog(context, req);
+                    },
+                    icon: const Icon(Icons.edit_note_rounded, size: 18),
+                    label: const Text('Custom'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (isCompletedTab) ...[
+            const SizedBox(height: AppConstants.space12),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: () {
-                  if (!ProfileGuard.checkOrPrompt(context)) return;
-                  _showSendToLabDialog(context, req);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
+                  );
                 },
-                icon: const Icon(Icons.science_outlined, size: 18),
-                label: const Text('Extract & Send to Lab'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.colors.primary,
-                  foregroundColor: context.colors.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                icon: const Icon(Icons.timeline_rounded, size: 16),
+                label: const Text('View Lifecycle & Blockchain Trace'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
   }
 }
+
 

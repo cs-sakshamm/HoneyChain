@@ -115,9 +115,13 @@ async function runProfileGateTests() {
   // 5. Test Database Operations & Workflow Restriction with Prisma
   console.log('\n── 5. Testing Database User Lifecycle & Profile State ──');
 
-  // Create an incomplete user in DB
   const testIncompleteUser = await prisma.user.upsert({
-    where: { email: 'test-incomplete@honeychain.io' },
+    where: {
+      email_role: {
+        email: 'test-incomplete@honeychain.io',
+        role: 'COLLECTOR_PROCESSOR',
+      },
+    },
     update: {
       name: 'Unknown Incomplete',
       phone: '',

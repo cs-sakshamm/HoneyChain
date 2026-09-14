@@ -31,6 +31,30 @@ enum UserRole {
   packaging,
 }
 
+String userRoleToString(UserRole? role) {
+  switch (role) {
+    case UserRole.harvester:
+      return 'HARVESTER';
+    case UserRole.collectionProcessing:
+      return 'COLLECTOR_PROCESSOR';
+    case UserRole.labTesting:
+      return 'LAB';
+    case UserRole.packaging:
+      return 'PACKAGING';
+    default:
+      return 'HARVESTER';
+  }
+}
+
+UserRole userRoleFromString(String? roleStr) {
+  if (roleStr == null) return UserRole.harvester;
+  final r = roleStr.toUpperCase();
+  if (r.contains('COLLECT') || r.contains('PROCESS')) return UserRole.collectionProcessing;
+  if (r.contains('LAB')) return UserRole.labTesting;
+  if (r.contains('PKG') || r.contains('PACKAG')) return UserRole.packaging;
+  return UserRole.harvester;
+}
+
 /// Production Controller managing business authentication & session state backed by PostgreSQL API
 class AuthController extends ChangeNotifier {
   final AuthService _authService;
@@ -123,9 +147,11 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Email Sign In Handler with validation against PostgreSQL backend API
-  Future<void> loginWithEmail(String email, String password) async {
+  Future<void> loginWithEmail(String email, String password, [UserRole? role]) async {
     final identifier = email.trim();
     final pass = password.trim();
+    final activeRole = role ?? _selectedRole ?? UserRole.harvester;
+    final roleStr = userRoleToString(activeRole);
 
     if (identifier.isEmpty || pass.isEmpty) {
       _status = AuthStateStatus.error;
@@ -147,6 +173,7 @@ class AuthController extends ChangeNotifier {
             body: jsonEncode({
               'emailOrPhone': identifier,
               'password': pass,
+              'role': roleStr,
             }),
           )
           .timeout(const Duration(seconds: 4));
@@ -193,10 +220,13 @@ class AuthController extends ChangeNotifier {
     required String name,
     required String email,
     required String password,
+    UserRole? role,
   }) async {
     final cleanName = name.trim();
     final cleanEmail = email.trim().toLowerCase();
     final cleanPassword = password.trim();
+    final activeRole = role ?? _selectedRole ?? UserRole.harvester;
+    final roleStr = userRoleToString(activeRole);
 
     if (cleanName.isEmpty || cleanEmail.isEmpty || cleanPassword.isEmpty) {
       _status = AuthStateStatus.error;
@@ -219,7 +249,7 @@ class AuthController extends ChangeNotifier {
               'name': cleanName,
               'email': cleanEmail,
               'password': cleanPassword,
-              'role': 'HARVESTER',
+              'role': roleStr,
             }),
           )
           .timeout(const Duration(seconds: 4));
@@ -270,7 +300,10 @@ class AuthController extends ChangeNotifier {
       );
 
   /// Google Sign-In
-  Future<void> signInWithGoogle() async {
+  Future<void> signInWithGoogle([UserRole? role]) async {
+    final activeRole = role ?? _selectedRole ?? UserRole.harvester;
+    final roleStr = userRoleToString(activeRole);
+
     _status = AuthStateStatus.authenticating;
     _errorMessage = null;
     notifyListeners();
@@ -300,13 +333,14 @@ class AuthController extends ChangeNotifier {
             await prefs.setString('user_profile_email', _currentUser!.email!);
           }
           if (_currentUser!.photoURL != null && _currentUser!.photoURL!.isNotEmpty) {
+            await prefs.setString('user_profile_google_photo_url', _currentUser!.photoURL!);
             await prefs.setString('user_profile_photo_url', _currentUser!.photoURL!);
           }
           if (_currentUser!.phoneNumber != null && _currentUser!.phoneNumber!.isNotEmpty) {
             await prefs.setString('user_profile_phone', _currentUser!.phoneNumber!);
           }
 
-          // Sync Google Account details to backend PostgreSQL
+          // Sync Google Account details to backend PostgreSQL for this role
           try {
             final syncUrl = Uri.parse('$_baseUrl/api/auth/google');
             final response = await _client.post(
@@ -316,6 +350,8 @@ class AuthController extends ChangeNotifier {
                 'name': _currentUser!.displayName,
                 'email': _currentUser!.email,
                 'phone': _currentUser!.phoneNumber,
+                'role': roleStr,
+                'photoUrl': _currentUser!.photoURL,
               }),
             ).timeout(const Duration(seconds: 4));
 
@@ -327,6 +363,10 @@ class AuthController extends ChangeNotifier {
                 if (u['beekeeperId'] != null) await prefs.setString('user_profile_beekeeper_id', u['beekeeperId']);
                 if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
                 if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
+                if (u['role'] != null) await prefs.setString('user_profile_role', u['role']);
+                if (u['googlePhotoUrl'] != null) await prefs.setString('user_profile_google_photo_url', u['googlePhotoUrl']);
+                if (u['avatarUrl'] != null) await prefs.setString('user_profile_avatar_url', u['avatarUrl']);
+                if (u['photoUrl'] != null) await prefs.setString('user_profile_photo_url', u['photoUrl']);
               }
             }
           } catch (e) {

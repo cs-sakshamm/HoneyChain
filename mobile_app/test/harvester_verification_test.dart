@@ -67,7 +67,7 @@ void main() {
         apiaryLocation: 'Willamette Valley, OR',
         locationVerified: 'Verified',
       );
-      expect(step4Model.completedStepsCount, 4);
+      expect(step4Model.completedStepsCount, 3);
       expect(step4Model.canSubmitBlockchain, isTrue);
       expect(step4Model.isFullyVerified, isFalse);
 
@@ -86,7 +86,7 @@ void main() {
       );
       expect(fullyVerifiedModel.canSubmitBlockchain, isTrue);
       expect(fullyVerifiedModel.isFullyVerified, isTrue);
-      expect(fullyVerifiedModel.completedStepsCount, 5);
+      expect(fullyVerifiedModel.completedStepsCount, 3);
     });
 
     test('HarvesterVerificationModel serialization to and from JSON', () {
@@ -126,7 +126,7 @@ void main() {
       expect(parsed.isStep4Complete, isTrue);
       expect(parsed.canSubmitBlockchain, isTrue);
       expect(parsed.isFullyVerified, isTrue);
-      expect(parsed.completedStepsCount, 5);
+      expect(parsed.completedStepsCount, 3);
 
       final exportedJson = parsed.toJson();
       expect(exportedJson['verificationId'], 'HV-2026-9A8B7C6D');

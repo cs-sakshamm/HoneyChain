@@ -1,0 +1,132 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_app/core/constants/app_constants.dart';
+import 'package:mobile_app/core/widgets/auto_image_slider.dart';
+
+class _FakeHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context);
+  }
+}
+
+void main() {
+  setUpAll(() {
+    HttpOverrides.global = _FakeHttpOverrides();
+  });
+
+  group('RoleImages Data Separation & Integrity Tests', () {
+    test('Harvester role returns at least 6 relevant beekeeping images', () {
+      final images = RoleImages.getImagesForRole('HARVESTER');
+      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.every((item) => item.url.isNotEmpty), isTrue);
+      expect(images.every((item) => item.label.isNotEmpty), isTrue);
+      expect(images.every((item) => item.localAssetFallback == 'assets/images/beekeeping_hero.jpg'), isTrue);
+    });
+
+    test('Collection & Processing role returns at least 6 relevant processing images', () {
+      final images = RoleImages.getImagesForRole('COLLECTOR_PROCESSOR');
+      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.every((item) => item.url.isNotEmpty), isTrue);
+      expect(images.every((item) => item.label.isNotEmpty), isTrue);
+      expect(images.every((item) => item.localAssetFallback == 'assets/images/collection_processing_hero.jpg'), isTrue);
+    });
+
+    test('Lab Tester role returns at least 6 relevant lab testing images', () {
+      final images = RoleImages.getImagesForRole('LAB_TESTER');
+      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.every((item) => item.url.isNotEmpty), isTrue);
+      expect(images.every((item) => item.label.isNotEmpty), isTrue);
+      expect(images.every((item) => item.localAssetFallback == 'assets/images/lab_testing_hero.jpg'), isTrue);
+    });
+
+    test('Packaging role returns at least 6 relevant packaging images', () {
+      final images = RoleImages.getImagesForRole('PACKAGING');
+      expect(images.length, greaterThanOrEqualTo(6));
+      expect(images.every((item) => item.url.isNotEmpty), isTrue);
+      expect(images.every((item) => item.label.isNotEmpty), isTrue);
+      expect(images.every((item) => item.localAssetFallback == 'assets/images/packaging_hero.jpg'), isTrue);
+    });
+
+    test('No watermelon references exist in role image datasets', () {
+      final allRoles = ['HARVESTER', 'COLLECTOR_PROCESSOR', 'LAB_TESTER', 'PACKAGING'];
+      for (final role in allRoles) {
+        final images = RoleImages.getImagesForRole(role);
+        for (final item in images) {
+          expect(item.url.toLowerCase().contains('watermelon'), isFalse);
+          expect(item.label.toLowerCase().contains('watermelon'), isFalse);
+          expect(item.localAssetFallback.toLowerCase().contains('watermelon'), isFalse);
+        }
+      }
+    });
+  });
+
+  group('AutoImageSlider Widget Tests', () {
+    testWidgets('AutoImageSlider renders cleanly and displays initial label', (WidgetTester tester) async {
+      final images = RoleImages.getImagesForRole('HARVESTER');
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: AutoImageSlider(
+              role: 'HARVESTER',
+              rotationInterval: Duration(seconds: 2),
+              transitionDuration: Duration(milliseconds: 300),
+            ),
+          ),
+        ),
+      );
+
+      // Initial frame
+      expect(find.byType(AutoImageSlider), findsOneWidget);
+      expect(find.byType(AnimatedSwitcher), findsOneWidget);
+      expect(find.byKey(ValueKey<String>('slider_label_text_${images[0].label}')), findsOneWidget);
+
+      // Advance by 2 seconds (rotation interval) + 300ms transition
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Should have advanced to image 2
+      expect(find.byKey(ValueKey<String>('slider_label_text_${images[1].label}')), findsOneWidget);
+
+      // Advance by another 2 seconds + 300ms transition
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Should have advanced to image 3
+      expect(find.byKey(ValueKey<String>('slider_label_text_${images[2].label}')), findsOneWidget);
+    });
+
+    testWidgets('AutoImageSlider loops through all images smoothly', (WidgetTester tester) async {
+      final images = RoleImages.getImagesForRole('LAB_TESTER');
+      final totalImages = images.length; // 6 images
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: AutoImageSlider(
+              role: 'LAB_TESTER',
+              rotationInterval: Duration(seconds: 2),
+              transitionDuration: Duration(milliseconds: 300),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byKey(ValueKey<String>('slider_label_text_${images[0].label}')), findsOneWidget);
+
+      // Step through each subsequent image
+      for (int i = 1; i < totalImages; i++) {
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byKey(ValueKey<String>('slider_label_text_${images[i].label}')), findsOneWidget);
+      }
+
+      // Final step loops back to first image
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(ValueKey<String>('slider_label_text_${images[0].label}')), findsOneWidget);
+    });
+  });
+}

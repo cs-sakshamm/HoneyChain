@@ -519,6 +519,36 @@ class _LoginScreenState extends State<LoginScreen> {
     return AppConstants.loginSubtitle;
   }
 
+  String _getRoleRegisterTitle(BuildContext context, UserRole? role) {
+    switch (role) {
+      case UserRole.harvester:
+        return 'Create Harvester Account';
+      case UserRole.collectionProcessing:
+        return 'Create Collection & Processing Account';
+      case UserRole.labTesting:
+        return 'Create Lab Tester Account';
+      case UserRole.packaging:
+        return 'Create Packaging Manager Account';
+      default:
+        return 'Create Account';
+    }
+  }
+
+  String _getRoleRegisterSubtitle(BuildContext context, UserRole? role) {
+    switch (role) {
+      case UserRole.harvester:
+        return 'Register your apiary and start hive honey logging.';
+      case UserRole.collectionProcessing:
+        return 'Register your collection center and intake batches.';
+      case UserRole.labTesting:
+        return 'Register your testing laboratory for sample analysis.';
+      case UserRole.packaging:
+        return 'Register your packaging facility for batch serialization.';
+      default:
+        return 'Start managing your supply chain with HoneyChain.';
+    }
+  }
+
   Widget _buildLoginForm(BuildContext context, AuthController controller) {
     final isLoading = controller.status == AuthStateStatus.authenticating;
 
@@ -740,7 +770,7 @@ class _LoginScreenState extends State<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Create account',
+            _getRoleRegisterTitle(context, controller.selectedRole),
             style: GoogleFonts.manrope(
               fontSize: 24,
               fontWeight: FontWeight.w800,
@@ -750,7 +780,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: AppConstants.space6),
           Text(
-            'Start managing your supply chain with HoneyChain.',
+            _getRoleRegisterSubtitle(context, controller.selectedRole),
             style: GoogleFonts.inter(
               fontSize: 14,
               color: context.textSecondaryColor,

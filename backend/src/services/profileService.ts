@@ -99,13 +99,34 @@ export const BEEKEEPER_PROFILE_INCOMPLETE_RESPONSE = {
 
 export const HARVESTER_VERIFICATION_REQUIRED_RESPONSE = {
   success: false,
-  code: 'VERIFICATION_REQUIRED',
-  message: 'Harvester verification is incomplete. All 5 verification parameters (Government ID, Mobile OTP, Beekeeper Registration, Apiary Location, and Blockchain Verification) must be completed before performing this action.',
-  error: 'Harvester verification is incomplete. Please complete harvester verification first.'
+  code: 'HARVESTER_VERIFICATION_REQUIRED',
+  message: 'Complete profile verification to add hives and start harvesting activities.',
+  error: 'Complete profile verification to add hives and start harvesting activities.'
+};
+
+export const COLLECTOR_VERIFICATION_REQUIRED_RESPONSE = {
+  success: false,
+  code: 'COLLECTOR_VERIFICATION_REQUIRED',
+  message: 'Complete profile verification to start collection & processing activities.',
+  error: 'Complete profile verification to start collection & processing activities.'
+};
+
+export const LAB_VERIFICATION_REQUIRED_RESPONSE = {
+  success: false,
+  code: 'LAB_VERIFICATION_REQUIRED',
+  message: 'Complete profile verification to accept and perform laboratory testing requests.',
+  error: 'Complete profile verification to accept and perform laboratory testing requests.'
+};
+
+export const PACKAGING_VERIFICATION_REQUIRED_RESPONSE = {
+  success: false,
+  code: 'PACKAGING_VERIFICATION_REQUIRED',
+  message: 'Complete profile verification to start packaging activities.',
+  error: 'Complete profile verification to start packaging activities.'
 };
 
 /**
- * Validates whether a harvester has completed all verification parameters and is recorded on-chain.
+ * Validates whether a harvester has completed verification parameters and is recorded on-chain.
  */
 export function isHarvesterFullyVerified(verification: any): boolean {
   if (!verification) return false;
@@ -113,9 +134,56 @@ export function isHarvesterFullyVerified(verification: any): boolean {
     verification.governmentIdVerified === 'Verified' &&
     verification.mobileVerified === 'Verified' &&
     verification.registrationVerified === 'Verified' &&
-    verification.locationVerified === 'Verified' &&
-    verification.verificationStatus === 'Verified' &&
-    Boolean(verification.verificationId)
+    (verification.verificationStatus === 'Verified' || Boolean(verification.verificationId))
   );
 }
+
+/**
+ * Validates whether a collector has completed all 3 verification parameters:
+ * 1. Identity Verification (Mobile OTP verified)
+ * 2. Business Verification (Organization & Location verified)
+ * 3. License & KYC (Legitimate KYC provider verification completed)
+ */
+export function isCollectorFullyVerified(verification: any): boolean {
+  if (!verification) return false;
+  return (
+    verification.mobileVerified === 'Verified' &&
+    verification.businessVerified === 'Verified' &&
+    verification.kycStatus === 'Verified' &&
+    verification.verificationStatus === 'Verified'
+  );
+}
+
+/**
+ * Validates whether a Lab Tester has completed all 3 verification parameters:
+ * 1. Identity Verification (Mobile OTP verified)
+ * 2. Laboratory Details (Lab Name, Address, Accreditation verified)
+ * 3. KYC & Certification (Government ID, Real KYC, Qualification & Scope verified)
+ */
+export function isLabTesterFullyVerified(verification: any): boolean {
+  if (!verification) return false;
+  return (
+    verification.mobileVerified === 'Verified' &&
+    verification.labDetailsVerified === 'Verified' &&
+    verification.kycStatus === 'Verified' &&
+    verification.verificationStatus === 'Verified'
+  );
+}
+
+/**
+ * Validates whether a Packaging Manager has completed all 3 verification parameters:
+ * 1. Identity Verification (Mobile OTP verified)
+ * 2. Facility Details (Organization, Address, License verified)
+ * 3. License & KYC (Government ID, Real KYC & Operational Scope verified)
+ */
+export function isPackagingManagerFullyVerified(verification: any): boolean {
+  if (!verification) return false;
+  return (
+    verification.mobileVerified === 'Verified' &&
+    verification.facilityDetailsVerified === 'Verified' &&
+    verification.kycStatus === 'Verified' &&
+    verification.verificationStatus === 'Verified'
+  );
+}
+
 
