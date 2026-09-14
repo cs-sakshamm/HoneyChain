@@ -71,9 +71,9 @@ void main() {
       expect(allUrls.toSet().length, equals(20));
     });
 
-    test('No bird, watermelon, tomato or unrelated imagery exist in role datasets', () {
+    test('No bird, watermelon, tomato, leaf or unrelated imagery exist in role datasets', () {
       final allRoles = ['HARVESTER', 'COLLECTOR_PROCESSOR', 'LAB_TESTER', 'PACKAGING'];
-      final forbidden = ['watermelon', 'tomato', 'bird', 'avian', 'parrot', 'fruit'];
+      final forbidden = ['watermelon', 'tomato', 'bird', 'avian', 'parrot', 'fruit', 'leaf', 'leaves', 'plant', 'vegetable'];
       for (final role in allRoles) {
         final images = RoleImages.getImagesForRole(role);
         for (final item in images) {

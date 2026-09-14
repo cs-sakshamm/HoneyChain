@@ -277,7 +277,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
             labelText: '6. Pollen Density (grains/10g) — Limit: >= 20000',
             hintText: 'e.g. 28000',
             keyboardType: TextInputType.number,
-            prefixIcon: Icon(Icons.eco_outlined, size: 20, color: context.textSecondaryColor),
+            prefixIcon: Icon(Icons.grain_outlined, size: 20, color: context.textSecondaryColor),
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: 14),

@@ -6,7 +6,6 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
-import '../../../core/widgets/auto_image_slider.dart';
 import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../authentication/auth_controller.dart';
@@ -90,15 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildRoleHero(BuildContext context, String role) {
-    return AutoImageSlider(
-      role: role,
-      height: 160,
-      borderRadius: 24,
-      margin: const EdgeInsets.only(bottom: AppConstants.space20),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final userCtrl = context.watch<UserController>();
@@ -116,9 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppConstants.space16),
-
-              // ── 1. Role-Specific Landscape Wallpaper / Hero ──
-              _buildRoleHero(context, user.role),
 
               // ── Profile card ──
               Container(

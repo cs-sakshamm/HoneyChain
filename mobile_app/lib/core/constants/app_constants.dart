@@ -117,7 +117,7 @@ class RoleImageItem {
 }
 
 class RoleImages {
-  // 1. HARVESTER: Beekeeping, Beehives, Bees, Honey Harvesting, Natural Apiary (Exactly 5 Unique Images)
+  // 1. HARVESTER: Beekeeping, Beehives, Bees, Honey Harvesting, Pure Honeycomb (Exactly 5 Unique Images)
   static const List<RoleImageItem> harvesterImages = [
     RoleImageItem(
       url: 'https://images.unsplash.com/photo-1473081556163-2a17de81fc97?auto=format&fit=crop&w=1200&q=80',
@@ -125,8 +125,8 @@ class RoleImages {
       localAssetFallback: 'assets/images/beekeeping_hero.jpg',
     ),
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1508873696983-2df57046475a?auto=format&fit=crop&w=1200&q=80',
-      label: 'Wooden beehives situated in open wildflower pasture',
+      url: 'https://images.unsplash.com/photo-1576402187878-974f70c890a5?auto=format&fit=crop&w=1200&q=80',
+      label: 'Pure raw honeycomb frames and natural honey',
       localAssetFallback: 'assets/images/beekeeping_hero.jpg',
     ),
     RoleImageItem(
@@ -140,8 +140,8 @@ class RoleImages {
       localAssetFallback: 'assets/images/beekeeping_hero.jpg',
     ),
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1582284540020-8acbe03f4924?auto=format&fit=crop&w=1200&q=80',
-      label: 'Natural apiary surrounded by lush rural reserve',
+      url: 'https://images.unsplash.com/photo-1568644396922-5c3bfae12521?auto=format&fit=crop&w=1200&q=80',
+      label: 'Beekeeping smoker and honeycomb harvesting frame',
       localAssetFallback: 'assets/images/beekeeping_hero.jpg',
     ),
   ];
