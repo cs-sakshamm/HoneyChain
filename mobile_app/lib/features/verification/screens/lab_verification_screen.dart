@@ -49,15 +49,15 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
     _mobileController = TextEditingController(text: labVer.mobileNumber ?? user.phone);
     _otpController = TextEditingController();
 
-    _labNameController = TextEditingController(text: labVer.labName ?? user.organizationName ?? 'Apex Quality Food Testing Lab');
-    _labAddressController = TextEditingController(text: labVer.labAddress ?? user.facilityLocation ?? 'Plot 14, Industrial Biotech Zone, Sector 62');
-    _labRegController = TextEditingController(text: labVer.labRegistrationNumber ?? user.licenseNumber ?? 'NABL-LAB-2026-HQ88');
-    _accreditationController = TextEditingController(text: labVer.accreditation ?? 'NABL / ISO-IEC-17025 Accredited');
+    _labNameController = TextEditingController(text: labVer.labName ?? user.organizationName ?? '');
+    _labAddressController = TextEditingController(text: labVer.labAddress ?? user.facilityLocation ?? '');
+    _labRegController = TextEditingController(text: labVer.labRegistrationNumber ?? user.licenseNumber ?? '');
+    _accreditationController = TextEditingController(text: labVer.accreditation ?? '');
 
     _selectedGovIdType = labVer.governmentIdType ?? 'AADHAAR';
     _govIdController = TextEditingController();
-    _qualificationController = TextEditingController(text: labVer.qualification ?? 'Lead Food Safety Chemist / M.Sc Analytical Chemistry');
-    _authorizedScopeController = TextEditingController(text: labVer.authorizedTestingDetails ?? 'Moisture, HMF, Diastase Activity, Purity Ratio, Residue Analysis');
+    _qualificationController = TextEditingController(text: labVer.qualification ?? '');
+    _authorizedScopeController = TextEditingController(text: labVer.authorizedTestingDetails ?? '');
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userId = user.id ?? user.email;

@@ -49,10 +49,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
   void _showFinalizePackagingDialog(BuildContext context, WorkflowRequest req) {
     if (!ProfileGuard.checkPackagingVerificationOrPrompt(context)) return;
 
-    final qtyCtrl = TextEditingController(text: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg.toStringAsFixed(1) : '15.0');
-    final countCtrl = TextEditingController(text: '30');
-    final sizeCtrl = TextEditingController(text: '500g Glass Jar (Tamper Evident)');
-    final notesCtrl = TextEditingController(text: 'Packaged in ISO cleanroom with tamper-evident seal and QR code.');
+    final qtyCtrl = TextEditingController(text: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg.toStringAsFixed(1) : '');
+    final countCtrl = TextEditingController();
+    final sizeCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -73,6 +73,7 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                 controller: qtyCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
+                  hintText: 'e.g. 15.0',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
@@ -86,6 +87,7 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                 controller: countCtrl,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
+                  hintText: 'e.g. 30',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
@@ -98,6 +100,7 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               TextField(
                 controller: sizeCtrl,
                 decoration: InputDecoration(
+                  hintText: 'e.g. 500g Glass Jar (Tamper Evident)',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
@@ -110,6 +113,7 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               TextField(
                 controller: notesCtrl,
                 decoration: InputDecoration(
+                  hintText: 'Enter packaging details or lot observations...',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),

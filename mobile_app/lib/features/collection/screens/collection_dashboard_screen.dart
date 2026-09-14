@@ -97,10 +97,11 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
 
   void _showSendToLabDialog(BuildContext context, WorkflowRequest req) {
     if (!ProfileGuard.checkCollectorVerificationOrPrompt(context)) return;
-    final methodCtrl = TextEditingController(text: 'Centrifugal Cold Extraction & Multi-mesh Filtration');
-    final facilityCtrl = TextEditingController(text: 'HoneyChain Regional Processing Hub');
-    final moistureCtrl = TextEditingController(text: '17.2');
-    final notesCtrl = TextEditingController(text: 'Processed under 35°C raw honey standards.');
+    final user = context.read<UserController>().user;
+    final methodCtrl = TextEditingController();
+    final facilityCtrl = TextEditingController(text: user.facilityLocation ?? '');
+    final moistureCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -120,6 +121,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
               TextField(
                 controller: methodCtrl,
                 decoration: InputDecoration(
+                  hintText: 'e.g. Cold Extraction & Filtration',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
@@ -132,6 +134,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
               TextField(
                 controller: facilityCtrl,
                 decoration: InputDecoration(
+                  hintText: 'Enter processing facility name or address',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
@@ -145,6 +148,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                 controller: moistureCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
+                  hintText: 'e.g. 17.2',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
@@ -157,6 +161,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
               TextField(
                 controller: notesCtrl,
                 decoration: InputDecoration(
+                  hintText: 'Enter notes or observations for testing lab...',
                   filled: true,
                   fillColor: context.scaffoldBg,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),

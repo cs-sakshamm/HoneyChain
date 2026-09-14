@@ -32,43 +32,30 @@ async function main() {
   await prisma.harvesterVerification.upsert({
     where: { harvesterId: harvesterUser.id },
     update: {
-      governmentIdVerified: 'Verified',
-      mobileVerified: 'Verified',
-      registrationVerified: 'Verified',
-      locationVerified: 'Verified',
-      verificationStatus: 'Verified',
-      apiaryLocation: 'Cascade Valley, OR',
-      apiaryCoordinates: '44.0521, -121.3153'
+      governmentIdVerified: 'Not Started',
+      mobileVerified: 'Not Started',
+      registrationVerified: 'Not Started',
+      locationVerified: 'Not Started',
+      verificationStatus: 'Not Started',
+      verificationId: null,
+      verificationHash: null,
+      transactionHash: null,
+      blockNumber: null,
+      verifiedAt: null
     },
     create: {
       harvesterId: harvesterUser.id,
-      governmentIdType: 'NATIONAL_ID',
-      governmentIdReference: 'DOC-NAT-***9481',
-      governmentIdDocHash: crypto.createHash('sha256').update('DL-98421094').digest('hex'),
-      governmentIdVerified: 'Verified',
-      governmentIdSubmittedAt: now,
-      mobileNumber: '+919876543210',
-      mobileVerified: 'Verified',
-      mobileVerifiedAt: now,
-      registrationId: 'BK-OR-8842',
-      registrationType: 'STATE_REGISTRY',
-      registrationVerified: 'Verified',
-      registrationSubmittedAt: now,
-      apiaryName: 'Cascade High Mountain Apiary',
+      governmentIdVerified: 'Not Started',
+      mobileVerified: 'Not Started',
+      registrationVerified: 'Not Started',
+      locationVerified: 'Not Started',
+      verificationStatus: 'Not Started',
+      apiaryName: 'Apiary 1',
       apiaryLocation: 'Cascade Valley, OR',
-      apiaryCoordinates: '44.0521, -121.3153',
-      locationVerified: 'Verified',
-      locationSubmittedAt: now,
-      verificationStatus: 'Verified',
-      verificationId: 'HV-2026-F98B2A1C',
-      verificationHash: crypto.createHash('sha256').update('HV-2026-F98B2A1C-CANONICAL').digest('hex'),
-      blockchainNetwork: 'HoneyChain Provenance Ledger',
-      transactionHash: '0x3f1e8a9d2c4b5e7f01a2b3c4d5e6f7a8b9c0d1e2',
-      blockNumber: 1042,
-      verifiedAt: now
+      apiaryCoordinates: '44.0521, -121.3153'
     }
   });
-  console.log(`✓ Seeded Harvester User & 3/3 Verification Record`);
+  console.log(`✓ Seeded Harvester User (Unverified / Ready for Verification)`);
 
   // ── 2. Seed Verified Collection & Processing Centres (with Real Coordinates) ──
   const collectorsData = [

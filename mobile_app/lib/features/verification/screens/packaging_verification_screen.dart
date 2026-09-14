@@ -46,9 +46,9 @@ class _PackagingVerificationScreenState extends State<PackagingVerificationScree
     _mobileController = TextEditingController(text: packagingVer.mobileNumber ?? user.phone);
     _otpController = TextEditingController();
 
-    _orgController = TextEditingController(text: packagingVer.organizationName ?? user.organizationName ?? 'HoneyChain Eco Packaging Facility');
-    _locationController = TextEditingController(text: packagingVer.facilityLocation ?? user.facilityLocation ?? 'Unit 8, Organic Food Processing Park');
-    _licenseController = TextEditingController(text: packagingVer.packagingLicenseNumber ?? user.licenseNumber ?? 'PKG-FSSAI-2026-B99');
+    _orgController = TextEditingController(text: packagingVer.organizationName ?? user.organizationName ?? '');
+    _locationController = TextEditingController(text: packagingVer.facilityLocation ?? user.facilityLocation ?? '');
+    _licenseController = TextEditingController(text: packagingVer.packagingLicenseNumber ?? user.licenseNumber ?? '');
 
     _selectedGovIdType = packagingVer.governmentIdType ?? 'AADHAAR';
     _govIdController = TextEditingController();

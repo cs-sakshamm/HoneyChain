@@ -25,13 +25,13 @@ class _LabReportScreenState extends State<LabReportScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // 6 Testing Parameters
-  final _moistureController = TextEditingController(text: '16.8');
-  final _hmfController = TextEditingController(text: '14.5');
-  final _diastaseController = TextEditingController(text: '12.4');
-  final _purityController = TextEditingController(text: '98.5');
-  final _residuesController = TextEditingController(text: '0.0');
-  final _pollenController = TextEditingController(text: '28000');
-  final _notesController = TextEditingController(text: 'Grade A Pure Flora Honey. All regulatory parameters passed.');
+  final _moistureController = TextEditingController();
+  final _hmfController = TextEditingController();
+  final _diastaseController = TextEditingController();
+  final _purityController = TextEditingController();
+  final _residuesController = TextEditingController();
+  final _pollenController = TextEditingController();
+  final _notesController = TextEditingController();
 
   bool _isReportGenerated = false;
   Map<String, dynamic>? _generatedReport;

@@ -96,13 +96,12 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
   }
 
   void _sendRequest(BuildContext context, Map<String, dynamic> center) {
-    final notesCtrl = TextEditingController(
-      text: widget.targetRole == 'COLLECTOR_PROCESSOR'
-          ? 'Harvest ready for cold extraction and collection'
-          : widget.targetRole == 'LAB'
-              ? 'Extracted sample sent for HPLC & spectrometry testing'
-              : 'Lab-certified batch sent for packaging and QR sealing',
-    );
+    final defaultHint = widget.targetRole == 'COLLECTOR_PROCESSOR'
+        ? 'e.g. Harvest ready for cold extraction and collection'
+        : widget.targetRole == 'LAB'
+            ? 'e.g. Extracted sample sent for HPLC & spectrometry testing'
+            : 'e.g. Lab-certified batch sent for packaging and QR sealing';
+    final notesCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -123,6 +122,7 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
             TextField(
               controller: notesCtrl,
               decoration: InputDecoration(
+                hintText: defaultHint,
                 filled: true,
                 fillColor: context.scaffoldBg,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
