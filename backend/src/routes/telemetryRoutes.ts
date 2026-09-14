@@ -36,7 +36,7 @@ router.post('/ingest', async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: 'HIVE_NOT_FOUND',
-        message: Hive with ID/Code  not found.
+        message: `Hive with ID/Code ${data.hiveId} not found.`
       });
     }
 
@@ -168,7 +168,7 @@ router.get('/alerts', async (req: Request, res: Response) => {
  */
 router.post('/alerts/:id/acknowledge', async (req: Request, res: Response) => {
   try {
-    const alertId = req.params.id;
+    const alertId = String(req.params.id);
     const { userId, userName } = req.body;
 
     const alert = await prisma.hiveAlert.findUnique({
@@ -204,7 +204,7 @@ router.post('/alerts/:id/acknowledge', async (req: Request, res: Response) => {
  */
 router.get('/live/:hiveId', async (req: Request, res: Response) => {
   try {
-    const hiveId = req.params.hiveId;
+    const hiveId = String(req.params.hiveId);
     const telemetry = await prisma.hiveTelemetry.findMany({
       where: {
         OR: [

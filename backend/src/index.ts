@@ -551,7 +551,8 @@ app.get(['/api/verify', '/api/verify/:batchId', '/verify/:batchId'], async (req,
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`🐝 HoneyChain PostgreSQL Backend running on port ${port}`);
+const port = Number(process.env.PORT) || 3000;
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🐝 HoneyChain Backend running on http://127.0.0.1:${port} and http://localhost:${port}`);
+  console.log(`📱 Mobile OTP & Verification API accessible at /api/verification`);
 });

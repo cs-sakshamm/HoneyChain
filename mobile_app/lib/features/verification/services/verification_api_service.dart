@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../models/collector_verification_model.dart';
 import '../models/harvester_verification_model.dart';
 import '../models/lab_tester_verification_model.dart';
@@ -12,14 +13,14 @@ import '../models/packaging_manager_verification_model.dart';
 class VerificationApiService {
   static String get _defaultBaseUrl {
     if (kIsWeb) {
-      return 'http://localhost:3000/api';
+      return '${AppConstants.backendBaseUrl}/api';
     }
     try {
       if (Platform.isAndroid) {
         return 'http://10.0.2.2:3000/api';
       }
     } catch (_) {}
-    return 'http://localhost:3000/api';
+    return '${AppConstants.backendBaseUrl}/api';
   }
 
   final String baseUrl;

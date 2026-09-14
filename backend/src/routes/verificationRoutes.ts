@@ -98,9 +98,11 @@ router.post('/harvester/government-id', async (req: Request, res: Response) => {
 
 /**
  * POST /api/verification/harvester/mobile/send-otp
+ * POST /api/verification/mobile/send-otp
+ * POST /api/verification/send-otp
  * Step 2a: Send Mobile OTP
  */
-router.post('/harvester/mobile/send-otp', async (req: Request, res: Response) => {
+const handleGenericSendOtp = async (req: Request, res: Response) => {
   try {
     const { mobile } = req.body;
     if (!mobile) {
@@ -115,7 +117,11 @@ router.post('/harvester/mobile/send-otp', async (req: Request, res: Response) =>
   } catch (error: any) {
     res.status(500).json({ success: false, error: error?.message || String(error) });
   }
-});
+};
+
+router.post('/harvester/mobile/send-otp', handleGenericSendOtp);
+router.post('/mobile/send-otp', handleGenericSendOtp);
+router.post('/send-otp', handleGenericSendOtp);
 
 /**
  * POST /api/verification/harvester/mobile/verify-otp
@@ -138,6 +144,31 @@ router.post('/harvester/mobile/verify-otp', async (req: Request, res: Response) 
     res.status(400).json({ success: false, error: error?.message || String(error) });
   }
 });
+
+/**
+ * POST /api/verification/mobile/verify-otp
+ * POST /api/verification/verify-otp
+ * Generic standalone OTP verification endpoint
+ */
+const handleGenericVerifyOtp = async (req: Request, res: Response) => {
+  try {
+    const { mobile, otp, sessionId } = req.body;
+    if (!mobile || !otp) {
+      return res.status(400).json({ success: false, error: 'mobile and otp are required' });
+    }
+
+    const result = await otpService.verifyOtp(mobile, otp, sessionId);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+};
+
+router.post('/mobile/verify-otp', handleGenericVerifyOtp);
+router.post('/verify-otp', handleGenericVerifyOtp);
 
 /**
  * POST /api/verification/harvester/registration
