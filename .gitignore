@@ -45,3 +45,14 @@ build/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Scratch & tooling
+show_files.txt
+temp_*.txt
+.freebuff/

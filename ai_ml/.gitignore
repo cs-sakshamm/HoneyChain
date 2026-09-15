@@ -1,0 +1,26 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+
+# Node
+node_modules/
+
+# Generated ML files
+*.joblib
+*.pt
+*.pth
+!models/honeychain_isolation_forest.joblib
+!models/threshold.json
+!models/metrics.json
+
+# Large datasets
+*.csv

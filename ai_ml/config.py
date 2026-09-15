@@ -1,0 +1,37 @@
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent
+
+DATA_DIR = BASE_DIR / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+
+MODEL_DIR = BASE_DIR / "models"
+
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+
+MQTT_TOPIC = "honeychain/hive/+/sensors"
+
+MODEL_PATH = MODEL_DIR / "hive_anomaly_model.joblib"
+
+FEATURE_COLUMNS = [
+    "temperature_c",
+    "humidity_pct",
+    "weight_kg",
+    "acoustics_hz",
+]
+
+DIAGNOSTIC_COLUMNS = [
+    "battery_v",
+    "wifi_rssi_dbm",
+]
+
+
+for directory in [
+    RAW_DATA_DIR,
+    PROCESSED_DATA_DIR,
+    MODEL_DIR,
+]:
+    directory.mkdir(parents=True, exist_ok=True)
