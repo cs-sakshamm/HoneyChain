@@ -6,6 +6,8 @@ import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
@@ -256,7 +258,7 @@ class HiveDetailsScreen extends StatelessWidget {
                           'Expected Production',
                           hive.expectedProductionKg > 0
                               ? '${hive.expectedProductionKg.toStringAsFixed(1)} kg'
-                              : 'Not recorded',
+                              : '> No data available yet.',
                         ),
                         const Divider(height: 16),
                         _buildRowItem(
@@ -264,7 +266,7 @@ class HiveDetailsScreen extends StatelessWidget {
                           'Current Season Yield',
                           hive.currentYearProductionKg > 0
                               ? '${hive.currentYearProductionKg.toStringAsFixed(1)} kg'
-                              : '0.0 kg (No harvest yet)',
+                              : '> No data available yet.',
                         ),
                         const Divider(height: 16),
                         _buildRowItem(
@@ -272,7 +274,7 @@ class HiveDetailsScreen extends StatelessWidget {
                           'Previous Season Yield',
                           hive.previousYearProductionKg > 0
                               ? '${hive.previousYearProductionKg.toStringAsFixed(1)} kg'
-                              : 'No prior record',
+                              : '> No data available yet.',
                         ),
                       ],
                     ),
@@ -415,42 +417,10 @@ class HiveDetailsScreen extends StatelessWidget {
                           .toList();
 
                       if (hiveRequests.isEmpty) {
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppConstants.space16),
-                          decoration: BoxDecoration(
-                            color: context.surfaceColor,
-                            borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-                            border: Border.all(color: context.borderColor),
-                          ),
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: AppConstants.space12),
-                              child: Column(
-                                children: [
-                                  Icon(Icons.inventory_2_outlined, size: 28, color: context.textMutedColor),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'No records found',
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: context.textPrimaryColor,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'No harvest records logged yet for this hive.',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: context.textSecondaryColor,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        return const EmptyStateWidget(
+                          title: 'No records found',
+                          subtitle: '> No data available yet.',
+                          icon: Icons.inventory_2_outlined,
                         );
                       }
 

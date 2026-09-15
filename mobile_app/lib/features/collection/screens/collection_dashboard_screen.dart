@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/status_badge.dart';
 import 'batch_timeline_screen.dart';
 import 'harvester_detail_screen.dart';
@@ -556,34 +557,9 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
   }
 
   Widget _buildEmptyState(BuildContext context, String title, String subtitle) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.space24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inbox_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
-            const SizedBox(height: AppConstants.space16),
-            Text(
-              title,
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimaryColor,
-              ),
-            ),
-            const SizedBox(height: AppConstants.space8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: context.textSecondaryColor,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return EmptyStateWidget(
+      title: title,
+      subtitle: subtitle,
     );
   }
 

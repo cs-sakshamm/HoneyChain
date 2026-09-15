@@ -10,6 +10,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../collection/screens/nearest_centres_screen.dart';
@@ -214,28 +215,10 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
     bool showSendToPackaging = false,
   }) {
     if (samples.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.science_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
-            const SizedBox(height: AppConstants.space16),
-            Text(
-              emptyTitle,
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimaryColor,
-              ),
-            ),
-            const SizedBox(height: AppConstants.space8),
-            Text(
-              emptySubtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
-            ),
-          ],
-        ),
+      return EmptyStateWidget(
+        title: emptyTitle,
+        subtitle: '> No data available yet.',
+        icon: Icons.science_outlined,
       );
     }
 
