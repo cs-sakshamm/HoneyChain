@@ -822,13 +822,26 @@ def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)):
 # ============================================================
 # 4. WORKFLOW: REQUESTS, HARVESTS, PROCESSING, LAB, PACKAGING
 # ============================================================
+# ============================================================
+# 4. WORKFLOW: REQUESTS, HARVESTS, PROCESSING, LAB, PACKAGING
+# ============================================================
+@app.get("/api/centers/nearest")
 @app.get("/api/requests/nearest-centers")
 def get_nearest_centers(
-    lat: float = None,
-    lon: float = None,
-    db: Session = Depends(get_db)
+    role: Optional[str] = Query("COLLECTOR_PROCESSOR"),
+    targetRole: Optional[str] = Query(None),
+    lat: Optional[float] = Query(None),
+    lon: Optional[float] = Query(None),
+    lng: Optional[float] = Query(None),
+    originLocation: Optional[str] = Query(None),
+    originHiveId: Optional[str] = Query(None),
+    batchId: Optional[str] = Query(None),
+    userId: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
 ):
-    # Helper to calculate haversine distance in kilometers
+    actual_lon = lon if lon is not None else lng
+    target = (targetRole or role or "COLLECTOR_PROCESSOR").upper().strip()
+
     def haversine(lat1, lon1, lat2, lon2):
         from math import radians, cos, sin, asin, sqrt
         if None in (lat1, lon1, lat2, lon2):
@@ -840,26 +853,73 @@ def get_nearest_centers(
         c = 2 * asin(sqrt(a))
         return r * c
 
-    centres = db.query(CollectionCentre).filter(CollectionCentre.is_active == True).all()
     results = []
-    for c in centres:
-        distance = None
-        if lat is not None and lon is not None and c.latitude is not None and c.longitude is not None:
-            distance = haversine(lat, lon, c.latitude, c.longitude)
-        distance_display = f"{distance:.1f} km away" if distance is not None else "Distance unknown"
-        results.append({
-            "id": c.id,
-            "name": c.name,
-            "location": c.location,
-            "distanceKm": distance,
-            "distanceDisplay": distance_display,
-            "contactPhone": c.contact_phone,
-            "latitude": c.latitude,
-            "longitude": c.longitude,
-        })
-    # Sort by distance if available, otherwise keep original order
+    if "LAB" in target:
+        labs = db.query(Lab).filter(Lab.is_active == True).all()
+        for lab in labs:
+            dist = haversine(lat, actual_lon, lab.latitude, lab.longitude)
+            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unknown"
+            results.append({
+                "id": lab.id,
+                "userId": lab.user_id,
+                "name": lab.lab_name,
+                "role": "LAB",
+                "location": lab.facility_location,
+                "distanceKm": dist,
+                "distanceDisplay": dist_display,
+                "contactPhone": lab.contact_phone,
+                "contactEmail": lab.contact_email,
+                "licenseNumber": lab.registration_number,
+                "accreditation": lab.accreditation,
+                "latitude": lab.latitude,
+                "longitude": lab.longitude,
+            })
+    elif "PACKAG" in target or "PKG" in target:
+        facilities = db.query(PackagingFacility).filter(PackagingFacility.is_active == True).all()
+        for p in facilities:
+            dist = haversine(lat, actual_lon, p.latitude, p.longitude)
+            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unknown"
+            results.append({
+                "id": p.id,
+                "userId": p.id,
+                "name": p.name,
+                "role": "PACKAGING",
+                "location": p.location,
+                "distanceKm": dist,
+                "distanceDisplay": dist_display,
+                "contactPhone": p.contact_phone,
+                "contactEmail": p.contact_email,
+                "licenseNumber": p.license_number,
+                "latitude": p.latitude,
+                "longitude": p.longitude,
+            })
+    else:
+        centres = db.query(CollectionCentre).filter(CollectionCentre.is_active == True).all()
+        for c in centres:
+            dist = haversine(lat, actual_lon, c.latitude, c.longitude)
+            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unknown"
+            results.append({
+                "id": c.id,
+                "userId": c.id,
+                "name": c.name,
+                "role": "COLLECTOR_PROCESSOR",
+                "location": c.location,
+                "distanceKm": dist,
+                "distanceDisplay": dist_display,
+                "contactPhone": c.contact_phone,
+                "contactEmail": c.contact_email,
+                "licenseNumber": c.license_number,
+                "latitude": c.latitude,
+                "longitude": c.longitude,
+            })
+
     results.sort(key=lambda x: (x["distanceKm"] is None, x["distanceKm"]))
-    return {"success": True, "centres": results}
+    return {
+        "success": True,
+        "centers": results,
+        "centres": results,
+        "total": len(results),
+    }
 
 
 @app.get("/api/requests")
@@ -872,6 +932,8 @@ def get_workflow_requests(db: Session = Depends(get_db)):
             "id": r.id,
             "requestId": r.request_id,
             "batchId": r.batch_id or r.request_id,
+            "harvestId": r.harvest_id,
+            "hiveId": r.hive_id,
             "fromRole": "HARVESTER",
             "toRole": "COLLECTOR_PROCESSOR",
             "requestType": "HARVEST_TO_COLLECTION",
@@ -881,53 +943,61 @@ def get_workflow_requests(db: Session = Depends(get_db)):
             "notes": r.notes or "",
             "createdAt": r.created_at.isoformat() if r.created_at else None,
             "updatedAt": r.updated_at.isoformat() if r.updated_at else None,
+            "acceptedAt": r.accepted_at.isoformat() if r.accepted_at else None,
         })
     return out
 
 
 @app.post("/api/requests")
 @app.post("/collection/requests")
-def create_workflow_request(payload: WorkflowCreateRequest, db: Session = Depends(get_db)):
+def create_workflow_request(payload: Dict[str, Any], db: Session = Depends(get_db)):
     req_code = f"REQ-COL-2026-{uuid.uuid4().hex[:6].upper()}"
-    batch_code = f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}"
+    batch_code = payload.get("batchId") or f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}"
 
+    harvester_id = payload.get("harvesterId")
     harvester = None
-    if payload.harvesterId:
-        harvester = db.query(User).filter((User.id == payload.harvesterId) | (User.email == payload.harvesterId)).first()
+    if harvester_id:
+        harvester = db.query(User).filter((User.id == harvester_id) | (User.email == harvester_id) | (User.name == harvester_id)).first()
     if not harvester:
         harvester = db.query(User).filter(User.role == "HARVESTER").first()
+
+    qty = float(payload.get("quantity") or payload.get("estimatedQuantityKg") or 15.0)
 
     col_req = CollectionRequest(
         request_id=req_code,
         harvester_id=harvester.id if harvester else "harvester-1",
-        hive_id=payload.hiveId,
-        collection_centre_id=payload.collectionCentreId,
+        hive_id=payload.get("hiveId"),
+        collection_centre_id=payload.get("collectionCentreId") or payload.get("toUserId"),
         batch_id=batch_code,
         status="PENDING",
-        requested_quantity_kg=payload.quantity or payload.estimatedQuantityKg or 15.0,
-        location=payload.location,
-        notes=payload.notes,
+        requested_quantity_kg=qty,
+        location=payload.get("location") or "Main Apiary",
+        notes=payload.get("notes") or "",
     )
     db.add(col_req)
 
-    # Initialize batch record
-    batch = CollectionBatch(
-        batch_id=batch_code,
-        request_id=req_code,
-        harvester_id=harvester.id if harvester else "harvester-1",
-        hive_id=payload.hiveId,
-        quantity_kg=payload.quantity or payload.estimatedQuantityKg or 15.0,
-        current_stage="HARVESTED",
-        status="PENDING",
-    )
-    db.add(batch)
+    # Initialize batch record if not exists
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_code).first()
+    if not batch:
+        batch = CollectionBatch(
+            batch_id=batch_code,
+            request_id=req_code,
+            harvester_id=harvester.id if harvester else "harvester-1",
+            hive_id=payload.get("hiveId"),
+            quantity_kg=qty,
+            current_stage="HARVESTED",
+            status="PENDING",
+        )
+        db.add(batch)
+    else:
+        batch.request_id = req_code
 
     # Record Blockchain Provenance
     blockchain_result = blockchain_service.record_batch_event(
         batch_id=batch_code,
         event_type="HARVEST_AND_COLLECTION_REQUESTED",
         actor_id=harvester.id if harvester else "harvester-1",
-        payload={"batch_id": batch_code, "quantity": col_req.requested_quantity_kg, "hive_id": payload.hiveId},
+        payload={"batch_id": batch_code, "quantity": col_req.requested_quantity_kg, "hive_id": payload.get("hiveId")},
     )
 
     bc_record = BlockchainRecord(
@@ -973,27 +1043,265 @@ def update_workflow_request(request_id: str, payload: WorkflowUpdateRequest, db:
     return {"success": True, "message": f"Request updated to {req_obj.status}"}
 
 
+@app.patch("/api/requests/{request_id}/accept")
+def accept_workflow_request(request_id: str, payload: Optional[Dict[str, Any]] = None, db: Session = Depends(get_db)):
+    req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
+    if not req_obj:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    payload = payload or {}
+    actor_id = payload.get("actorId") or "Collector"
+    notes = payload.get("notes")
+    if notes:
+        req_obj.notes = f"{req_obj.notes or ''}\n{notes}".strip()
+
+    req_obj.status = "ACCEPTED"
+    req_obj.accepted_at = datetime.utcnow()
+
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
+    if batch:
+        batch.current_stage = "COLLECTED"
+        batch.status = "ACCEPTED"
+
+    # Blockchain event
+    bc = blockchain_service.record_batch_event(
+        batch_id=req_obj.batch_id or req_obj.request_id,
+        event_type="REQUEST_ACCEPTED",
+        actor_id=actor_id,
+        payload={"request_id": req_obj.request_id, "status": "ACCEPTED", "timestamp": datetime.utcnow().isoformat()},
+    )
+    db.add(BlockchainRecord(
+        batch_id=req_obj.batch_id or req_obj.request_id,
+        event_type="REQUEST_ACCEPTED",
+        actor_id=actor_id,
+        data_hash=bc["data_hash"],
+        tx_hash=bc.get("tx_hash"),
+        network=bc["network"],
+        status=bc["status"],
+    ))
+    db.commit()
+    return {"success": True, "message": "Request accepted successfully", "requestId": req_obj.request_id, "status": "ACCEPTED", "blockchain": bc}
+
+
+@app.patch("/api/requests/{request_id}/reject")
+def reject_workflow_request(request_id: str, payload: Optional[Dict[str, Any]] = None, db: Session = Depends(get_db)):
+    req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
+    if not req_obj:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    payload = payload or {}
+    reason = payload.get("reason") or "Rejected by reviewer"
+    req_obj.status = "REJECTED"
+    req_obj.notes = f"{req_obj.notes or ''}\nRejection Reason: {reason}".strip()
+
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
+    if batch:
+        batch.status = "REJECTED"
+
+    db.commit()
+    return {"success": True, "message": "Request rejected", "requestId": req_obj.request_id, "status": "REJECTED"}
+
+
+@app.patch("/api/requests/{request_id}/status")
+def update_workflow_request_status(request_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
+    req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
+    if not req_obj:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    new_status = (payload.get("status") or "").upper().strip()
+    if new_status:
+        req_obj.status = new_status
+        batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
+        if batch:
+            batch.status = new_status
+            if new_status in ("PROCESSING", "IN_PROCESS", "IN_PROCESSING"):
+                batch.current_stage = "PROCESSING"
+        db.commit()
+    return {"success": True, "message": f"Status updated to {req_obj.status}"}
+
+
+@app.post("/api/requests/{request_id}/send-next")
+def send_workflow_request_next(request_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
+    req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
+    batch_id = req_obj.batch_id if req_obj else request_id
+
+    actor_role = (payload.get("actorRole") or "").upper().strip()
+    actor_id = payload.get("actorId") or "System"
+    to_user_id = payload.get("toUserId")
+    notes = payload.get("notes") or ""
+
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+
+    if "COLLECT" in actor_role or "PROCESS" in actor_role:
+        qty_received = float(payload.get("quantityReceived", req_obj.requested_quantity_kg if req_obj else 20.0))
+        qty_after = float(payload.get("quantityAfter", qty_received * 0.98))
+        method = payload.get("method") or "Cold Extraction & Centrifugation (< 40°C)"
+        moisture = float(payload.get("moistureAtReceipt", 17.0))
+
+        proc = ProcessingBatch(
+            batch_id=batch_id,
+            processor_id=actor_id,
+            quantity_received=qty_received,
+            quantity_after=qty_after,
+            method=method,
+            moisture_at_receipt=moisture,
+            notes=notes,
+        )
+        db.add(proc)
+
+        lab_req_code = f"REQ-LAB-2026-{uuid.uuid4().hex[:6].upper()}"
+        lab_req = LabRequest(
+            request_id=lab_req_code,
+            batch_id=batch_id,
+            requested_by_id=actor_id,
+            lab_id=to_user_id,
+            sample_code=f"SMP-{batch_id[-6:]}",
+            status="PENDING",
+            notes=notes,
+        )
+        db.add(lab_req)
+
+        if req_obj:
+            req_obj.status = "SENT_TO_LAB"
+            req_obj.actual_quantity_kg = qty_after
+
+        if batch:
+            batch.quantity_kg = qty_after
+            batch.current_stage = "LAB_TESTING"
+            batch.status = "SENT_TO_LAB"
+
+        bc = blockchain_service.record_batch_event(
+            batch_id=batch_id,
+            event_type="PROCESSING_COMPLETED_AND_DISPATCHED_TO_LAB",
+            actor_id=actor_id,
+            payload={"batch_id": batch_id, "target_lab_id": to_user_id, "quantity_after": qty_after, "method": method},
+        )
+        db.add(BlockchainRecord(
+            batch_id=batch_id,
+            event_type="PROCESSING_COMPLETED_AND_DISPATCHED_TO_LAB",
+            actor_id=actor_id,
+            data_hash=bc["data_hash"],
+            tx_hash=bc.get("tx_hash"),
+            network=bc["network"],
+            status=bc["status"],
+        ))
+        db.commit()
+        return {"success": True, "message": "Batch processed and forwarded to Lab", "batchId": batch_id, "labRequestId": lab_req_code, "blockchain": bc}
+
+    elif "LAB" in actor_role:
+        lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
+        if lab_req:
+            lab_req.status = "COMPLETED"
+
+        if req_obj:
+            req_obj.status = "SENT_TO_PACKAGING"
+
+        if batch:
+            batch.current_stage = "PACKAGING"
+            batch.status = "SENT_TO_PACKAGING"
+
+        bc = blockchain_service.record_batch_event(
+            batch_id=batch_id,
+            event_type="LAB_APPROVED_DISPATCHED_TO_PACKAGING",
+            actor_id=actor_id,
+            payload={"batch_id": batch_id, "target_packager_id": to_user_id, "notes": notes},
+        )
+        db.add(BlockchainRecord(
+            batch_id=batch_id,
+            event_type="LAB_APPROVED_DISPATCHED_TO_PACKAGING",
+            actor_id=actor_id,
+            data_hash=bc["data_hash"],
+            tx_hash=bc.get("tx_hash"),
+            network=bc["network"],
+            status=bc["status"],
+        ))
+        db.commit()
+        return {"success": True, "message": "Batch approved and forwarded to Packaging", "batchId": batch_id, "blockchain": bc}
+
+    db.commit()
+    return {"success": True, "message": "Batch status advanced", "batchId": batch_id}
+
+
 @app.post("/api/harvests")
 def create_harvest(payload: Dict[str, Any], db: Session = Depends(get_db)):
     batch_id = payload.get("batchId") or f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}"
     harvester_id = payload.get("harvesterId") or "harvester-1"
     hive_id = payload.get("hiveId")
-    quantity = payload.get("quantity", 0.0)
-    
+    quantity = float(payload.get("quantity") or payload.get("quantityKg") or 0.0)
+    location = payload.get("location") or "Main Apiary"
+    notes = payload.get("notes") or ""
+
+    harvester = db.query(User).filter((User.id == harvester_id) | (User.email == harvester_id) | (User.name == harvester_id)).first()
+    real_harvester_id = harvester.id if harvester else harvester_id
+
+    # Create real Harvest record in DB
+    harvest = Harvest(
+        harvester_id=real_harvester_id,
+        hive_id=hive_id,
+        quantity_kg=quantity,
+        unit="kg",
+        location=location,
+        status="HARVESTED",
+        notes=notes,
+    )
+    db.add(harvest)
+
+    # Create or update CollectionBatch
     batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
     if not batch:
         batch = CollectionBatch(
             batch_id=batch_id,
-            harvester_id=harvester_id,
+            harvest_id=harvest.id,
+            harvester_id=real_harvester_id,
             hive_id=hive_id,
-            quantity_kg=float(quantity),
+            quantity_kg=quantity,
             current_stage="HARVESTED",
-            status="COMPLETED",
+            status="HARVESTED",
         )
         db.add(batch)
-        db.commit()
-    
-    return {"success": True, "batchId": batch_id, "status": "HARVESTED"}
+    else:
+        batch.quantity_kg = quantity
+        batch.current_stage = "HARVESTED"
+
+    # Record Blockchain Provenance
+    bc = blockchain_service.record_batch_event(
+        batch_id=batch_id,
+        event_type="HARVEST_REGISTERED",
+        actor_id=real_harvester_id,
+        payload={"batch_id": batch_id, "harvest_id": harvest.id, "quantity_kg": quantity, "hive_id": hive_id, "location": location},
+    )
+    db.add(BlockchainRecord(
+        batch_id=batch_id,
+        event_type="HARVEST_REGISTERED",
+        actor_id=real_harvester_id,
+        data_hash=bc["data_hash"],
+        tx_hash=bc.get("tx_hash"),
+        block_number=bc.get("block_number"),
+        network=bc["network"],
+        status=bc["status"],
+    ))
+
+    db.commit()
+    db.refresh(harvest)
+    db.refresh(batch)
+
+    return {
+        "success": True,
+        "batchId": batch_id,
+        "harvestId": harvest.id,
+        "batch": {
+            "id": batch.batch_id,
+            "batch_id": batch.batch_id,
+            "harvester_id": batch.harvester_id,
+            "hive_id": batch.hive_id,
+            "quantity_kg": batch.quantity_kg,
+            "current_stage": batch.current_stage,
+            "status": batch.status,
+            "location": location,
+        },
+        "status": "HARVESTED",
+        "blockchain": bc,
+    }
 
 
 @app.post("/api/processing")
@@ -1008,6 +1316,10 @@ def process_batch(payload: Dict[str, Any], db: Session = Depends(get_db)):
         notes=payload.get("notes", "Extraction completed within optimal thermal limits."),
     )
     db.add(proc)
+
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+    if batch:
+        batch.current_stage = "PROCESSING"
 
     # Record Blockchain event
     bc = blockchain_service.record_batch_event(
@@ -1040,13 +1352,27 @@ def create_lab_report(payload: Dict[str, Any], db: Session = Depends(get_db)):
         batch_id=batch_id,
         lab_id=payload.get("labId", "lab-1"),
         quality_score=float(payload.get("qualityScore", 98.5)),
-        moisture_content=float(payload.get("moistureContent", 16.8)),
+        moisture_content=float(payload.get("moistureContent", payload.get("moistureValue", 16.8))),
         purity_grade=payload.get("purityGrade", "Grade A (99.2%)"),
+        hmf_value=float(payload.get("hmfValue", 12.4)),
+        diastase_value=float(payload.get("diastaseValue", 14.2)),
+        contaminants_found=payload.get("contaminantsFound", "None"),
+        pollen_origin=payload.get("pollenValue", "Authentic Floral Matrix (Apis mellifera)"),
         overall_result="PASS",
         status="APPROVED",
-        remarks=payload.get("remarks", "Complies with Codex Alimentarius & FSSAI standards."),
+        remarks=payload.get("notes") or payload.get("remarks") or "Complies with Codex Alimentarius & FSSAI standards.",
     )
     db.add(lab_report)
+
+    # Update lab request and batch stage
+    lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
+    if lab_req:
+        lab_req.status = "COMPLETED"
+
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+    if batch:
+        batch.current_stage = "LAB_TESTING"
+        batch.status = "APPROVED"
 
     # Blockchain
     bc = blockchain_service.record_batch_event(
@@ -1073,7 +1399,7 @@ def create_lab_report(payload: Dict[str, Any], db: Session = Depends(get_db)):
 def create_packaging_batch(payload: Dict[str, Any], db: Session = Depends(get_db)):
     batch_id = payload.get("batchId", f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}")
 
-    # 1. Generate final verifiable QR
+    # Generate final verifiable QR pointing to real verification endpoint
     verification_url, data_uri = generate_qr_data_uri(batch_id)
 
     pkg = PackagingBatch(
@@ -1093,6 +1419,12 @@ def create_packaging_batch(payload: Dict[str, Any], db: Session = Depends(get_db
     if not qr_rec:
         qr_rec = QRCode(batch_id=batch_id, verification_url=verification_url, qr_image_data_uri=data_uri)
         db.add(qr_rec)
+
+    # Update collection batch stage
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+    if batch:
+        batch.current_stage = "COMPLETED"
+        batch.status = "COMPLETED"
 
     # Blockchain
     bc = blockchain_service.record_batch_event(
@@ -1125,89 +1457,333 @@ def create_packaging_batch(payload: Dict[str, Any], db: Session = Depends(get_db
 # ============================================================
 # 5. PUBLIC QR VERIFICATION & BLOCKCHAIN PROVENANCE
 # ============================================================
+def generate_verification_html(data: Dict[str, Any]) -> str:
+    batch_id = data.get("batchId", "Unknown")
+    status = data.get("status", "VERIFIED 100% GENUINE HONEY")
+    product = data.get("product") or {}
+    harvester = data.get("harvester") or {}
+    collection = data.get("collectionProcessing") or {}
+    lab = data.get("labVerification") or {}
+    pkg = data.get("packaging") or {}
+    bc = data.get("blockchainVerification") or {}
+
+    events_html = ""
+    for ev in bc.get("events", []):
+        tx_str = f"<code>{ev.get('txHash')}</code>" if ev.get("txHash") else "<span class='badge pending'>Pending On-Chain</span>"
+        events_html += f"""
+        <div class="event-item">
+            <div class="event-type"><strong>{ev.get('eventType')}</strong></div>
+            <div class="event-hash">Data Hash: <code>{ev.get('dataHash', '')[:24]}...</code></div>
+            <div class="event-tx">Tx: {tx_str}</div>
+            <div class="event-status">{ev.get('status')}</div>
+        </div>
+        """
+
+    lab_params_html = ""
+    if lab and lab.get("parameters"):
+        for param in lab.get("parameters", []):
+            lab_params_html += f"""
+            <tr>
+                <td>{param.get('name')}</td>
+                <td><strong>{param.get('value')}</strong></td>
+                <td>{param.get('standard')}</td>
+                <td><span class="badge pass">{param.get('status')}</span></td>
+            </tr>
+            """
+    else:
+        lab_params_html = "<tr><td colspan='4' style='text-align: center; color: #94A3B8;'>No laboratory report submitted yet.</td></tr>"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HoneyChain Provenance Verification - {batch_id}</title>
+    <style>
+        :root {{
+            --primary: #F59E0B;
+            --bg: #0F172A;
+            --card-bg: #1E293B;
+            --border: #334155;
+            --text: #F8FAFC;
+            --text-muted: #94A3B8;
+            --success: #10B981;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 24px;
+        }}
+        .container {{ max-width: 860px; margin: 0 auto; }}
+        .header {{
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 24px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }}
+        .logo {{ font-size: 28px; font-weight: 800; color: var(--primary); }}
+        .badge {{
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }}
+        .badge.pass, .badge.verified {{
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }}
+        .badge.pending {{
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }}
+        .card {{
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }}
+        .card-title {{
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 0;
+            margin-bottom: 16px;
+            color: var(--primary);
+        }}
+        .grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }}
+        .grid-item label {{
+            display: block;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }}
+        .grid-item span {{ font-size: 15px; font-weight: 600; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+        th, td {{
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }}
+        th {{ color: var(--text-muted); font-size: 12px; text-transform: uppercase; }}
+        .event-item {{
+            padding: 12px;
+            border-left: 3px solid var(--primary);
+            background: rgba(255, 255, 255, 0.02);
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }}
+        .event-type {{ font-size: 14px; color: var(--primary); margin-bottom: 4px; }}
+        .event-hash, .event-tx {{ font-size: 12px; color: var(--text-muted); word-break: break-all; }}
+        code {{ background: rgba(0, 0, 0, 0.3); padding: 2px 6px; border-radius: 4px; color: #E2E8F0; }}
+        .footer {{
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 40px;
+            padding-bottom: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">HoneyChain</div>
+            <p style="margin: 8px 0 16px 0; color: var(--text-muted);">Decentralized Honey Provenance & Supply Chain Verification</p>
+            <div style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">Batch #{batch_id}</div>
+            <span class="badge verified">{status}</span>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">1. Product & Batch Details</h2>
+            <div class="grid">
+                <div class="grid-item"><label>Product Name</label><span>{product.get('productName', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Batch Code</label><span>{product.get('batchCode', batch_id)}</span></div>
+                <div class="grid-item"><label>Quantity</label><span>{product.get('quantityKg', 'No data available yet.')} kg</span></div>
+                <div class="grid-item"><label>Package Type</label><span>{product.get('packageSize', 'No data available yet.')}</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">2. Harvester & Apiary Origin</h2>
+            <div class="grid">
+                <div class="grid-item"><label>Beekeeper / Harvester</label><span>{harvester.get('name', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Beekeeper ID</label><span>{harvester.get('beekeeperId', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Apiary Location</label><span>{harvester.get('apiaryLocation', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Hive Code</label><span>{harvester.get('hiveCode', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Bee Breed</label><span>{harvester.get('beeBreed', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Queen Status</label><span>{harvester.get('queenStatus', 'No data available yet.')}</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">3. Extraction & Processing</h2>
+            <div class="grid">
+                <div class="grid-item"><label>Processing Facility</label><span>{collection.get('processor', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Extraction Method</label><span>{collection.get('method', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Quantity Received</label><span>{collection.get('quantityReceivedKg', 'No data available yet.')} kg</span></div>
+                <div class="grid-item"><label>Moisture at Receipt</label><span>{collection.get('moistureAtReceipt', 'No data available yet.')}</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">4. Laboratory Chemical & Quality Analysis</h2>
+            <div class="grid" style="margin-bottom: 16px;">
+                <div class="grid-item"><label>Testing Laboratory</label><span>{lab.get('labName', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Report Number</label><span>{lab.get('reportId', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Quality Score</label><span>{lab.get('qualityScore', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Certification Status</label><span>{lab.get('status', 'No data available yet.')}</span></div>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Parameter</th><th>Measured Value</th><th>Standard Requirement</th><th>Result</th></tr>
+                </thead>
+                <tbody>
+                    {lab_params_html}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">5. Packaging & Tamper-Evident Seal</h2>
+            <div class="grid">
+                <div class="grid-item"><label>Packaging Facility</label><span>{pkg.get('facility', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Packaging Date</label><span>{pkg.get('packagingDate', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Seal Verification</label><span>{pkg.get('sealStatus', 'No data available yet.')}</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">6. Blockchain Provenance Ledger</h2>
+            <div class="grid" style="margin-bottom: 16px;">
+                <div class="grid-item"><label>Ledger Status</label><span>{bc.get('ledgerStatus', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Network</label><span>{bc.get('network', 'No data available yet.')}</span></div>
+                <div class="grid-item"><label>Confirmed Events</label><span>{bc.get('totalConfirmedEvents', 0)}</span></div>
+            </div>
+            {events_html if events_html else '<p style="color: #94A3B8;">No blockchain provenance events committed yet.</p>'}
+        </div>
+
+        <div class="footer">
+            &copy; 2026 HoneyChain Cryptographic Traceability Protocol. Genuine Honey Verification.
+        </div>
+    </div>
+</body>
+</html>"""
+
+
 @app.get("/api/verify")
 @app.get("/verify")
 @app.get("/api/verify/{batch_id}")
 @app.get("/verify/{batch_id}")
-def verify_batch(batch_id: Optional[str] = None, batch: Optional[str] = None, db: Session = Depends(get_db)):
-    batch_id = batch_id or batch
-    if not batch_id:
+def verify_batch(
+    req: Request,
+    batch_id: Optional[str] = None,
+    batch: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    target_batch_id = batch_id or batch
+    if not target_batch_id:
         raise HTTPException(status_code=400, detail="Missing batch parameter")
-    # Look up batch or request or lab report matching batch_id
-    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+
+    # Look up batch in database
+    batch_obj = db.query(CollectionBatch).filter(CollectionBatch.batch_id == target_batch_id).first()
+
+    # Look up related models
     hive = None
     harvester = None
-    if batch and batch.hive_id:
-        hive = db.query(Hive).filter(Hive.id == batch.hive_id).first()
-    if batch and batch.harvester_id:
-        harvester = db.query(User).filter(User.id == batch.harvester_id).first()
+    if batch_obj and batch_obj.hive_id:
+        hive = db.query(Hive).filter(Hive.id == batch_obj.hive_id).first()
+    if batch_obj and batch_obj.harvester_id:
+        harvester = db.query(User).filter(User.id == batch_obj.harvester_id).first()
 
-    lab_report = db.query(LabReport).filter(LabReport.batch_id == batch_id).first()
-    packaging = db.query(PackagingBatch).filter(PackagingBatch.batch_id == batch_id).first()
-    processing = db.query(ProcessingBatch).filter(ProcessingBatch.batch_id == batch_id).first()
-    bc_records = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == batch_id).all()
+    lab_report = db.query(LabReport).filter(LabReport.batch_id == target_batch_id).first()
+    lab_facility = None
+    if lab_report:
+        lab_facility = db.query(Lab).filter((Lab.user_id == lab_report.lab_id) | (Lab.id == lab_report.lab_id)).first()
+
+    packaging = db.query(PackagingBatch).filter(PackagingBatch.batch_id == target_batch_id).first()
+    processing = db.query(ProcessingBatch).filter(ProcessingBatch.batch_id == target_batch_id).first()
+    bc_records = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == target_batch_id).all()
 
     verification_data = {
         "success": True,
-        "found": True,
-        "batchId": batch_id,
-        "traceabilityId": batch_id,
-        "status": "VERIFIED 100% GENUINE HONEY",
-        "currentStage": "COMPLETED",
-        "isFullyVerified": True,
+        "found": batch_obj is not None,
+        "batchId": target_batch_id,
+        "traceabilityId": target_batch_id,
+        "status": "VERIFIED 100% GENUINE HONEY" if (batch_obj or lab_report or packaging) else "UNVERIFIED BATCH",
+        "currentStage": batch_obj.current_stage if batch_obj else "No data available yet.",
+        "isFullyVerified": packaging is not None and lab_report is not None,
         "verificationTimestamp": datetime.utcnow().isoformat(),
         "product": {
-            "productName": f"{hive.honey_type if hive else 'Pure Raw Wildflower'} Honey",
-            "batchCode": batch_id,
-            "quantityKg": packaging.final_quantity if packaging else (batch.quantity_kg if batch else 20.0),
-            "numberOfPackages": packaging.number_of_packages if packaging else 40,
+            "productName": f"{hive.honey_type if hive and hive.honey_type else 'Pure Raw Wildflower'} Honey",
+            "batchCode": target_batch_id,
+            "quantityKg": packaging.final_quantity if packaging else (batch_obj.quantity_kg if batch_obj else "No data available yet."),
+            "numberOfPackages": packaging.number_of_packages if packaging else "No data available yet.",
             "packageSize": packaging.package_size if packaging else "500g Tamper-Evident Glass Jar",
             "sealType": "Induction Tamper-Evident Digital QR Seal",
         },
         "harvester": {
-            "name": harvester.name if harvester else "Cascade Artisan Beekeepers Cooperative",
-            "beekeeperId": harvester.beekeeper_id if harvester else "HC-BK-97FD3395",
-            "apiaryLocation": hive.apiary_location if hive else "Cascade Foothills Apiary, OR",
-            "hiveCode": hive.hive_code if hive else "HIVE-MVP-01",
-            "beeBreed": hive.bee_breed if hive else "Italian (Apis mellifera ligustica)",
-            "queenStatus": hive.queen_status if hive else "Mated & Active",
+            "name": harvester.name if harvester else "No data available yet.",
+            "beekeeperId": harvester.beekeeper_id if harvester else (f"HC-BK-{target_batch_id[-8:]}" if batch_obj else "No data available yet."),
+            "apiaryLocation": hive.apiary_location if hive else "No data available yet.",
+            "hiveCode": hive.hive_code if hive else "No data available yet.",
+            "beeBreed": hive.bee_breed if hive else "No data available yet.",
+            "queenStatus": hive.queen_status if hive else "No data available yet.",
         },
         "collectionProcessing": {
-            "processor": "Authorized Regional Honey Collection & Centrifugation Center",
-            "method": processing.method if processing else "Cold Extraction & Multi-Stage Fine Filtration (< 40°C)",
-            "quantityReceivedKg": processing.quantity_received if processing else 20.0,
-            "moistureAtReceipt": f"{processing.moisture_at_receipt if processing else 17.0}%",
-        },
+            "processor": "Authorized Regional Honey Collection & Centrifugation Center" if processing else "No data available yet.",
+            "method": processing.method if processing else "No data available yet.",
+            "quantityReceivedKg": processing.quantity_received if processing else "No data available yet.",
+            "moistureAtReceipt": f"{processing.moisture_at_receipt}%" if processing else "No data available yet.",
+        } if processing else None,
         "labVerification": {
-            "labName": "National Food Safety & Apiculture Analytical Testing Lab",
-            "reportId": lab_report.report_id if lab_report else f"LAB-RPT-{batch_id[-6:]}",
-            "qualityScore": lab_report.quality_score if lab_report else 98.5,
-            "status": "CERTIFIED APPROVED (PASS)",
+            "labName": lab_facility.lab_name if lab_facility else "Certified Food Safety & Apiculture Analytical Lab",
+            "reportId": lab_report.report_id if lab_report else "No data available yet.",
+            "qualityScore": lab_report.quality_score if lab_report else "No data available yet.",
+            "status": "CERTIFIED APPROVED (PASS)" if lab_report and lab_report.overall_result == "PASS" else "No data available yet.",
             "parameters": [
-                {"name": "Moisture Content", "value": f"{lab_report.moisture_content if lab_report else 16.8}%", "standard": "<= 20.0%", "status": "PASS"},
-                {"name": "Hydroxymethylfurfural (HMF)", "value": f"{lab_report.hmf_value if lab_report else 12.4} mg/kg", "standard": "<= 40.0 mg/kg", "status": "PASS"},
-                {"name": "Diastase Enzyme Activity", "value": f"{lab_report.diastase_value if lab_report else 14.2} Schade Units", "standard": ">= 8.0 Schade Units", "status": "PASS"},
-                {"name": "F/G Ratio (Fructose/Glucose)", "value": f"{lab_report.f_g_ratio if lab_report else 1.15}", "standard": ">= 0.95 Ratio", "status": "PASS"},
+                {"name": "Moisture Content", "value": f"{lab_report.moisture_content}%", "standard": "<= 20.0%", "status": "PASS"},
+                {"name": "Hydroxymethylfurfural (HMF)", "value": f"{lab_report.hmf_value} mg/kg", "standard": "<= 40.0 mg/kg", "status": "PASS"},
+                {"name": "Diastase Enzyme Activity", "value": f"{lab_report.diastase_value} Schade Units", "standard": ">= 8.0 Schade Units", "status": "PASS"},
+                {"name": "F/G Ratio (Fructose/Glucose)", "value": f"{lab_report.f_g_ratio}", "standard": ">= 0.95 Ratio", "status": "PASS"},
                 {"name": "Antibiotic & Chemical Residues", "value": "None Detected (< 0.01 ppm)", "standard": "Zero Tolerance", "status": "PASS"},
-                {"name": "Microscopic Pollen Origin", "value": "Authentic Flora (Apis mellifera)", "standard": "Botanical Identity Match", "status": "PASS"},
-            ],
-        },
+                {"name": "Microscopic Pollen Origin", "value": lab_report.pollen_origin or "Authentic Flora (Apis mellifera)", "standard": "Botanical Identity Match", "status": "PASS"},
+            ] if lab_report else [],
+        } if lab_report else None,
         "packaging": {
-            "facility": "Pure Honey Cleanroom Bottling Facility",
-            "packagingDate": packaging.created_at.isoformat() if packaging else datetime.utcnow().isoformat(),
-            "sealStatus": "DIGITALLY SEALED & VERIFIED",
-        },
+            "facility": "HoneyChain Certified Cleanroom Bottling Facility" if packaging else "No data available yet.",
+            "packagingDate": packaging.created_at.isoformat() if packaging else "No data available yet.",
+            "sealStatus": "DIGITALLY SEALED & VERIFIED" if packaging else "No data available yet.",
+        } if packaging else None,
         "blockchainVerification": {
             "network": "Hardhat Localhost (Chain ID: 31337)",
-            "ledgerStatus": "CONFIRMED_ON_CHAIN" if any(b.status == "CONFIRMED" for b in bc_records) else "TAMPER_EVIDENT_HASH_RECORDED",
+            "ledgerStatus": "CONFIRMED_ON_CHAIN" if any(b.status == "CONFIRMED" for b in bc_records) else ("TAMPER_EVIDENT_HASH_RECORDED" if bc_records else "NO_ON_CHAIN_RECORDS_YET"),
             "totalConfirmedEvents": len(bc_records),
-            "latestTxHash": bc_records[-1].tx_hash if bc_records and bc_records[-1].tx_hash else f"0x{hashlib.sha256(batch_id.encode()).hexdigest()}",
+            "latestTxHash": bc_records[-1].tx_hash if bc_records and bc_records[-1].tx_hash else None,
             "events": [
                 {"eventType": b.event_type, "dataHash": b.data_hash, "txHash": b.tx_hash, "status": b.status}
                 for b in bc_records
             ],
         },
     }
+
+    accept_hdr = req.headers.get("accept", "").lower()
+    if "text/html" in accept_hdr:
+        return HTMLResponse(content=generate_verification_html(verification_data))
+
     return verification_data
 
 
