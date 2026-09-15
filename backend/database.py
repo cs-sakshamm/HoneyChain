@@ -51,4 +51,23 @@ def get_db():
 def init_db():
     import backend.models  # noqa
     Base.metadata.create_all(bind=engine)
+
+    # Automatically add any missing columns for backwards compatibility
+    with engine.connect() as conn:
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        for table_name in Base.metadata.tables.keys():
+            if inspector.has_table(table_name):
+                existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+                table_obj = Base.metadata.tables[table_name]
+                for col in table_obj.columns:
+                    if col.name not in existing_cols:
+                        col_type = col.type.compile(engine.dialect)
+                        try:
+                            conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}"))
+                            conn.commit()
+                            logger.info(f"Added missing column '{col.name}' ({col_type}) to table '{table_name}'.")
+                        except Exception as err:
+                            logger.warning(f"Could not add column {col.name} to {table_name}: {err}")
+
     logger.info("Database tables initialized successfully.")
