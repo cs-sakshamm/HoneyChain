@@ -132,6 +132,7 @@ export function isHarvesterFullyVerified(verification: any): boolean {
   if (!verification) return false;
   return (
     verification.governmentIdVerified === 'Verified' &&
+    verification.fssaiLicenseVerified === 'Verified' &&
     verification.mobileVerified === 'Verified' &&
     verification.registrationVerified === 'Verified' &&
     (verification.verificationStatus === 'Verified' || Boolean(verification.verificationId))

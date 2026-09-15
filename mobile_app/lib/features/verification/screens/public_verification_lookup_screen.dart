@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../collection/screens/batch_timeline_screen.dart';
 import '../models/harvester_verification_model.dart';
 import '../services/verification_api_service.dart';
 
@@ -42,7 +43,17 @@ class _PublicVerificationLookupScreenState extends State<PublicVerificationLooku
     final cleanId = id.trim();
     if (cleanId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a Harvester Verification ID.')),
+        const SnackBar(content: Text('Please enter a Harvester Verification ID or Batch ID.')),
+      );
+      return;
+    }
+
+    if (cleanId.toUpperCase().startsWith('HC-BATCH-') || cleanId.toUpperCase().startsWith('BATCH')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BatchTimelineScreen(batchId: cleanId.toUpperCase()),
+        ),
       );
       return;
     }

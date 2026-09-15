@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/global_app_bar.dart';
+import '../hives/screens/add_edit_hive_screen.dart';
 import '../hives/screens/all_hives_screen.dart';
 import '../hives/screens/harvester_dashboard_screen.dart';
 import '../profile/screens/profile_screen.dart';
@@ -155,17 +157,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                       children: [
                         _buildNavItem(
                           index: 0,
-                          icon: Icons.grid_view_rounded,
-                          activeIcon: Icons.grid_view_rounded,
+                          icon: Icons.hive_outlined,
+                          activeIcon: Icons.hive_rounded,
                           label: context.tr('home'),
                           isSelected: _currentIndex == 0,
                         ),
                         _buildNavItem(
                           index: 1,
-                          icon: Icons.hive_outlined,
-                          activeIcon: Icons.hive_rounded,
-                          label: context.tr('hives'),
+                          icon: Icons.add_circle_outline_rounded,
+                          activeIcon: Icons.add_circle_rounded,
+                          label: context.tr('add_hive'),
                           isSelected: _currentIndex == 1,
+                          onTapOverride: () {
+                             if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+                             Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditHiveScreen()));
+                          }
                         ),
                         _buildNavItem(
                           index: 2,
@@ -192,6 +198,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     required IconData activeIcon,
     required String label,
     required bool isSelected,
+    VoidCallback? onTapOverride,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final activeColor = context.textPrimaryColor;
@@ -209,7 +216,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
+            onTap: onTapOverride ?? () {
               setState(() {
                 _currentIndex = index;
                 _showNav();

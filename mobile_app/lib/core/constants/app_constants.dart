@@ -124,26 +124,6 @@ class RoleImages {
       label: 'Beekeeping and hive inspection in active apiary',
       localAssetFallback: 'assets/images/beekeeping_hero.jpg',
     ),
-    RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1576402187878-974f70c890a5?auto=format&fit=crop&w=1200&q=80',
-      label: 'Pure raw honeycomb frames and natural honey',
-      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
-    ),
-    RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=1200&q=80',
-      label: 'Honey bees actively producing fresh honey on honeycomb frames',
-      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
-    ),
-    RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1587049352851-8d4e89133924?auto=format&fit=crop&w=1200&q=80',
-      label: 'Raw honey harvesting directly from honeycomb frame',
-      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
-    ),
-    RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1568644396922-5c3bfae12521?auto=format&fit=crop&w=1200&q=80',
-      label: 'Beekeeping smoker and honeycomb harvesting frame',
-      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
-    ),
   ];
 
   // 2. COLLECTION & PROCESSING: Honey Collection, Extraction, Processing, Collection Centre, Facility (Exactly 5 Unique Images)

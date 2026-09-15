@@ -324,6 +324,31 @@ class VerificationController extends ChangeNotifier {
     }
   }
 
+  /// Step 3.5: Submit FSSAI License
+  Future<bool> submitHarvesterFssaiLicense({
+    required String fssaiLicense,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _verification = await _apiService.submitHarvesterFssaiLicense(
+        harvesterId: _verification.harvesterId,
+        fssaiLicense: fssaiLicense,
+      );
+      _successMessage = 'FSSAI License verified successfully.';
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   /// Step 4: Submit Apiary Location
   Future<bool> submitApiaryLocation({
     required String apiaryName,

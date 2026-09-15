@@ -57,6 +57,7 @@ export class VerificationService {
           governmentIdVerified: 'Not Started',
           mobileVerified: 'Not Started',
           registrationVerified: 'Not Started',
+          fssaiLicenseVerified: 'Not Started',
           locationVerified: 'Not Started',
           verificationStatus: 'Not Started'
         },
@@ -257,6 +258,35 @@ export class VerificationService {
   }
 
   /**
+   * 3.5 Submit FSSAI License for Harvester
+   */
+  async submitHarvesterFssaiLicense(
+    harvesterId: string,
+    fssaiLicenseRaw: string
+  ) {
+    const fssaiLicense = (fssaiLicenseRaw || '').trim().toUpperCase();
+
+    if (fssaiLicense.length < 5) {
+      throw new Error('Please enter a valid FSSAI License number.');
+    }
+
+    const verification = await this.getOrCreateVerification(harvesterId);
+
+    const updated = await prisma.harvesterVerification.update({
+      where: { id: verification.id },
+      data: {
+        fssaiLicense: fssaiLicense,
+        fssaiLicenseVerified: 'Verified',
+        fssaiLicenseSubmittedAt: new Date(),
+        verificationStatus: verification.verificationStatus === 'Not Started' ? 'In Progress' : verification.verificationStatus
+      },
+      include: { harvester: true }
+    });
+
+    return updated;
+  }
+
+  /**
    * Helper to validate GPS coordinate values
    */
   public parseAndValidateCoordinates(coordinatesRaw: string): { isValid: boolean; error?: string } {
@@ -406,6 +436,9 @@ export class VerificationService {
     if (record.registrationVerified !== 'Verified') {
       issues.push('Beekeeper Registration ID is not verified');
     }
+    if (record.fssaiLicenseVerified !== 'Verified') {
+      issues.push('FSSAI License is not verified');
+    }
     if (record.locationVerified !== 'Verified') {
       issues.push('Apiary Location is not verified');
     }
@@ -440,6 +473,7 @@ export class VerificationService {
       mobileVerified: record.mobileVerified,
       registrationId: record.registrationId,
       registrationType: record.registrationType,
+      fssaiLicense: record.fssaiLicense,
       apiaryName: record.apiaryName,
       apiaryLocation: record.apiaryLocation,
       verifiedAt: verifiedAt.toISOString()
@@ -508,6 +542,7 @@ export class VerificationService {
       mobileVerified: record.mobileVerified,
       registrationId: record.registrationId,
       registrationType: record.registrationType,
+      fssaiLicense: record.fssaiLicense,
       apiaryName: record.apiaryName,
       apiaryLocation: record.apiaryLocation,
       verifiedAt: record.verifiedAt?.toISOString()
@@ -537,6 +572,7 @@ export class VerificationService {
         mobileStatus: record.mobileVerified,
         registrationId: record.registrationId,
         registrationType: record.registrationType,
+        fssaiLicenseStatus: record.fssaiLicenseVerified,
         apiaryLocation: record.apiaryLocation,
         apiaryName: record.apiaryName
       },

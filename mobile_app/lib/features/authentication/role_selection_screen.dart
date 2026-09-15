@@ -10,6 +10,7 @@ import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/honeycomb_painter.dart';
 import '../profile/controllers/user_controller.dart';
+import '../verification/screens/public_verification_lookup_screen.dart';
 import 'auth_controller.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
@@ -117,7 +118,28 @@ class RoleSelectionScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 500),
-                child: _buildRoleGrid(context),
+                child: Column(
+                  children: [
+                    _buildRoleGrid(context),
+                    const SizedBox(height: 32),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PublicVerificationLookupScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_scanner_rounded),
+                      label: Text(
+                        'Public Verifier / Scan QR',
+                        style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -154,6 +176,25 @@ class RoleSelectionScreen extends StatelessWidget {
           ),
           const SizedBox(height: 48),
           _buildRoleGrid(context),
+          const SizedBox(height: 32),
+          Center(
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const PublicVerificationLookupScreen()),
+                );
+              },
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: Text(
+                'Public Verifier / Scan QR',
+                style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              ),
+            ),
+          ),
           const SizedBox(height: 32),
         ],
       ),
