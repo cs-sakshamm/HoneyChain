@@ -27,7 +27,7 @@ class TelemetryAlertController extends ChangeNotifier {
   TelemetryAlertController({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
         _baseUrl = baseUrl ?? _resolveApiUrl() {
-    startMonitoring();
+    // Wait for the UI to call startMonitoring with the correct userId
   }
 
   static String _resolveApiUrl() {
@@ -112,6 +112,23 @@ class TelemetryAlertController extends ChangeNotifier {
     } catch (e) {
       debugPrint('[TelemetryAlertController] Alerts poll error: $e');
     }
+  }
+
+  /// Fetch recent 7-day telemetry history for a specific hive
+  Future<List<Map<String, dynamic>>> fetchHiveTelemetry(String hiveId) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/telemetry/live/$hiveId');
+      final response = await _client.get(uri, headers: {'Accept': 'application/json'});
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['telemetry'] is List) {
+          return List<Map<String, dynamic>>.from(data['telemetry']);
+        }
+      }
+    } catch (e) {
+      debugPrint('[TelemetryAlertController] Telemetry history fetch error: $e');
+    }
+    return [];
   }
 
   /// Ingests sensor data directly (used by simulator or local tests)

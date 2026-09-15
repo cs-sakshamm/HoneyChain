@@ -96,6 +96,7 @@ async function recordWorkflowProvenance(
   return { provEvent, onChainResult };
 }
 
+// The GET /verify route was removed because index.ts handles /api/verify with a comprehensive response for QR scanning.
 /**
  * ─────────────────────────────────────────────────────────
  * 0. GET /api/centers/nearest

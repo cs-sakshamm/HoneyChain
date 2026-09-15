@@ -34,6 +34,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _regConfirmPasswordController = TextEditingController();
 
   final _resetIdentifierController = TextEditingController();
+  final _resetPasswordController = TextEditingController();
+  final _resetConfirmPasswordController = TextEditingController();
   final _languageSearchController = TextEditingController();
 
   final _emailFocusNode = FocusNode();
@@ -45,6 +47,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _regEmailErrorText;
   String? _regPasswordErrorText;
   String? _regConfirmPasswordErrorText;
+  String? _resetPasswordErrorText;
+  String? _resetConfirmPasswordErrorText;
 
   @override
   void dispose() {
@@ -55,6 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
     _regPasswordController.dispose();
     _regConfirmPasswordController.dispose();
     _resetIdentifierController.dispose();
+    _resetPasswordController.dispose();
+    _resetConfirmPasswordController.dispose();
     _languageSearchController.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
@@ -477,6 +483,7 @@ class _LoginScreenState extends State<LoginScreen> {
           AuthMode.login => _buildLoginForm(context, controller),
           AuthMode.register => _buildRegisterForm(context, controller),
           AuthMode.forgotPassword => _buildForgotPasswordForm(context, controller),
+          AuthMode.resetPassword => _buildResetPasswordForm(context, controller),
         },
 
         const SizedBox(height: AppConstants.space32),
@@ -1052,6 +1059,127 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. Reset Password View
+  // ---------------------------------------------------------------------------
+  void _handleResetPassword(AuthController controller) {
+    setState(() {
+      _resetPasswordErrorText = null;
+      _resetConfirmPasswordErrorText = null;
+    });
+
+    final password = _resetPasswordController.text;
+    final confirmPassword = _resetConfirmPasswordController.text;
+    final token = controller.resetToken;
+
+    bool hasError = false;
+
+    if (password.length < 6) {
+      setState(() {
+        _resetPasswordErrorText = 'Password must be at least 6 characters.';
+      });
+      hasError = true;
+    }
+
+    if (password != confirmPassword) {
+      setState(() {
+        _resetConfirmPasswordErrorText = 'Passwords do not match.';
+      });
+      hasError = true;
+    }
+
+    if (!hasError && token != null) {
+      controller.resetPasswordWithToken(token, password);
+    }
+  }
+
+  Widget _buildResetPasswordForm(BuildContext context, AuthController controller) {
+    final isLoading = controller.status == AuthStateStatus.authenticating;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Set New Password',
+          style: GoogleFonts.manrope(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: context.textPrimaryColor,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: AppConstants.space6),
+        Text(
+          'Please enter your new password.',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: context.textSecondaryColor,
+          ),
+        ),
+
+        const SizedBox(height: AppConstants.space24),
+
+        AppTextField(
+          controller: _resetPasswordController,
+          labelText: 'New Password',
+          hintText: 'Enter new password',
+          obscureText: !controller.isPasswordVisible,
+          textInputAction: TextInputAction.next,
+          errorText: _resetPasswordErrorText,
+          prefixIcon: Icon(
+            Icons.lock_outline_rounded,
+            size: 18,
+            color: context.textSecondaryColor,
+          ),
+          suffixIcon: IconButton(
+            icon: Icon(
+              controller.isPasswordVisible
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 20,
+              color: context.textSecondaryColor,
+            ),
+            onPressed: () => controller.togglePasswordVisibility(),
+          ),
+          onChanged: (_) {
+            if (_resetPasswordErrorText != null) {
+              setState(() => _resetPasswordErrorText = null);
+            }
+          },
+        ),
+        const SizedBox(height: AppConstants.space16),
+
+        AppTextField(
+          controller: _resetConfirmPasswordController,
+          labelText: 'Confirm Password',
+          hintText: 'Re-enter your new password',
+          obscureText: !controller.isPasswordVisible,
+          textInputAction: TextInputAction.done,
+          errorText: _resetConfirmPasswordErrorText,
+          onFieldSubmitted: (_) => _handleResetPassword(controller),
+          prefixIcon: Icon(
+            Icons.lock_outline_rounded,
+            size: 18,
+            color: context.textSecondaryColor,
+          ),
+          onChanged: (_) {
+            if (_resetConfirmPasswordErrorText != null) {
+              setState(() => _resetConfirmPasswordErrorText = null);
+            }
+          },
+        ),
+
+        const SizedBox(height: AppConstants.space24),
+
+        AppButton(
+          text: 'Reset password',
+          isLoading: isLoading,
+          onPressed: () => _handleResetPassword(controller),
         ),
       ],
     );

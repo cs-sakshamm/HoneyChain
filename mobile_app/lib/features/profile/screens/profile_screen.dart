@@ -278,15 +278,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
 
                     const SizedBox(height: AppConstants.space20),
-                    _PillAction(
-                      label: context.tr('edit_profile'),
-                      icon: Icons.edit_rounded,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const EditProfileScreen()),
-                        );
-                      },
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _PillAction(
+                          label: context.tr('edit_profile'),
+                          icon: Icons.edit_rounded,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: AppConstants.space16),
+                        _PillAction(
+                          label: complete ? 'Verified' : 'Complete Profile',
+                          icon: complete ? Icons.verified_rounded : Icons.pending_actions_rounded,
+                          color: complete ? context.successBgColor : context.warningBgColor,
+                          textColor: complete ? context.successColor : context.warningColor,
+                          onTap: () {
+                            if (!complete) {
+                              if (user.role.toUpperCase().contains('COLLECT') || user.role.toUpperCase().contains('PROCESS')) {
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()));
+                              } else if (user.role.toUpperCase().contains('LAB')) {
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const LabVerificationScreen()));
+                              } else if (user.role.toUpperCase().contains('PKG') || user.role.toUpperCase().contains('PACKAG')) {
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()));
+                              } else {
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()));
+                              }
+                            } else {
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()));
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1323,20 +1350,24 @@ class _PillAction extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool destructive;
+  final Color? color;
+  final Color? textColor;
 
   const _PillAction({
     required this.label,
     required this.icon,
     required this.onTap,
     this.destructive = false,
+    this.color,
+    this.textColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final fg = destructive ? AppConstants.error : context.primaryDarkColor;
-    final bg = destructive
+    final fg = textColor ?? (destructive ? AppConstants.error : context.primaryDarkColor);
+    final bg = color ?? (destructive
         ? AppConstants.error.withValues(alpha: 0.1)
-        : context.primarySoftColor;
+        : context.primarySoftColor);
 
     return Material(
       color: bg,

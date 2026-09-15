@@ -144,8 +144,6 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
                   ),
                   const SizedBox(height: 14),
 
-                  // ── 3/3 Profile Verification Banner Card ──
-                  _buildVerificationBanner(context, completedCount, isFullyVerified),
                   const SizedBox(height: 14),
 
                   TabBar(

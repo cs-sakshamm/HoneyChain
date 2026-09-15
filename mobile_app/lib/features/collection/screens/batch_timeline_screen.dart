@@ -164,42 +164,7 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
   }
 
   Widget _buildVisualWorkflowCard(BuildContext context) {
-    final stages = (workflowData?['stages'] as List?) ?? [
-      {
-        'stage': 'HARVEST',
-        'title': 'Honey Harvested',
-        'completed': true,
-        'actor': workflowData?['harvest']?['harvester']?['name'] ?? 'Harvester',
-        'details': '${workflowData?['harvest']?['quantity'] ?? 0} kg harvested',
-      },
-      {
-        'stage': 'COLLECTION',
-        'title': 'Collection & Processing',
-        'completed': workflowData?['processing'] != null,
-        'actor': workflowData?['processing']?['processor']?['name'] ?? 'Processing Unit',
-        'details': workflowData?['processing']?['method'] ?? 'Pending extraction',
-      },
-      {
-        'stage': 'LAB',
-        'title': 'Lab Testing',
-        'completed': workflowData?['labReport'] != null && workflowData?['labReport']?['status'] == 'APPROVED',
-        'actor': workflowData?['labReport']?['lab']?['name'] ?? 'Quality Lab',
-        'details': workflowData?['labReport'] != null ? 'Purity & Moisture verified' : 'Pending verification',
-      },
-      {
-        'stage': 'PACKAGING',
-        'title': 'Packaging & Sealing',
-        'completed': workflowData?['packaging'] != null,
-        'actor': workflowData?['packaging']?['packager']?['name'] ?? 'Packaging Unit',
-        'details': workflowData?['packaging'] != null ? '${workflowData?['packaging']?['numberOfPackages']} packages sealed' : 'Pending packaging',
-      },
-      {
-        'stage': 'COMPLETED',
-        'title': 'Consumer QR Ready',
-        'completed': workflowData?['status'] == 'COMPLETED' || workflowData?['currentStage'] == 'COMPLETED',
-        'details': 'Verifiable provenance active',
-      },
-    ];
+    final stages = (workflowData?['timeline'] as List?) ?? [];
 
     return AppCard(
       child: Column(
@@ -243,7 +208,7 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
               title: stages[i]['title'] ?? '',
               details: stages[i]['details'] ?? '',
               actor: stages[i]['actor'],
-              isCompleted: stages[i]['completed'] == true,
+              isCompleted: stages[i]['date'] != null,
               isLast: i == stages.length - 1,
             ),
           ],
@@ -253,10 +218,10 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
   }
 
   Widget _buildProductDetailsCard(BuildContext context) {
-    final harvest = workflowData?['harvest'];
-    final processing = workflowData?['processing'];
+    final product = workflowData?['product'];
+    final harvester = workflowData?['harvester'];
+    final collectionProcessing = workflowData?['collectionProcessing'];
     final packaging = workflowData?['packaging'];
-    final hive = harvest?['hive'];
 
     return AppCard(
       child: Column(
@@ -274,21 +239,22 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
           ),
           const SizedBox(height: 12),
           _buildSpecRow('Traceability ID', widget.batchId),
-          if (harvest != null) ...[
-            _buildSpecRow('Harvester', harvest['harvester']?['name'] ?? 'Harvester'),
-            _buildSpecRow('Apiary Location', harvest['location'] ?? 'Apiary'),
-            _buildSpecRow('Harvest Qty', '${harvest['quantity']} kg'),
+          if (product != null) ...[
+            _buildSpecRow('Product', product['productName'] ?? ''),
           ],
-          if (hive != null) ...[
-            _buildSpecRow('Hive Code', hive['hiveCode'] ?? 'HC-HIVE'),
-            _buildSpecRow('Bee Breed', hive['beeBreed'] ?? 'Italian Honey Bee'),
+          if (harvester != null) ...[
+            _buildSpecRow('Harvester', harvester['name'] ?? ''),
+            _buildSpecRow('Apiary Location', harvester['location'] ?? ''),
+            _buildSpecRow('Harvest Qty', '${harvester['quantityKg']} kg'),
+            _buildSpecRow('Hive Code', harvester['hiveCode'] ?? ''),
+            _buildSpecRow('Bee Breed', harvester['beeBreed'] ?? ''),
           ],
-          if (processing != null) ...[
-            _buildSpecRow('Extraction Method', processing['method'] ?? 'Cold Extraction'),
-            _buildSpecRow('Processing Facility', processing['facility'] ?? 'Regional Center'),
+          if (collectionProcessing != null) ...[
+            _buildSpecRow('Extraction Method', collectionProcessing['method'] ?? ''),
+            _buildSpecRow('Processing Facility', collectionProcessing['processor'] ?? ''),
           ],
           if (packaging != null) ...[
-            _buildSpecRow('Package Type', packaging['packageSize'] ?? '500g Glass Jar'),
+            _buildSpecRow('Package Type', packaging['packageSize'] ?? ''),
             _buildSpecRow('Units Packaged', '${packaging['numberOfPackages']} jars'),
           ],
         ],
@@ -297,7 +263,7 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
   }
 
   Widget _buildLabReportCard(BuildContext context) {
-    final lab = workflowData?['labReport'];
+    final lab = workflowData?['labVerification'];
     if (lab == null) {
       return AppCard(
         child: Row(
@@ -315,10 +281,8 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
       );
     }
 
-    final moisture = (lab['moisture'] as num?)?.toDouble() ?? 16.8;
-    final purity = (lab['purity'] as num?)?.toDouble() ?? 98.5;
-    final qualityScore = (lab['qualityScore'] as num?)?.toDouble() ?? 96.0;
-    final isApproved = lab['status'] == 'APPROVED';
+    final qualityScore = (lab['qualityScore'] as num?)?.toDouble() ?? 0.0;
+    final isApproved = lab['overallResult'] == 'PASS';
 
     return AppCard(
       child: Column(
@@ -349,16 +313,20 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildParamRow(context, '1. Moisture Content', '$moisture%', '<= 20.0%', moisture <= 20.0),
-          _buildParamRow(context, '2. HMF Concentration', '14.5 mg/kg', '<= 40.0 mg/kg', true),
-          _buildParamRow(context, '3. Diastase Activity', '12.4 DN', '>= 8.0 DN', true),
-          _buildParamRow(context, '4. F/G Purity Ratio', '$purity%', '>= 95.0%', purity >= 95.0),
-          _buildParamRow(context, '5. Chemical Residues', '0.0 ppb (None)', '< 10.0 ppb', true),
-          _buildParamRow(context, '6. Pollen Analysis', '28,000 grains/g (85% Floral)', '>= 70%', true),
-          if (lab['notes'] != null && lab['notes'].toString().isNotEmpty) ...[
+          if (lab['parameters'] != null)
+            ...(lab['parameters'] as List).map((param) {
+              return _buildParamRow(
+                context,
+                param['name'] ?? '',
+                param['value'] ?? '',
+                param['limit'] ?? '',
+                param['status'] == 'PASS',
+              );
+            }),
+          if (lab['remarks'] != null && lab['remarks'].toString().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              'Lab Notes: ${lab['notes']}',
+              'Lab Notes: ${lab['remarks']}',
               style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor, fontStyle: FontStyle.italic),
             ),
           ],

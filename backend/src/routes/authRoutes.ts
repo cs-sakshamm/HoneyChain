@@ -740,4 +740,90 @@ router.post('/profile/identity', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/auth/forgot-password
+ * Issue password reset email
+ */
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findFirst({ where: { email: cleanEmail } });
+
+    if (!user) {
+      // Don't leak if the user exists or not, but for demo we can return success
+      return res.json({ success: true, message: 'If the email exists, a reset link was sent.' });
+    }
+
+    // In a real application, you would generate a secure reset token,
+    // save it to the DB with an expiry, and send an email.
+    // For now, we simulate a successful email sending.
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpiry = new Date(Date.now() + 3600000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { resetToken, resetExpiry }
+    });
+
+    res.json({
+      success: true,
+      message: 'If the email exists, a reset link was sent.',
+      devToken: resetToken // Expose for testing
+    });
+
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Reset user password using token
+ */
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Token and new password are required' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetExpiry: {
+          gt: new Date()
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired reset token.' });
+    }
+
+    const passwordHash = crypto.createHash('sha256').update(newPassword.trim()).digest('hex');
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        resetToken: null,
+        resetExpiry: null
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully. You can now log in.'
+    });
+
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
 export default router;

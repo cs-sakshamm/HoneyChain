@@ -15,6 +15,7 @@ import '../../collection/screens/batch_timeline_screen.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../../verification/controllers/verification_controller.dart';
 import '../../verification/screens/packaging_verification_screen.dart';
+import '../../verification/screens/public_verification_lookup_screen.dart';
 import 'packaging_qr_screen.dart';
 
 class PackagingDashboardScreen extends StatefulWidget {
@@ -240,6 +241,23 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // This would ideally open a camera scanner, but we just navigate to the public lookup for now
+          // and they can paste the verification or batch ID.
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PublicVerificationLookupScreen(),
+            ),
+          );
+        },
+        backgroundColor: context.colors.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.qr_code_scanner_rounded),
+        label: Text('Scan QR', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: SafeArea(
         bottom: false,
         child: Column(

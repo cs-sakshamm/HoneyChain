@@ -21,6 +21,7 @@ enum AuthMode {
   login,
   register,
   forgotPassword,
+  resetPassword,
 }
 
 /// Roles in the HoneyChain supply chain
@@ -68,6 +69,7 @@ class AuthController extends ChangeNotifier {
   String? _infoMessage;
   User? _currentUser;
   bool _isDemoMode = false;
+  String? _resetToken;
 
   // Role State
   UserRole? _selectedRole;
@@ -111,6 +113,7 @@ class AuthController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get infoMessage => _infoMessage;
   User? get currentUser => _currentUser;
+  String? get resetToken => _resetToken;
   bool get isAuthenticated =>
       _currentUser != null || (_isDemoMode && _status == AuthStateStatus.authenticated);
   bool get isPasswordVisible => _isPasswordVisible;
@@ -412,10 +415,68 @@ class AuthController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final url = Uri.parse('$_baseUrl/api/auth/forgot-password');
+      final response = await _client
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({'email': target}),
+          )
+          .timeout(const Duration(seconds: 4));
 
-    _status = AuthStateStatus.passwordResetSent;
-    _infoMessage = 'Reset instructions sent to $target.';
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.passwordResetSent;
+        _infoMessage = 'Reset instructions sent to $target.';
+        if (data['devToken'] != null) {
+          _resetToken = data['devToken'];
+          _mode = AuthMode.resetPassword;
+        }
+      } else {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.error;
+        _errorMessage = data['error'] ?? data['message'] ?? 'Failed to send reset link.';
+      }
+    } catch (e) {
+      debugPrint('[AuthController] Backend reset error: $e');
+      _status = AuthStateStatus.error;
+      _errorMessage = 'Unable to connect to server. Please try again.';
+    }
+    notifyListeners();
+  }
+
+  /// Reset Password with Token
+  Future<void> resetPasswordWithToken(String token, String newPassword) async {
+    _status = AuthStateStatus.authenticating;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('$_baseUrl/api/auth/reset-password');
+      final response = await _client
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({'token': token, 'newPassword': newPassword}),
+          )
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        _status = AuthStateStatus.idle;
+        _mode = AuthMode.login;
+        _infoMessage = 'Password reset successfully. Please log in.';
+        _resetToken = null;
+      } else {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.error;
+        _errorMessage = data['error'] ?? data['message'] ?? 'Failed to reset password.';
+      }
+    } catch (e) {
+      debugPrint('[AuthController] Reset password error: $e');
+      _status = AuthStateStatus.error;
+      _errorMessage = 'Unable to connect to server. Please try again.';
+    }
     notifyListeners();
   }
 

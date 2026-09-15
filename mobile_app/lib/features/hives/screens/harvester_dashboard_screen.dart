@@ -39,9 +39,10 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserController>().user;
-      final userId = user.id ?? user.email;
+      final userId = (user.id != null && user.id!.isNotEmpty) ? user.id! : user.email;
       if (userId.isNotEmpty) {
         context.read<VerificationController>().loadVerification(userId);
+        context.read<TelemetryAlertController>().startMonitoring(userId: userId);
       }
     });
   }
@@ -692,14 +693,40 @@ class _IdentityCard extends StatelessWidget {
   }
 }
 
-class _HiveInfoCard extends StatelessWidget {
+class _HiveInfoCard extends StatefulWidget {
   final Hive hive;
 
   const _HiveInfoCard({required this.hive});
 
   @override
+  State<_HiveInfoCard> createState() => _HiveInfoCardState();
+}
+
+class _HiveInfoCardState extends State<_HiveInfoCard> {
+  List<Map<String, dynamic>> _telemetryHistory = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTelemetry();
+  }
+
+  Future<void> _loadTelemetry() async {
+    if (!mounted) return;
+    final ctrl = context.read<TelemetryAlertController>();
+    final history = await ctrl.fetchHiveTelemetry(widget.hive.id);
+    if (mounted) {
+      setState(() {
+        _telemetryHistory = history;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final healthy = hive.isHealthy;
+    final healthy = widget.hive.isHealthy;
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppConstants.space12),
@@ -711,69 +738,137 @@ class _HiveInfoCard extends StatelessWidget {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => HiveDetailsScreen(hiveId: hive.id)),
+              MaterialPageRoute(builder: (context) => HiveDetailsScreen(hiveId: widget.hive.id)),
             );
           },
           child: Padding(
             padding: const EdgeInsets.all(AppConstants.space16),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: context.primarySoftColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.borderColor),
-                  ),
-                  child: Icon(Icons.hive_outlined, color: context.textPrimaryColor, size: 22),
-                ),
-                const SizedBox(width: AppConstants.space16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        hive.name,
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: context.primarySoftColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                      child: Icon(Icons.hive_outlined, color: context.textPrimaryColor, size: 22),
+                    ),
+                    const SizedBox(width: AppConstants.space16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.hive.name,
+                            style: GoogleFonts.manrope(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${widget.hive.hiveCode} · ${widget.hive.apiaryLocation}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: context.textSecondaryColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: healthy ? context.successBgColor : context.warningBgColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        widget.hive.overallHealth,
                         style: GoogleFonts.manrope(
-                          fontSize: 15,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: context.textPrimaryColor,
+                          color: healthy ? context.successColor : context.warningColor,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${hive.hiveCode} · ${hive.apiaryLocation}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: context.textSecondaryColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: healthy ? context.successBgColor : context.warningBgColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    hive.overallHealth,
-                    style: GoogleFonts.manrope(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: healthy ? context.successColor : context.warningColor,
+                if (!_isLoading && _telemetryHistory.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.scaffoldBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _TelemetryStat(
+                          label: 'Temp',
+                          value: '${_telemetryHistory.first['temperature'] ?? '--'}°C',
+                          icon: Icons.thermostat_rounded,
+                        ),
+                        _TelemetryStat(
+                          label: 'Humidity',
+                          value: '${_telemetryHistory.first['humidity'] ?? '--'}%',
+                          icon: Icons.water_drop_rounded,
+                        ),
+                        _TelemetryStat(
+                          label: 'Weight',
+                          value: '${_telemetryHistory.first['weightKg'] ?? '--'} kg',
+                          icon: Icons.scale_rounded,
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TelemetryStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _TelemetryStat({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: context.colors.primary),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: context.textPrimaryColor,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: context.textSecondaryColor,
+          ),
+        ),
+      ],
     );
   }
 }

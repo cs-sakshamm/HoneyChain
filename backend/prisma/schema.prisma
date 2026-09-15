@@ -25,6 +25,8 @@ model User {
   facilityLocation String?
   licenseNumber    String?
   designation      String?
+  resetToken       String?
+  resetExpiry      DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -320,6 +322,11 @@ model HarvesterVerification {
   registrationType        String? // STATE_REGISTRY, COOPERATIVE, APICULTURE_BOARD
   registrationVerified    String    @default("Not Started") // Not Started, Pending, Verified, Rejected
   registrationSubmittedAt DateTime?
+
+  // 3.5 FSSAI License
+  fssaiLicense            String?
+  fssaiLicenseVerified    String    @default("Not Started") // Not Started, Pending, Verified, Rejected
+  fssaiLicenseSubmittedAt DateTime?
 
   // 4. Apiary Location
   apiaryName          String?

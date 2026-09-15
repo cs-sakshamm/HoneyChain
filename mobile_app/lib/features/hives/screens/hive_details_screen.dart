@@ -10,6 +10,7 @@ import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
 import 'start_harvesting_screen.dart';
+import '../../../core/controllers/telemetry_alert_controller.dart';
 
 /// Clean, Minimal Field Overview & Harvest Details Screen
 class HiveDetailsScreen extends StatelessWidget {
@@ -478,6 +479,20 @@ class HiveDetailsScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: AppConstants.space24),
+
+                  // 4. Telemetry History Section
+                  Text(
+                    'Live Telemetry & Sensors',
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _TelemetryHistorySection(hiveId: hive.id),
+
+                  const SizedBox(height: AppConstants.space24),
                 ],
               ),
             ),
@@ -617,3 +632,131 @@ class _PillBackButton extends StatelessWidget {
     );
   }
 }
+
+class _TelemetryHistorySection extends StatefulWidget {
+  final String hiveId;
+  const _TelemetryHistorySection({required this.hiveId});
+
+  @override
+  State<_TelemetryHistorySection> createState() => _TelemetryHistorySectionState();
+}
+
+class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
+  List<Map<String, dynamic>> _history = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final ctrl = context.read<TelemetryAlertController>();
+    final data = await ctrl.fetchHiveTelemetry(widget.hiveId);
+    if (mounted) {
+      setState(() {
+        _history = data;
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatTime(String isoString) {
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${dt.day}/${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        height: 100,
+        alignment: Alignment.center,
+        child: const CircularProgressIndicator(),
+      );
+    }
+    
+    if (_history.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppConstants.space16),
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+          border: Border.all(color: context.borderColor),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.sensors_off_rounded, size: 28, color: context.textMutedColor),
+            const SizedBox(height: 8),
+            Text(
+              'No Sensor Data',
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: context.textPrimaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Telemetry data not available for this hive yet.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: context.textSecondaryColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppConstants.space16),
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Time', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textSecondaryColor)),
+              Text('Temp', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textSecondaryColor)),
+              Text('Hum', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textSecondaryColor)),
+              Text('Weight', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textSecondaryColor)),
+            ],
+          ),
+          const Divider(height: 16),
+          ..._history.take(7).map((entry) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(flex: 3, child: Text(_formatTime(entry['recordedAt']), style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor))),
+                  Expanded(flex: 2, child: Text('${entry['temperature']}°C', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textPrimaryColor), textAlign: TextAlign.center)),
+                  Expanded(flex: 2, child: Text('${entry['humidity']}%', style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor), textAlign: TextAlign.center)),
+                  Expanded(flex: 2, child: Text('${entry['weightKg']}kg', style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor), textAlign: TextAlign.right)),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
