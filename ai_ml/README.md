@@ -532,7 +532,7 @@ The AI processor publishes a response similar to:
 }
 ```
 
-## 16. Flutter Integration — Prabhakar Gupta
+## 16. Flutter Integration
 
 The Flutter application should normally receive application data from the backend, rather than implementing the ML algorithm.
 
