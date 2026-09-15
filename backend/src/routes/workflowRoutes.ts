@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
-import { blockchainService } from '../services/blockchainService';
+import { generateQRDataUri } from '../services/qrService';
 
 const router = Router();
 const prisma = new PrismaClient();

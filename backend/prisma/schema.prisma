@@ -105,6 +105,9 @@ model Batch {
   labReports        LabReport[]
   packagingRecords  PackagingRecord[]
   provenanceEvents  ProvenanceEvent[]
+  finalQr          String?   // Base64 PNG/SVG of final QR
+  verificationUrl  String?   // Public verification URL
+  finalizedAt      DateTime? // Timestamp when final QR was generated
 }
 
 model ChainRequest {
