@@ -3,12 +3,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/controllers/telemetry_alert_controller.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/critical_alert_dialog.dart';
 import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
@@ -31,6 +34,19 @@ class HarvesterDashboardScreen extends StatefulWidget {
 }
 
 class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<UserController>().user;
+      final userId = (user.id != null && user.id!.isNotEmpty) ? user.id! : user.email;
+      if (userId.isNotEmpty) {
+        context.read<VerificationController>().loadVerification(userId);
+        context.read<TelemetryAlertController>().startMonitoring(userId: userId);
+      }
+    });
+  }
+
   String _timeBasedGreeting() {
     final hour = DateTime.now().hour;
     if (hour >= 5 && hour < 12) {
@@ -53,39 +69,11 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
   }
 
   Widget _buildHeroImage(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      width: double.infinity,
+    return const AutoImageSlider(
+      role: 'HARVESTER',
       height: 165,
-      margin: const EdgeInsets.only(bottom: AppConstants.space20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.12) : context.borderColor,
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Image.asset(
-          'assets/images/beekeeping_hero.jpg',
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: context.primarySoftColor,
-              alignment: Alignment.center,
-              child: Icon(Icons.hive_rounded, size: 48, color: context.colors.primary),
-            );
-          },
-        ),
-      ),
+      borderRadius: 20,
+      margin: EdgeInsets.only(bottom: AppConstants.space20),
     );
   }
 
@@ -94,6 +82,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
     final userController = context.watch<UserController>();
     final workflowController = context.watch<WorkflowController>();
     final hiveController = context.watch<HiveController>();
+    final telemetryAlertCtrl = context.watch<TelemetryAlertController>();
 
     final user = userController.user;
     final beekeeperName = user.name.trim();
@@ -102,17 +91,20 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
     
     final activeRequests = workflowController.pendingCollectionRequests.length;
     final hives = hiveController.hives;
+    final criticalAlert = telemetryAlertCtrl.activeUnacknowledgedAlert;
 
-    return SafeArea(
-      bottom: false,
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(AppConstants.space24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+    return Stack(
+      children: [
+        SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppConstants.space24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                   // 1. Natural Professional Beekeeping Hero Image directly below Top Navbar
                   _buildHeroImage(context),
 
@@ -338,8 +330,27 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+
+    // Unignorable Critical Alert Modal Overlay
+    if (criticalAlert != null)
+      Container(
+        color: Colors.black.withValues(alpha: 0.65),
+        alignment: Alignment.center,
+        child: CriticalAlertDialog(
+          alert: criticalAlert,
+          onAcknowledge: () {
+            telemetryAlertCtrl.acknowledgeAlert(
+              criticalAlert.id,
+              userId: user.id ?? user.email,
+              userName: user.name,
+            );
+          },
+        ),
+      ),
+    ],
+  );
+}
 }
 
 class _StatCard extends StatelessWidget {
@@ -461,165 +472,261 @@ class _AddHiveCard extends StatelessWidget {
   }
 }
 
-/// Harvester identity & verification status card with direct navigation to
-/// the 5-parameter verification workflow.
+/// Harvester identity & verification status card with dynamic linear progress indicator
+/// and 3-parameter verification workflow.
 class _IdentityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final verCtrl = context.watch<VerificationController>();
     final ver = verCtrl.verification;
     final isVerified = ver.isFullyVerified;
+    final int count = ver.completedStepsCount;
+    final double progress = (count / 3.0).clamp(0.0, 1.0);
+    final int percentage = (progress * 100).round();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final badgeColor = isVerified
-        ? context.successColor
-        : ver.completedStepsCount > 0
-            ? context.primaryColor
-            : context.textMutedColor;
+    final String statusBadgeText;
+    final Color statusColor;
+    final Color statusBgColor;
 
-    final badgeBg = isVerified
-        ? context.successBgColor
-        : context.primarySoftColor;
+    if (isVerified || count == 3) {
+      statusBadgeText = 'Profile Verified (3 of 3)';
+      statusColor = context.successColor;
+      statusBgColor = context.successBgColor;
+    } else if (count == 0) {
+      statusBadgeText = 'Profile Setup (0 of 3)';
+      statusColor = context.warningColor;
+      statusBgColor = context.warningBgColor;
+    } else {
+      statusBadgeText = 'Partially Verified ($count of 3)';
+      statusColor = context.colors.primary;
+      statusBgColor = context.primarySoftColor;
+    }
 
-    final statusLabel = isVerified
-        ? 'Verified ✓'
-        : ver.completedStepsCount > 0
-            ? '${ver.completedStepsCount}/5 Steps'
-            : 'Not Verified';
+    final String supportingText;
+    if (isVerified) {
+      supportingText = 'Profile Verified — Harvester access enabled.';
+    } else {
+      supportingText = 'Complete profile verification to add hives and start harvesting activities.';
+    }
 
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppConstants.space16),
       decoration: BoxDecoration(
         color: context.surfaceColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isVerified ? context.successColor.withValues(alpha: 0.35) : context.borderColor,
-          width: isVerified ? 1.5 : 1.0,
+          color: isVerified
+              ? context.successColor.withValues(alpha: 0.5)
+              : (isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: isVerified
+                ? context.successColor.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            if (isVerified) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
-              );
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
-              );
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(AppConstants.space16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      isVerified ? Icons.verified_user_rounded : Icons.hive_rounded,
+                      size: 20,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Harvester Verification',
+                        style: GoogleFonts.manrope(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimaryColor,
+                          letterSpacing: -0.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  statusBadgeText,
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor.withValues(alpha: 0.5),
+                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '$percentage%',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: statusColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              _buildMiniCheck(context, 'Govt ID', ver.isStep1Complete),
+              _buildMiniCheck(context, 'Mobile OTP', ver.isStep2Complete),
+              _buildMiniCheck(context, 'Apiary & Reg', ver.isStep3Complete),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  supportingText,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: context.textSecondaryColor,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () {
+                  if (isVerified) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: isVerified ? context.successBgColor : context.primarySoftColor,
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isVerified ? context.successColor.withValues(alpha: 0.2) : context.borderColor,
+                      color: isVerified ? context.successColor.withValues(alpha: 0.4) : context.borderColor,
                     ),
                   ),
-                  child: Icon(
-                    isVerified ? Icons.verified_rounded : Icons.hive_rounded,
-                    size: 20,
-                    color: isVerified ? context.successColor : context.textPrimaryColor,
+                  child: Text(
+                    isVerified ? 'View Certificate ✓' : 'Verify Profile →',
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isVerified ? context.successColor : context.textPrimaryColor,
+                    ),
                   ),
                 ),
-                const SizedBox(width: AppConstants.space16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Harvester Verification',
-                            style: GoogleFonts.manrope(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: context.textPrimaryColor,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: badgeBg,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              statusLabel,
-                              style: GoogleFonts.manrope(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: badgeColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Builder(
-                        builder: (context) {
-                          final user = context.watch<UserController>().user;
-                          final bkrText = user.beekeeperId != null ? 'ID: ${user.beekeeperId}' : null;
-                          if (isVerified) {
-                            return Text(
-                              '${bkrText != null ? "$bkrText · " : ""}${ver.verificationId} · Blockchain Recorded',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: context.textSecondaryColor,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            );
-                          }
-                          return Text(
-                            bkrText != null
-                                ? '$bkrText · 5 Steps Verification'
-                                : '5 Parameters · Complete to unlock blockchain badge',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: context.textSecondaryColor,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: context.textMutedColor,
-                ),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniCheck(BuildContext context, String title, bool isDone) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          size: 14,
+          color: isDone ? context.successColor : context.textMutedColor,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: isDone ? FontWeight.w600 : FontWeight.w500,
+            color: isDone ? context.textPrimaryColor : context.textMutedColor,
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
-class _HiveInfoCard extends StatelessWidget {
+class _HiveInfoCard extends StatefulWidget {
   final Hive hive;
 
   const _HiveInfoCard({required this.hive});
 
   @override
+  State<_HiveInfoCard> createState() => _HiveInfoCardState();
+}
+
+class _HiveInfoCardState extends State<_HiveInfoCard> {
+  List<Map<String, dynamic>> _telemetryHistory = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTelemetry();
+  }
+
+  Future<void> _loadTelemetry() async {
+    if (!mounted) return;
+    final ctrl = context.read<TelemetryAlertController>();
+    final history = await ctrl.fetchHiveTelemetry(widget.hive.id);
+    if (mounted) {
+      setState(() {
+        _telemetryHistory = history;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final healthy = hive.isHealthy;
+    final healthy = widget.hive.isHealthy;
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppConstants.space12),
@@ -631,69 +738,137 @@ class _HiveInfoCard extends StatelessWidget {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => HiveDetailsScreen(hiveId: hive.id)),
+              MaterialPageRoute(builder: (context) => HiveDetailsScreen(hiveId: widget.hive.id)),
             );
           },
           child: Padding(
             padding: const EdgeInsets.all(AppConstants.space16),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: context.primarySoftColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.borderColor),
-                  ),
-                  child: Icon(Icons.hive_outlined, color: context.textPrimaryColor, size: 22),
-                ),
-                const SizedBox(width: AppConstants.space16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        hive.name,
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: context.primarySoftColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                      child: Icon(Icons.hive_outlined, color: context.textPrimaryColor, size: 22),
+                    ),
+                    const SizedBox(width: AppConstants.space16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.hive.name,
+                            style: GoogleFonts.manrope(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${widget.hive.hiveCode} · ${widget.hive.apiaryLocation}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: context.textSecondaryColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: healthy ? context.successBgColor : context.warningBgColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        widget.hive.overallHealth,
                         style: GoogleFonts.manrope(
-                          fontSize: 15,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: context.textPrimaryColor,
+                          color: healthy ? context.successColor : context.warningColor,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${hive.hiveCode} · ${hive.apiaryLocation}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: context.textSecondaryColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: healthy ? context.successBgColor : context.warningBgColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    hive.overallHealth,
-                    style: GoogleFonts.manrope(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: healthy ? context.successColor : context.warningColor,
+                if (!_isLoading && _telemetryHistory.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.scaffoldBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _TelemetryStat(
+                          label: 'Temp',
+                          value: '${_telemetryHistory.first['temperature'] ?? '--'}°C',
+                          icon: Icons.thermostat_rounded,
+                        ),
+                        _TelemetryStat(
+                          label: 'Humidity',
+                          value: '${_telemetryHistory.first['humidity'] ?? '--'}%',
+                          icon: Icons.water_drop_rounded,
+                        ),
+                        _TelemetryStat(
+                          label: 'Weight',
+                          value: '${_telemetryHistory.first['weightKg'] ?? '--'} kg',
+                          icon: Icons.scale_rounded,
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TelemetryStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _TelemetryStat({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: context.colors.primary),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: context.textPrimaryColor,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: context.textSecondaryColor,
+          ),
+        ),
+      ],
     );
   }
 }

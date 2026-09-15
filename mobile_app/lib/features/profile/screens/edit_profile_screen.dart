@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../controllers/user_controller.dart';
 
 /// Form screen to Edit User Profile
@@ -21,6 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+  late TextEditingController _avatarUrlController;
 
   // Role-specific controllers
   late TextEditingController _organizationController;
@@ -37,6 +39,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController(text: user.name);
     _emailController = TextEditingController(text: user.email);
     _phoneController = TextEditingController(text: user.phone);
+    _avatarUrlController = TextEditingController(text: user.avatarUrl ?? '');
     _organizationController = TextEditingController(text: user.organizationName ?? '');
     _locationController = TextEditingController(text: user.facilityLocation ?? '');
     _licenseController = TextEditingController(text: user.licenseNumber ?? '');
@@ -48,6 +51,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _avatarUrlController.dispose();
     _organizationController.dispose();
     _locationController.dispose();
     _licenseController.dispose();
@@ -88,6 +92,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       email: _emailController.text,
       phone: _phoneController.text,
       role: user.role,
+      avatarUrl: _avatarUrlController.text,
       organizationName: !isHarv ? _organizationController.text : null,
       facilityLocation: !isHarv ? _locationController.text : null,
       licenseNumber: !isHarv ? _licenseController.text : null,
@@ -123,40 +128,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     String nameLabel = 'Full Name *';
     String nameHint = 'Enter your full name';
-    String orgLabel = 'Organization / Business Name *';
-    String orgHint = 'e.g. Cascade Processing Facility';
-    String locLabel = 'Processing Location *';
-    String locHint = 'e.g. Bend Industrial Park, OR';
+    String orgLabel = 'Organization / Collection Centre Name *';
+    String orgHint = 'Enter collection centre name';
+    String locLabel = 'Processing Location / Address *';
+    String locHint = 'Enter your complete address';
     String licLabel = 'FSSAI Registration / License Number *';
-    String licHint = 'e.g. FSSAI-PROC-2026-9812';
+    String licHint = 'e.g. FSSAI-2026-98124';
 
     if (isLb) {
       nameLabel = 'Authorized Person Name *';
-      nameHint = 'e.g. Dr. Evelyn Vance';
+      nameHint = 'Enter your full name';
       orgLabel = 'Laboratory Name *';
-      orgHint = 'e.g. Pacific Pure Apiculture Labs';
-      locLabel = 'Laboratory Address *';
-      locHint = 'e.g. Corvallis Tech Campus, OR';
+      orgHint = 'e.g. Apex Quality Food Testing Lab';
+      locLabel = 'Laboratory Complete Address *';
+      locHint = 'Enter your complete address';
       licLabel = 'Laboratory Registration / Accreditation Number *';
-      licHint = 'e.g. LAB-ACCRED-2026-4402';
+      licHint = 'e.g. NABL-LAB-2026-HQ88';
     } else if (isPkg) {
       nameLabel = 'Authorized Person Name *';
-      nameHint = 'e.g. Marcus Sterling';
-      orgLabel = 'Company / Packaging Unit Name *';
-      orgHint = 'e.g. Artisan Honey Packaging Co.';
-      locLabel = 'Packaging Facility Location *';
-      locHint = 'e.g. Portland Logistics Hub, OR';
+      nameHint = 'Enter your full name';
+      orgLabel = 'Company / Packaging Facility Name *';
+      orgHint = 'e.g. HoneyChain Eco Packaging Facility';
+      locLabel = 'Packaging Facility Complete Address *';
+      locHint = 'Enter your complete address';
       licLabel = 'FSSAI Registration / License Number *';
-      licHint = 'e.g. FSSAI-PKG-2026-1184';
+      licHint = 'e.g. PKG-FSSAI-2026-B99';
     } else if (isCol) {
       nameLabel = 'Full Name *';
-      nameHint = 'e.g. Cascade Facility Manager';
-      orgLabel = 'Organization / Business Name *';
-      orgHint = 'e.g. Cascade Processing Ltd.';
-      locLabel = 'Collection / Processing Location *';
-      locHint = 'e.g. Bend Industrial Park, OR';
+      nameHint = 'Enter your full name';
+      orgLabel = 'Organization / Collection Centre Name *';
+      orgHint = 'Enter collection centre name';
+      locLabel = 'Collection / Processing Location Address *';
+      locHint = 'Enter your complete address';
       licLabel = 'FSSAI Registration / License Number *';
-      licHint = 'e.g. FSSAI-PROC-2026-9812';
+      licHint = 'e.g. FSSAI-2026-98124';
     }
 
     return Scaffold(
@@ -193,6 +198,74 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: AppConstants.space8),
+
+                      // Avatar Management Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppConstants.space16),
+                        decoration: BoxDecoration(
+                          color: context.surfaceColor,
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            const UserAvatar(size: 64),
+                            const SizedBox(width: AppConstants.space16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                                        ? 'Custom Avatar'
+                                        : (user.googlePhotoUrl != null && user.googlePhotoUrl!.isNotEmpty
+                                            ? 'Google Profile Picture'
+                                            : 'Initials Placeholder'),
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textPrimaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                                        ? 'Custom photo takes priority over Google profile.'
+                                        : (user.googlePhotoUrl != null && user.googlePhotoUrl!.isNotEmpty
+                                            ? 'Synced automatically from your Google account.'
+                                            : 'Add a custom photo URL or sign in with Google.'),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: context.textSecondaryColor,
+                                    ),
+                                  ),
+                                  if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _avatarUrlController.clear();
+                                        });
+                                      },
+                                      child: Text(
+                                        'Revert to Google Photo',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppConstants.honeyAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.space16),
+
                       // Section 1: Personal & Contact Information
                       Container(
                         padding: const EdgeInsets.all(AppConstants.space16),
@@ -224,7 +297,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             _buildInputField(
                               context,
                               label: 'Email *',
-                              hint: 'email@example.com',
+                              hint: 'Enter your email address',
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               validator: (val) {
@@ -237,7 +310,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             _buildInputField(
                               context,
                               label: 'Mobile Number *',
-                              hint: '+1 (555) 234-5678',
+                              hint: 'e.g. 98765 43210',
                               controller: _phoneController,
                               keyboardType: TextInputType.phone,
                               validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter phone number' : null,

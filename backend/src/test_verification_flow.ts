@@ -1,5 +1,6 @@
 import { verificationService } from './services/verificationService';
 import { otpService } from './services/otpService';
+import { SmsProviderFactory } from './services/sms';
 import { blockchainService } from './services/blockchainService';
 import { PrismaClient } from '@prisma/client';
 import { isUserProfileComplete, isHarvesterFullyVerified } from './services/profileService';
@@ -7,6 +8,9 @@ import { isUserProfileComplete, isHarvesterFullyVerified } from './services/prof
 const prisma = new PrismaClient();
 
 async function runTests() {
+  process.env.OTP_ENVIRONMENT = 'sandbox';
+  process.env.OTP_PROVIDER = 'sandbox';
+  SmsProviderFactory.resetProvider();
   console.log('=== Starting Harvester Verification System Automated Tests ===\n');
 
   const testHarvesterId = `test-harv-${Date.now()}`;
@@ -68,7 +72,7 @@ async function runTests() {
 
     // 4. Step 2: Mobile Number & OTP Verification
     console.log('\n--- 4. Step 2: Mobile OTP System ---');
-    const testPhone = `+1555${Date.now().toString().slice(-7)}`;
+    const testPhone = `+9198${Date.now().toString().slice(-8)}`;
     const otpSent = await otpService.sendOtp(testPhone);
     assert(otpSent.success === true, 'OTP generated successfully');
     assert(otpSent.cooldownSeconds === 60, '60-second cooldown returned');
@@ -88,7 +92,7 @@ async function runTests() {
     assert(thirdWrong.message.includes('invalidated') || thirdWrong.message.includes('Too many'), 'OTP invalidated after 3 failed attempts');
 
     // Generate fresh OTP for valid verification
-    const freshPhone = `+1556${Date.now().toString().slice(-7)}`;
+    const freshPhone = `+9199${Date.now().toString().slice(-8)}`;
     const freshOtpSent = await otpService.sendOtp(freshPhone);
     const validOtpSubmission = await verificationService.submitMobileVerification(testHarvesterId, freshPhone, freshOtpSent.devOtp!);
     assert(validOtpSubmission.mobileVerified === 'Verified', 'Mobile number verified successfully with valid OTP');

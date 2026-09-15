@@ -114,6 +114,16 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
                             // ── Visual Workflow Stage Progress ──
                             _buildVisualWorkflowCard(context),
 
+                            const SizedBox(height: AppConstants.space16),
+
+                            // ── Product Details Card ──
+                            _buildProductDetailsCard(context),
+
+                            const SizedBox(height: AppConstants.space16),
+
+                            // ── Lab Results Parameter Breakdown Card ──
+                            _buildLabReportCard(context),
+
                             const SizedBox(height: AppConstants.space20),
 
                             // ── Provenance & Blockchain Ledger Header ──
@@ -154,42 +164,7 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
   }
 
   Widget _buildVisualWorkflowCard(BuildContext context) {
-    final stages = (workflowData?['stages'] as List?) ?? [
-      {
-        'stage': 'HARVEST',
-        'title': 'Honey Harvested',
-        'completed': true,
-        'actor': workflowData?['harvest']?['harvester']?['name'] ?? 'Harvester',
-        'details': '${workflowData?['harvest']?['quantity'] ?? 0} kg harvested',
-      },
-      {
-        'stage': 'COLLECTION',
-        'title': 'Collection & Processing',
-        'completed': workflowData?['processing'] != null,
-        'actor': workflowData?['processing']?['processor']?['name'] ?? 'Processing Unit',
-        'details': workflowData?['processing']?['method'] ?? 'Pending extraction',
-      },
-      {
-        'stage': 'LAB',
-        'title': 'Lab Testing',
-        'completed': workflowData?['labReport'] != null && workflowData?['labReport']?['status'] == 'APPROVED',
-        'actor': workflowData?['labReport']?['lab']?['name'] ?? 'Quality Lab',
-        'details': workflowData?['labReport'] != null ? 'Purity & Moisture verified' : 'Pending verification',
-      },
-      {
-        'stage': 'PACKAGING',
-        'title': 'Packaging & Sealing',
-        'completed': workflowData?['packaging'] != null,
-        'actor': workflowData?['packaging']?['packager']?['name'] ?? 'Packaging Unit',
-        'details': workflowData?['packaging'] != null ? '${workflowData?['packaging']?['numberOfPackages']} packages sealed' : 'Pending packaging',
-      },
-      {
-        'stage': 'COMPLETED',
-        'title': 'Consumer QR Ready',
-        'completed': workflowData?['status'] == 'COMPLETED' || workflowData?['currentStage'] == 'COMPLETED',
-        'details': 'Verifiable provenance active',
-      },
-    ];
+    final stages = (workflowData?['timeline'] as List?) ?? [];
 
     return AppCard(
       child: Column(
@@ -233,10 +208,185 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
               title: stages[i]['title'] ?? '',
               details: stages[i]['details'] ?? '',
               actor: stages[i]['actor'],
-              isCompleted: stages[i]['completed'] == true,
+              isCompleted: stages[i]['date'] != null,
               isLast: i == stages.length - 1,
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductDetailsCard(BuildContext context) {
+    final product = workflowData?['product'];
+    final harvester = workflowData?['harvester'];
+    final collectionProcessing = workflowData?['collectionProcessing'];
+    final packaging = workflowData?['packaging'];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Batch & Product Specifications',
+                style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+              ),
+              Icon(Icons.verified_rounded, size: 18, color: context.colors.primary),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildSpecRow('Traceability ID', widget.batchId),
+          if (product != null) ...[
+            _buildSpecRow('Product', product['productName'] ?? ''),
+          ],
+          if (harvester != null) ...[
+            _buildSpecRow('Harvester', harvester['name'] ?? ''),
+            _buildSpecRow('Apiary Location', harvester['location'] ?? ''),
+            _buildSpecRow('Harvest Qty', '${harvester['quantityKg']} kg'),
+            _buildSpecRow('Hive Code', harvester['hiveCode'] ?? ''),
+            _buildSpecRow('Bee Breed', harvester['beeBreed'] ?? ''),
+          ],
+          if (collectionProcessing != null) ...[
+            _buildSpecRow('Extraction Method', collectionProcessing['method'] ?? ''),
+            _buildSpecRow('Processing Facility', collectionProcessing['processor'] ?? ''),
+          ],
+          if (packaging != null) ...[
+            _buildSpecRow('Package Type', packaging['packageSize'] ?? ''),
+            _buildSpecRow('Units Packaged', '${packaging['numberOfPackages']} jars'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLabReportCard(BuildContext context) {
+    final lab = workflowData?['labVerification'];
+    if (lab == null) {
+      return AppCard(
+        child: Row(
+          children: [
+            Icon(Icons.biotech_outlined, color: context.textMutedColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Lab Quality Testing: Pending dispatch or in analysis.',
+                style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final qualityScore = (lab['qualityScore'] as num?)?.toDouble() ?? 0.0;
+    final isApproved = lab['overallResult'] == 'PASS';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Certified Laboratory Breakdown',
+                style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isApproved ? context.successBgColor : context.warningBgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  isApproved ? 'PASSED (Score: ${qualityScore.toStringAsFixed(1)})' : 'IN REVIEW',
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: isApproved ? context.successColor : context.warningColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (lab['parameters'] != null)
+            ...(lab['parameters'] as List).map((param) {
+              return _buildParamRow(
+                context,
+                param['name'] ?? '',
+                param['value'] ?? '',
+                param['limit'] ?? '',
+                param['status'] == 'PASS',
+              );
+            }),
+          if (lab['remarks'] != null && lab['remarks'].toString().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Lab Notes: ${lab['remarks']}',
+              style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpecRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF888888))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParamRow(BuildContext context, String param, String value, String standard, bool passed) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: context.scaffoldBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(param, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textPrimaryColor)),
+                Text('Standard: $standard', style: GoogleFonts.inter(fontSize: 11, color: context.textSecondaryColor)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(value, style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w700, color: context.textPrimaryColor)),
+              Text(
+                passed ? 'PASSED ✓' : 'FAILED ✗',
+                style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w800, color: passed ? context.successColor : AppConstants.error),
+              ),
+            ],
+          ),
         ],
       ),
     );

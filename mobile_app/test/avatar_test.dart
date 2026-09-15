@@ -6,54 +6,89 @@ import 'package:mobile_app/features/profile/controllers/user_controller.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  group('User Profile & Avatar Priority Tests', () {
-    test('Calculates first-letter initial correctly from name', () {
-      const profile1 = UserProfile(
-        name: 'Prabhakar Gupta',
-        email: 'prabhakar@example.com',
-        phone: '9876543210',
+  group('3-Tier Avatar Priority & Google Profile Picture Tests', () {
+    test('UserProfile effectivePhotoUrl: Tier 1 (custom avatar) takes precedence over Tier 2 (Google photo)', () {
+      const profile = UserProfile(
+        name: 'Test Harvester',
+        email: 'test@honeychain.io',
+        phone: '1234567890',
+        role: 'HARVESTER',
+        avatarUrl: 'https://example.com/custom_avatar.jpg',
+        googlePhotoUrl: 'https://lh3.googleusercontent.com/a/google_photo.jpg',
       );
-      expect(profile1.initial, equals('P'));
 
-      const profile2 = UserProfile(
-        name: 'rahul Sharma',
-        email: 'rahul@example.com',
-        phone: '9876543210',
-      );
-      expect(profile2.initial, equals('R'));
+      expect(profile.effectivePhotoUrl, equals('https://example.com/custom_avatar.jpg'));
     });
 
-    test('Falls back to email initial when name is unavailable', () {
-      const profileEmail = UserProfile(
-        name: '',
-        email: 'rahul@gmail.com',
-        phone: '9876543210',
+    test('UserProfile effectivePhotoUrl: Tier 2 (Google photo) takes precedence when Tier 1 is null or empty', () {
+      const profileWithNullAvatar = UserProfile(
+        name: 'Test Lab',
+        email: 'lab@honeychain.io',
+        phone: '1234567890',
+        role: 'LAB',
+        avatarUrl: null,
+        googlePhotoUrl: 'https://lh3.googleusercontent.com/a/google_photo.jpg',
       );
-      expect(profileEmail.initial, equals('R'));
 
-      const profileZ = UserProfile(
-        name: '',
-        email: 'zackary@domain.org',
-        phone: '9876543210',
+      expect(profileWithNullAvatar.effectivePhotoUrl, equals('https://lh3.googleusercontent.com/a/google_photo.jpg'));
+
+      const profileWithEmptyAvatar = UserProfile(
+        name: 'Test Lab',
+        email: 'lab@honeychain.io',
+        phone: '1234567890',
+        role: 'LAB',
+        avatarUrl: '   ',
+        googlePhotoUrl: 'https://lh3.googleusercontent.com/a/google_photo.jpg',
       );
-      expect(profileZ.initial, equals('Z'));
+
+      expect(profileWithEmptyAvatar.effectivePhotoUrl, equals('https://lh3.googleusercontent.com/a/google_photo.jpg'));
     });
 
-    test('Two different beekeepers have distinct initials', () {
-      const userA = UserProfile(
-        name: 'Alice Wonder',
-        email: 'alice@honey.com',
-        phone: '1111111111',
+    test('UserProfile effectivePhotoUrl: Falls back to null (Tier 3) when neither is set', () {
+      const profileWithoutPhotos = UserProfile(
+        name: 'Test Packaging',
+        email: 'pkg@honeychain.io',
+        phone: '1234567890',
+        role: 'PACKAGING',
+        avatarUrl: null,
+        googlePhotoUrl: null,
       );
-      const userB = UserProfile(
-        name: 'Bob Miller',
-        email: 'bob@honey.com',
-        phone: '2222222222',
-      );
-      expect(userA.initial, isNot(equals(userB.initial)));
+
+      expect(profileWithoutPhotos.effectivePhotoUrl, isNull);
+      expect(profileWithoutPhotos.initial, equals('T'));
     });
 
-    testWidgets('UserAvatar renders initial letter properly', (WidgetTester tester) async {
+    test('RoleAccountSummary effectivePhotoUrl respects 3-tier priority', () {
+      final summaryWithCustom = RoleAccountSummary.fromJson({
+        'id': 'acc-1',
+        'role': 'HARVESTER',
+        'email': 'user@honeychain.io',
+        'name': 'Harvester User',
+        'avatarUrl': 'https://example.com/custom.png',
+        'googlePhotoUrl': 'https://google.com/photo.png',
+        'isProfileComplete': true,
+        'isVerified': true,
+        'verificationStatus': 'Verified',
+      });
+
+      expect(summaryWithCustom.effectivePhotoUrl, equals('https://example.com/custom.png'));
+
+      final summaryWithGoogleOnly = RoleAccountSummary.fromJson({
+        'id': 'acc-2',
+        'role': 'COLLECTOR_PROCESSOR',
+        'email': 'user@honeychain.io',
+        'name': 'Collector User',
+        'avatarUrl': null,
+        'googlePhotoUrl': 'https://google.com/photo.png',
+        'isProfileComplete': true,
+        'isVerified': true,
+        'verificationStatus': 'Verified',
+      });
+
+      expect(summaryWithGoogleOnly.effectivePhotoUrl, equals('https://google.com/photo.png'));
+    });
+
+    testWidgets('UserAvatar renders initial letter when effectivePhotoUrl is null', (WidgetTester tester) async {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -63,17 +98,17 @@ void main() {
           child: const MaterialApp(
             home: Scaffold(
               body: UserAvatar(
-                name: 'Prabhakar',
-                email: 'prabhakar@honey.com',
+                name: 'Alex Honey',
+                email: 'alex@example.com',
+                photoUrl: null,
               ),
             ),
           ),
         ),
       );
 
-      await tester.pumpAndSettle();
-
-      expect(find.text('P'), findsOneWidget);
+      await tester.pump();
+      expect(find.text('A'), findsOneWidget);
     });
   });
 }

@@ -2,6 +2,7 @@
 class HarvesterVerificationModel {
   final String id;
   final String harvesterId;
+  final String? fullName;
 
   // 1. Government ID
   final String? governmentIdType;
@@ -43,6 +44,7 @@ class HarvesterVerificationModel {
   const HarvesterVerificationModel({
     required this.id,
     required this.harvesterId,
+    this.fullName,
     this.governmentIdType,
     this.governmentIdReference,
     this.governmentIdDocHash,
@@ -72,6 +74,7 @@ class HarvesterVerificationModel {
     this.updatedAt,
   });
 
+  bool get isStep1IdentityComplete => mobileVerified == 'Verified';
   bool get isStep1Complete => governmentIdVerified == 'Verified';
   bool get isStep2Complete => mobileVerified == 'Verified';
   bool get isStep3Complete => registrationVerified == 'Verified';
@@ -101,9 +104,8 @@ class HarvesterVerificationModel {
     if (isStep1Complete) count++;
     if (isStep2Complete) count++;
     if (isStep3Complete) count++;
-    if (isStep4Complete) count++;
-    if (isFullyVerified) count++;
-    return count;
+    if (isStep4Complete || isFullyVerified) count++;
+    return count.clamp(0, 3);
   }
 
   factory HarvesterVerificationModel.initial(String harvesterId) {
@@ -117,6 +119,7 @@ class HarvesterVerificationModel {
     return HarvesterVerificationModel(
       id: json['id'] as String? ?? '',
       harvesterId: json['harvesterId'] as String? ?? '',
+      fullName: json['fullName'] as String?,
       governmentIdType: json['governmentIdType'] as String?,
       governmentIdReference: json['governmentIdReference'] as String?,
       governmentIdDocHash: json['governmentIdDocHash'] as String?,
@@ -165,6 +168,7 @@ class HarvesterVerificationModel {
     return {
       'id': id,
       'harvesterId': harvesterId,
+      'fullName': fullName,
       'governmentIdType': governmentIdType,
       'governmentIdReference': governmentIdReference,
       'governmentIdDocHash': governmentIdDocHash,

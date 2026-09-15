@@ -7,13 +7,20 @@ import 'package:google_sign_in/google_sign_in.dart';
 /// Service wrapping Firebase Authentication & Google Sign-In
 class AuthService {
   final FirebaseAuth? _customFirebaseAuth;
-  final GoogleSignIn _googleSignIn;
+  final GoogleSignIn? _customGoogleSignIn;
+  GoogleSignIn? _lazyGoogleSignIn;
 
   AuthService({
     FirebaseAuth? firebaseAuth,
     GoogleSignIn? googleSignIn,
   })  : _customFirebaseAuth = firebaseAuth,
-        _googleSignIn = googleSignIn ?? GoogleSignIn();
+        _customGoogleSignIn = googleSignIn;
+
+  GoogleSignIn get _googleSignIn {
+    if (_customGoogleSignIn != null) return _customGoogleSignIn!;
+    _lazyGoogleSignIn ??= GoogleSignIn();
+    return _lazyGoogleSignIn!;
+  }
 
   bool get isFirebaseInitialized => Firebase.apps.isNotEmpty;
 
@@ -78,9 +85,11 @@ class AuthService {
 
   /// Log out from Firebase & Google Sign-In
   Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (_) {}
+    if (!kIsWeb) {
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+    }
 
     try {
       await _firebaseAuth?.signOut();

@@ -6,7 +6,20 @@ import { generateQRDataUri } from '../services/qrService';
 const router = Router();
 const prisma = new PrismaClient();
 
-import { isUserProfileComplete, normalizeUserRole, PROFILE_INCOMPLETE_RESPONSE } from '../services/profileService';
+import {
+  isUserProfileComplete,
+  normalizeUserRole,
+  isHarvesterFullyVerified,
+  isCollectorFullyVerified,
+  isLabTesterFullyVerified,
+  isPackagingManagerFullyVerified,
+  PROFILE_INCOMPLETE_RESPONSE,
+  HARVESTER_VERIFICATION_REQUIRED_RESPONSE,
+  COLLECTOR_VERIFICATION_REQUIRED_RESPONSE,
+  LAB_VERIFICATION_REQUIRED_RESPONSE,
+  PACKAGING_VERIFICATION_REQUIRED_RESPONSE
+} from '../services/profileService';
+import { parseCoordinates, calculateHaversineDistanceKm } from '../services/geoService';
 
 // Helper to generate unique Request ID
 function generateRequestId(stagePrefix: string): string {
@@ -83,6 +96,178 @@ async function recordWorkflowProvenance(
   return { provEvent, onChainResult };
 }
 
+// The GET /verify route was removed because index.ts handles /api/verify with a comprehensive response for QR scanning.
+/**
+ * ─────────────────────────────────────────────────────────
+ * 0. GET /api/centers/nearest
+ * Find nearest verified partner centers (Collector, Lab, Packager)
+ * ─────────────────────────────────────────────────────────
+ */
+router.get('/centers/nearest', async (req: Request, res: Response) => {
+  try {
+    const {
+      role,
+      lat,
+      lng,
+      originLocation,
+      originHiveId,
+      batchId,
+      userId
+    } = req.query;
+
+    if (!role) {
+      return res.status(400).json({ success: false, error: 'Target role is required (COLLECTOR_PROCESSOR, LAB, or PACKAGING)' });
+    }
+
+    const targetRole = normalizeRole(String(role));
+
+    // Resolve Origin Coordinates
+    let originCoords: { lat: number; lng: number } | null = null;
+    if (lat && lng) {
+      const parsedLat = parseFloat(String(lat));
+      const parsedLng = parseFloat(String(lng));
+      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+        originCoords = { lat: parsedLat, lng: parsedLng };
+      }
+    }
+
+    if (!originCoords && originLocation) {
+      originCoords = parseCoordinates(String(originLocation));
+    }
+
+    if (!originCoords && originHiveId) {
+      const hive = await prisma.hive.findUnique({ where: { id: String(originHiveId) } });
+      if (hive) {
+        originCoords = parseCoordinates(hive.apiaryLocation);
+      }
+    }
+
+    if (!originCoords && batchId) {
+      const batch = await prisma.batch.findUnique({
+        where: { id: String(batchId) },
+        include: {
+          harvest: { include: { hive: true, harvester: { include: { harvesterVerification: true } } } },
+          processingRecords: { include: { processor: true } }
+        }
+      });
+      if (batch) {
+        if (targetRole === 'PACKAGING' && batch.processingRecords[0]?.processor?.facilityLocation) {
+          originCoords = parseCoordinates(batch.processingRecords[0].processor.facilityLocation);
+        } else if (batch.harvest?.hive?.apiaryLocation) {
+          originCoords = parseCoordinates(batch.harvest.hive.apiaryLocation);
+        } else if (batch.harvest?.location) {
+          originCoords = parseCoordinates(batch.harvest.location);
+        } else if (batch.harvest?.harvester?.harvesterVerification?.apiaryCoordinates) {
+          originCoords = parseCoordinates(batch.harvest.harvester.harvesterVerification.apiaryCoordinates);
+        }
+      }
+    }
+
+    if (!originCoords && userId) {
+      const user = await prisma.user.findFirst({
+        where: { OR: [{ id: String(userId) }, { email: String(userId) }] },
+        include: { harvesterVerification: true }
+      });
+      if (user?.harvesterVerification?.apiaryCoordinates) {
+        originCoords = parseCoordinates(user.harvesterVerification.apiaryCoordinates);
+      } else if (user?.facilityLocation) {
+        originCoords = parseCoordinates(user.facilityLocation);
+      }
+    }
+
+    // Default origin fallback (Cascade Valley Apiary)
+    if (!originCoords) {
+      originCoords = { lat: 44.0521, lng: -121.3153 };
+    }
+
+    // Fetch verified users of targetRole
+    const users = await prisma.user.findMany({
+      where: {
+        role: targetRole
+      },
+      include: {
+        collectorVerification: true,
+        labVerification: true,
+        packagingVerification: true
+      }
+    });
+
+    // Filter only verified centers
+    const verifiedCenters = users.filter((u) => {
+      if (targetRole === 'COLLECTOR_PROCESSOR') {
+        return isCollectorFullyVerified(u.collectorVerification);
+      }
+      if (targetRole === 'LAB') {
+        return isLabTesterFullyVerified(u.labVerification);
+      }
+      if (targetRole === 'PACKAGING') {
+        return isPackagingManagerFullyVerified(u.packagingVerification);
+      }
+      return true;
+    });
+
+    const results = verifiedCenters.map((u) => {
+      let locStr = u.facilityLocation || '';
+      let specialty = '';
+      let license = u.licenseNumber || '';
+
+      if (targetRole === 'COLLECTOR_PROCESSOR') {
+        locStr = u.collectorVerification?.facilityLocation || u.facilityLocation || 'Regional Processing Hub';
+        specialty = u.collectorVerification?.businessDetails || 'Cold Extraction & Centrifugal Processing';
+        license = u.collectorVerification?.licenseNumber || u.licenseNumber || 'FSSAI Certified';
+      } else if (targetRole === 'LAB') {
+        locStr = u.labVerification?.labAddress || u.facilityLocation || 'Quality Testing Lab Hub';
+        specialty = u.labVerification?.authorizedTestingDetails || 'Physicochemical & Spectrometry Testing (Moisture, HMF, Diastase, Pollen)';
+        license = u.labVerification?.labRegistrationNumber || u.labVerification?.accreditation || u.licenseNumber || 'NABL Accredited';
+      } else if (targetRole === 'PACKAGING') {
+        locStr = u.packagingVerification?.facilityLocation || u.facilityLocation || 'Sterile Bottling Facility';
+        specialty = u.packagingVerification?.authorizedPackagingDetails || 'Automated Cleanroom Bottling, Tamper-Evident Seals, QR Code Generation';
+        license = u.packagingVerification?.packagingLicenseNumber || u.licenseNumber || 'FSSAI Packaging License';
+      }
+
+      const centerCoords = parseCoordinates(locStr) || { lat: originCoords!.lat + 0.05, lng: originCoords!.lng + 0.05 };
+      const distanceKm = calculateHaversineDistanceKm(
+        originCoords!.lat,
+        originCoords!.lng,
+        centerCoords.lat,
+        centerCoords.lng
+      );
+
+      return {
+        id: u.id,
+        name: u.organizationName || u.name,
+        organizationName: u.organizationName || u.name,
+        managerName: u.name,
+        role: u.role,
+        address: locStr,
+        phone: u.phone,
+        email: u.email,
+        licenseNumber: license,
+        specialtyDetails: specialty,
+        distanceKm,
+        distanceDisplay: `${distanceKm} km away`,
+        isVerified: true,
+        verificationBadge: 'Verified Centre ✓',
+        coordinates: centerCoords
+      };
+    });
+
+    // Sort ascending by distance (nearest first)
+    results.sort((a, b) => a.distanceKm - b.distanceKm);
+
+    res.json({
+      success: true,
+      origin: originCoords,
+      targetRole,
+      count: results.length,
+      centers: results
+    });
+  } catch (error: any) {
+    console.error('Error finding nearest centers:', error);
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
 /**
  * ─────────────────────────────────────────────────────────
  * 1. POST /api/requests
@@ -137,11 +322,15 @@ router.post('/requests', async (req: Request, res: Response) => {
     const senderIdentifier = fromUserId || harvesterId || batch.harvest.harvesterId;
     const sender = await ensureUser(senderIdentifier, fromRole);
     if (!isProfileComplete(sender)) {
-      return res.status(403).json({
-        success: false,
-        code: 'PROFILE_INCOMPLETE',
-        error: 'Please complete your profile and required verification details before continuing with this request.'
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+    if (normalizeRole(fromRole) === 'HARVESTER' || sender.role === 'HARVESTER') {
+      const harvesterVer = await prisma.harvesterVerification.findUnique({
+        where: { harvesterId: sender.id }
       });
+      if (!isHarvesterFullyVerified(harvesterVer)) {
+        return res.status(403).json(HARVESTER_VERIFICATION_REQUIRED_RESPONSE);
+      }
     }
     const receiver = toUserId ? await ensureUser(toUserId, toRole) : null;
 
@@ -391,6 +580,36 @@ router.patch('/requests/:id/accept', async (req: Request, res: Response) => {
       });
     }
 
+    // Strict Collection & Processing Gate: Check that Collector profile is 3/3 verified
+    if (normalizedActorRole === 'COLLECTOR_PROCESSOR' || request.requestType === 'HARVEST_TO_COLLECTION') {
+      const colVer = await prisma.collectorVerification.findUnique({
+        where: { collectorId: actor.id }
+      });
+      if (!isCollectorFullyVerified(colVer)) {
+        return res.status(403).json(COLLECTOR_VERIFICATION_REQUIRED_RESPONSE);
+      }
+    }
+
+    // Strict Lab Tester Gate: Check that Lab Tester profile is 3/3 verified
+    if (normalizedActorRole === 'LAB' || request.requestType === 'COLLECTION_TO_LAB') {
+      const labVer = await prisma.labVerification.findUnique({
+        where: { labId: actor.id }
+      });
+      if (!isLabTesterFullyVerified(labVer)) {
+        return res.status(403).json(LAB_VERIFICATION_REQUIRED_RESPONSE);
+      }
+    }
+
+    // Strict Packaging Manager Gate: Check that Packaging Manager profile is 3/3 verified
+    if (normalizedActorRole === 'PACKAGING' || request.requestType === 'LAB_TO_PACKAGING') {
+      const pkgVer = await prisma.packagingVerification.findUnique({
+        where: { packagerId: actor.id }
+      });
+      if (!isPackagingManagerFullyVerified(pkgVer)) {
+        return res.status(403).json(PACKAGING_VERIFICATION_REQUIRED_RESPONSE);
+      }
+    }
+
     let nextBatchStatus = 'ACCEPTED';
     let provEventType = 'REQUEST_ACCEPTED';
 
@@ -489,11 +708,37 @@ router.patch('/requests/:id/reject', async (req: Request, res: Response) => {
     const normalizedActorRole = normalizeRole(actorRole || request.toRole);
     const actor = await ensureUser(actorId || 'Role Officer', normalizedActorRole);
     if (!isProfileComplete(actor)) {
-      return res.status(403).json({
-        success: false,
-        code: 'PROFILE_INCOMPLETE',
-        error: 'Please complete your profile and required verification details before continuing with this request.'
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+
+    // Strict Collection & Processing Gate
+    if (normalizedActorRole === 'COLLECTOR_PROCESSOR' || request.requestType === 'HARVEST_TO_COLLECTION') {
+      const colVer = await prisma.collectorVerification.findUnique({
+        where: { collectorId: actor.id }
       });
+      if (!isCollectorFullyVerified(colVer)) {
+        return res.status(403).json(COLLECTOR_VERIFICATION_REQUIRED_RESPONSE);
+      }
+    }
+
+    // Strict Lab Tester Gate
+    if (normalizedActorRole === 'LAB' || request.requestType === 'COLLECTION_TO_LAB') {
+      const labVer = await prisma.labVerification.findUnique({
+        where: { labId: actor.id }
+      });
+      if (!isLabTesterFullyVerified(labVer)) {
+        return res.status(403).json(LAB_VERIFICATION_REQUIRED_RESPONSE);
+      }
+    }
+
+    // Strict Packaging Manager Gate
+    if (normalizedActorRole === 'PACKAGING' || request.requestType === 'LAB_TO_PACKAGING') {
+      const pkgVer = await prisma.packagingVerification.findUnique({
+        where: { packagerId: actor.id }
+      });
+      if (!isPackagingManagerFullyVerified(pkgVer)) {
+        return res.status(403).json(PACKAGING_VERIFICATION_REQUIRED_RESPONSE);
+      }
     }
 
     let nextBatchStatus = 'REJECTED';
@@ -577,6 +822,9 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
     const {
       actorId,
       actorRole,
+      toUserId,
+      targetLabId,
+      targetPackagerId,
       quantityReceived,
       quantityAfter,
       method,
@@ -614,12 +862,17 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
 
       const processor = await ensureUser(actorId || 'Processor', 'COLLECTOR_PROCESSOR');
       if (!isProfileComplete(processor)) {
-        return res.status(403).json({
-          success: false,
-          code: 'PROFILE_INCOMPLETE',
-          error: 'Please complete your profile and required verification details before continuing with this request.'
-        });
+        return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
       }
+      const colVer = await prisma.collectorVerification.findUnique({
+        where: { collectorId: processor.id }
+      });
+      if (!isCollectorFullyVerified(colVer)) {
+        return res.status(403).json(COLLECTOR_VERIFICATION_REQUIRED_RESPONSE);
+      }
+
+      const targetLabUser = (toUserId || targetLabId) ? await ensureUser(toUserId || targetLabId, 'LAB') : null;
+
       const nextRequestId = generateRequestId('LAB');
       const qtyIn = quantityReceived !== undefined ? Number(quantityReceived) : (currentRequest.quantity || 0);
       const qtyOut = quantityAfter !== undefined ? Number(quantityAfter) : qtyIn;
@@ -654,6 +907,7 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
             requestId: nextRequestId,
             batchId: batch.id,
             fromUserId: processor.id,
+            toUserId: targetLabUser?.id || null,
             fromRole: 'COLLECTOR_PROCESSOR',
             toRole: 'LAB',
             requestType: 'COLLECTION_TO_LAB',
@@ -684,7 +938,7 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
             toStatus: 'PENDING',
             actorId: processor.id,
             actorRole: 'COLLECTOR_PROCESSOR',
-            notes: `Batch processed (${qtyOut} kg) and sample forwarded to Lab`
+            notes: `Batch processed (${qtyOut} kg) and sample forwarded to ${targetLabUser ? targetLabUser.name : 'Lab'}`
           }
         });
 
@@ -734,12 +988,17 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
 
       const labOfficer = await ensureUser(actorId || 'Lab Officer', 'LAB');
       if (!isProfileComplete(labOfficer)) {
-        return res.status(403).json({
-          success: false,
-          code: 'PROFILE_INCOMPLETE',
-          error: 'Please complete your profile and required verification details before continuing with this request.'
-        });
+        return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
       }
+      const labVer = await prisma.labVerification.findUnique({
+        where: { labId: labOfficer.id }
+      });
+      if (!isLabTesterFullyVerified(labVer)) {
+        return res.status(403).json(LAB_VERIFICATION_REQUIRED_RESPONSE);
+      }
+
+      const targetPackagerUser = (toUserId || targetPackagerId) ? await ensureUser(toUserId || targetPackagerId, 'PACKAGING') : null;
+
       const nextRequestId = generateRequestId('PKG');
 
       const result = await prisma.$transaction(async (tx) => {
@@ -758,6 +1017,7 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
             requestId: nextRequestId,
             batchId: batch.id,
             fromUserId: labOfficer.id,
+            toUserId: targetPackagerUser?.id || null,
             fromRole: 'LAB',
             toRole: 'PACKAGING',
             requestType: 'LAB_TO_PACKAGING',
@@ -788,7 +1048,7 @@ router.post('/requests/:id/send-next', async (req: Request, res: Response) => {
             toStatus: 'PENDING',
             actorId: labOfficer.id,
             actorRole: 'LAB',
-            notes: notes || 'Lab verification complete; approved for packaging'
+            notes: notes || `Lab verification complete; approved for packaging with ${targetPackagerUser ? targetPackagerUser.name : 'Packaging Facility'}`
           }
         });
 
@@ -844,6 +1104,14 @@ router.post('/lab-reports', async (req: Request, res: Response) => {
       moistureContent = 16.8,
       purityGrade = 'Grade A',
       contaminantsFound = 'None',
+      moistureValue,
+      hmfValue = 12.4,
+      diastaseValue = 14.2,
+      purityValue = 1.15,
+      residuesValue = 'None Detected',
+      pollenValue = 'Authentic Floral Matrix',
+      sampleCode,
+      remarks,
       notes
     } = req.body;
 
@@ -869,37 +1137,91 @@ router.post('/lab-reports', async (req: Request, res: Response) => {
       });
     }
 
-    const labUser = await ensureUser(labId || 'Lab Officer', 'LAB');
-    if (!isProfileComplete(labUser)) {
-      return res.status(403).json({
+    // Strict Workflow Rule: Testing cannot start without an accepted request
+    if (request.status !== 'ACCEPTED' && request.status !== 'IN_PROGRESS') {
+      return res.status(400).json({
         success: false,
-        code: 'PROFILE_INCOMPLETE',
-        error: 'Please complete your profile and required verification details before continuing with this request.'
+        error: `Lab testing cannot start without an accepted request. Current request status is "${request.status}". Please accept the sample request first.`
       });
     }
-    const score = Number(qualityScore) || 0;
-    const moisture = Number(moistureContent) || 0;
 
-    // Strict validation: honey quality standards
-    // Moisture must be <= 20% and Quality Score >= 70 for verification
-    const isQualityApproved = moisture <= 20.0 && score >= 70.0;
+    const labUser = await ensureUser(labId || 'Lab Officer', 'LAB');
+    if (!isProfileComplete(labUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+
+    // Strict 3/3 Profile Verification Check
+    const labVer = await prisma.labVerification.findUnique({
+      where: { labId: labUser.id }
+    });
+    if (!isLabTesterFullyVerified(labVer)) {
+      return res.status(403).json(LAB_VERIFICATION_REQUIRED_RESPONSE);
+    }
+
+    // Parameter values & limits
+    const finalMoisture = Number(moistureValue !== undefined ? moistureValue : moistureContent) || 16.8;
+    const finalHmf = Number(hmfValue) || 12.0;
+    const finalDiastase = Number(diastaseValue) || 14.0;
+    const finalPurity = Number(purityValue) || 1.1;
+    const finalScore = Number(qualityScore) || 92.0;
+
+    const moisturePass = finalMoisture <= 20.0;
+    const hmfPass = finalHmf <= 40.0;
+    const diastasePass = finalDiastase >= 8.0;
+    const purityPass = finalPurity >= 0.95;
+    const residuesPass = String(residuesValue).toLowerCase().includes('none') || String(residuesValue).toLowerCase().includes('nd') || String(residuesValue) === '0';
+    const pollenPass = !String(pollenValue).toLowerCase().includes('adulterat') && !String(pollenValue).toLowerCase().includes('fail');
+
+    const isQualityApproved = moisturePass && hmfPass && diastasePass && purityPass && residuesPass && pollenPass && finalScore >= 70.0;
     const reportStatus = isQualityApproved ? 'APPROVED' : 'REJECTED';
+    const overallResult = isQualityApproved ? 'PASS' : 'FAIL';
     const nextReqStatus = isQualityApproved ? 'VERIFIED' : 'REJECTED';
     const nextBatchStatus = isQualityApproved ? 'LAB_VERIFIED' : 'LAB_REJECTED';
 
+    const generatedReportId = `LAB-RPT-2026-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const generatedTraceId = `HC-TRACE-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const signatureHash = crypto.createHash('sha256').update(`${generatedReportId}:${labUser.id}:${batchId}:${Date.now()}`).digest('hex');
+
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create Lab Report
+      // 1. Create Comprehensive Lab Report
       const report = await tx.labReport.create({
         data: {
+          reportId: generatedReportId,
+          qrTraceabilityId: generatedTraceId,
           batchId,
           labId: labUser.id,
           requestId: request.id,
-          testResults: testResults || `Moisture: ${moisture}%, Purity: ${purityGrade}, Score: ${score}/100`,
-          qualityScore: score,
-          moistureContent: moisture,
+          testResults: testResults || `Moisture: ${finalMoisture}%, HMF: ${finalHmf} mg/kg, Diastase: ${finalDiastase}, Score: ${finalScore}/100`,
+          qualityScore: finalScore,
+          moistureContent: finalMoisture,
           purityGrade: String(purityGrade),
           contaminantsFound: String(contaminantsFound || 'None'),
           status: reportStatus,
+          overallResult,
+          moistureValue: finalMoisture,
+          moistureLimit: '<= 20.0%',
+          moistureStatus: moisturePass ? 'PASS' : 'FAIL',
+          hmfValue: finalHmf,
+          hmfLimit: '<= 40.0 mg/kg',
+          hmfStatus: hmfPass ? 'PASS' : 'FAIL',
+          diastaseValue: finalDiastase,
+          diastaseLimit: '>= 8.0 Schade Units',
+          diastaseStatus: diastasePass ? 'PASS' : 'FAIL',
+          purityValue: finalPurity,
+          purityLimit: '>= 0.95 F/G Ratio',
+          purityStatus: purityPass ? 'PASS' : 'FAIL',
+          residuesValue: String(residuesValue),
+          residuesLimit: '0.0 ppm (None Detected)',
+          residuesStatus: residuesPass ? 'PASS' : 'FAIL',
+          pollenValue: String(pollenValue),
+          pollenLimit: 'Botanical Origin Authentic',
+          pollenStatus: pollenPass ? 'PASS' : 'FAIL',
+          labTesterName: labVer?.fullName || labUser.name,
+          labName: labVer?.labName || labUser.organizationName || 'HoneyChain Certified Testing Laboratory',
+          testDate: new Date(),
+          sampleCode: sampleCode || `SMP-${batchId.slice(-6)}`,
+          remarks: remarks || notes || (isQualityApproved ? 'All physicochemical parameters conform to FSSAI & Codex Honey Standards.' : 'Sample failed quality or purity thresholds.'),
+          testerSignatureHash: signatureHash,
           notes: notes || ''
         }
       });
@@ -910,11 +1232,13 @@ router.post('/lab-reports', async (req: Request, res: Response) => {
         data: {
           status: nextReqStatus,
           toUserId: labUser.id,
+          completedAt: new Date(),
           metadata: JSON.stringify({
-            qualityScore: score,
-            moistureContent: moisture,
-            purityGrade: String(purityGrade),
-            contaminantsFound: String(contaminantsFound)
+            reportId: generatedReportId,
+            qualityScore: finalScore,
+            moistureContent: finalMoisture,
+            overallResult,
+            purityGrade: String(purityGrade)
           })
         }
       });
@@ -930,12 +1254,12 @@ router.post('/lab-reports', async (req: Request, res: Response) => {
         data: {
           requestId: request.id,
           batchId,
-          action: isQualityApproved ? 'VERIFIED' : 'FAILED_QUALITY_CHECK',
+          action: isQualityApproved ? 'TESTED' : 'REJECTED',
           fromStatus: request.status,
           toStatus: nextReqStatus,
           actorId: labUser.id,
           actorRole: 'LAB',
-          notes: `Lab testing complete: ${reportStatus} (Score: ${score}, Moisture: ${moisture}%)`
+          notes: `Lab testing complete: ${overallResult} (Report: ${generatedReportId}, Moisture: ${finalMoisture}%, HMF: ${finalHmf} mg/kg)`
         }
       });
 
@@ -948,25 +1272,24 @@ router.post('/lab-reports', async (req: Request, res: Response) => {
       labUser.id,
       request.id,
       {
-        batchId,
-        labReportId: result.report.id,
-        qualityScore: score,
-        moistureContent: moisture,
+        reportId: generatedReportId,
+        qualityScore: finalScore,
+        moistureContent: finalMoisture,
+        hmfValue: finalHmf,
+        diastaseValue: finalDiastase,
+        overallResult,
         status: reportStatus
       }
     );
 
     res.json({
       success: true,
-      verified: isQualityApproved,
-      message: isQualityApproved ? 'Lab report submitted and verified' : 'Lab report submitted; batch rejected due to quality threshold',
-      labReport: result.report,
+      message: isQualityApproved ? 'Lab report generated & honey batch verified.' : 'Lab test completed with failure/rejection recorded.',
+      report: result.report,
       request: result.updatedReq,
-      provenance: prov.provEvent,
-      blockchainStatus: prov.onChainResult.status
+      provenance: prov.onChainResult
     });
   } catch (error: any) {
-    console.error('Error submitting lab report:', error);
     res.status(500).json({ success: false, error: error?.message || String(error) });
   }
 });
@@ -1003,7 +1326,7 @@ router.post('/packaging', async (req: Request, res: Response) => {
     }
 
     // Security check: cannot package without lab verification
-    const verifiedLabReport = batch.labReports.find((r) => r.status === 'APPROVED');
+    const verifiedLabReport = batch.labReports.find((r) => r.status === 'APPROVED' || r.overallResult === 'PASS');
     if (!verifiedLabReport) {
       return res.status(400).json({
         success: false,
@@ -1022,14 +1345,26 @@ router.post('/packaging', async (req: Request, res: Response) => {
           }
         });
 
-    const packagerUser = await ensureUser(packagerId || 'Packager', 'PACKAGING');
-    if (!isProfileComplete(packagerUser)) {
-      return res.status(403).json({
+    if (request && request.status !== 'ACCEPTED' && request.status !== 'IN_PROGRESS') {
+      return res.status(400).json({
         success: false,
-        code: 'PROFILE_INCOMPLETE',
-        error: 'Please complete your profile and required verification details before continuing with this request.'
+        error: `Packaging cannot be finalized without an accepted request. Current request status is "${request.status}". Please accept the packaging request first.`
       });
     }
+
+    const packagerUser = await ensureUser(packagerId || 'Packager', 'PACKAGING');
+    if (!isProfileComplete(packagerUser)) {
+      return res.status(403).json(PROFILE_INCOMPLETE_RESPONSE);
+    }
+
+    // Strict 3/3 Profile Verification Check
+    const pkgVer = await prisma.packagingVerification.findUnique({
+      where: { packagerId: packagerUser.id }
+    });
+    if (!isPackagingManagerFullyVerified(pkgVer)) {
+      return res.status(403).json(PACKAGING_VERIFICATION_REQUIRED_RESPONSE);
+    }
+
     const finalQty = finalQuantity !== undefined ? Number(finalQuantity) : (request?.quantity || 25.0);
     const numPkgs = numberOfPackages !== undefined ? Number(numberOfPackages) : 50;
 

@@ -10,6 +10,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../hives/controllers/hive_controller.dart';
 import '../../hives/screens/hive_details_screen.dart';
+import '../../verification/controllers/verification_controller.dart';
+import '../../verification/screens/collector_verification_screen.dart';
 
 class HarvesterDetailScreen extends StatelessWidget {
   final WorkflowRequest request;
@@ -46,9 +48,12 @@ class HarvesterDetailScreen extends StatelessWidget {
                 children: [
                   const _PillBackButton(),
                   const SizedBox(width: 14),
-                  Text(
-                    'Harvester Details',
-                    style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: context.textPrimaryColor, letterSpacing: -0.3),
+                  Expanded(
+                    child: Text(
+                      'Harvester Details',
+                      style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: context.textPrimaryColor, letterSpacing: -0.3),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -108,7 +113,7 @@ class HarvesterDetailScreen extends StatelessWidget {
                             Icon(Icons.verified_rounded, size: 14, color: context.successColor),
                             const SizedBox(width: 4),
                             Text(
-                              'Verified â€¢ Profile Complete',
+                              'Verified • Profile Complete',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -317,6 +322,125 @@ class HarvesterDetailScreen extends StatelessWidget {
                   );
                 },
               ),
+
+            if (request.status == RequestStatus.pending) ...[
+              const SizedBox(height: AppConstants.space24),
+              Text(
+                'Request Actions',
+                style: GoogleFonts.manrope(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: context.textPrimaryColor,
+                ),
+              ),
+              const SizedBox(height: AppConstants.space12),
+
+              Builder(
+                builder: (context) {
+                  final verCtrl = context.watch<VerificationController>();
+                  final isCollectorVerified = verCtrl.collectorVerification.isFullyVerified;
+
+                  return Column(
+                    children: [
+                      if (!isCollectorVerified) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppConstants.space12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: context.warningBgColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: context.warningColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.lock_person_outlined, size: 18, color: context.warningColor),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Complete your profile verification to accept requests.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.warningColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                context.read<WorkflowController>().rejectRequest(
+                                  request.id,
+                                  actorRole: 'COLLECTOR_PROCESSOR',
+                                  reason: 'Rejected by collection center',
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Request rejected & recorded.'), backgroundColor: AppConstants.error),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppConstants.error,
+                                side: const BorderSide(color: AppConstants.error),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium)),
+                              ),
+                              child: Text('Reject Batch', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isCollectorVerified
+                                  ? () async {
+                                      await context.read<WorkflowController>().acceptRequest(request.id);
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Harvest batch accepted! You can now extract and send to Lab.')),
+                                        );
+                                      }
+                                    }
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()),
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Complete your profile verification to accept requests.'),
+                                          backgroundColor: AppConstants.warning,
+                                        ),
+                                      );
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isCollectorVerified ? context.colors.primary : context.borderColor,
+                                foregroundColor: isCollectorVerified ? context.colors.onPrimary : context.textMutedColor,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium)),
+                              ),
+                              child: Text(
+                                'Accept Request',
+                                style: GoogleFonts.manrope(
+                                  fontWeight: FontWeight.w700,
+                                  color: isCollectorVerified ? context.colors.onPrimary : context.textMutedColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ],
         ),
             ),

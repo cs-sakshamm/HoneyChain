@@ -9,11 +9,14 @@ generator client {
 
 model User {
   id           String   @id @default(uuid())
-  firebaseId   String?  @unique
+  firebaseId   String?
   name         String
-  email        String   @unique
+  email        String
   passwordHash String?
   phone        String?
+  avatarUrl    String?
+  googlePhotoUrl String?
+  authProvider String?  @default("local")
   role         String   @default("HARVESTER")
   beekeeperId  String?  @unique
   bsid         String?  @unique
@@ -22,6 +25,8 @@ model User {
   facilityLocation String?
   licenseNumber    String?
   designation      String?
+  resetToken       String?
+  resetExpiry      DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -32,10 +37,17 @@ model User {
   packagingRecords      PackagingRecord[]
   provenanceEvents      ProvenanceEvent[]
   harvesterVerification HarvesterVerification?
+  collectorVerification CollectorVerification?
+  labVerification       LabVerification?
+  packagingVerification PackagingVerification?
 
   sentWorkflowRequests     WorkflowRequest[] @relation("SentWorkflowRequests")
   receivedWorkflowRequests WorkflowRequest[] @relation("ReceivedWorkflowRequests")
   requestHistory           RequestHistory[]
+
+  @@unique([email, role])
+  @@index([email])
+  @@index([role])
 }
 
 model Hive {
@@ -68,6 +80,8 @@ model Hive {
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   harvests Harvest[]
+  telemetry HiveTelemetry[]
+  alerts    HiveAlert[]
 
   @@index([userId])
 }
@@ -200,18 +214,53 @@ model ProcessingRecord {
 }
 
 model LabReport {
-  id                String   @id @default(uuid())
-  batchId           String
-  labId             String
-  requestId         String?  @unique
-  testResults       String
-  qualityScore      Float?
-  moistureContent   Float?
-  purityGrade       String?
-  contaminantsFound String?  @default("None")
-  status            String   @default("APPROVED") // APPROVED, REJECTED
-  notes             String?
-  createdAt         DateTime @default(now())
+  id                  String    @id @default(uuid())
+  reportId            String?   @unique // LAB-RPT-2026-XXXX
+  qrTraceabilityId    String?
+  batchId             String
+  labId               String
+  requestId           String?   @unique
+  testResults         String
+  qualityScore        Float?
+  moistureContent     Float?
+  purityGrade         String?
+  contaminantsFound   String?   @default("None")
+  status              String    @default("APPROVED") // APPROVED, REJECTED
+  overallResult       String    @default("PASS")     // PASS, FAIL
+
+  // Specific parameters with thresholds and status
+  moistureValue       Float?
+  moistureLimit       String?   @default("<= 20.0%")
+  moistureStatus      String?   @default("PASS") // PASS, FAIL
+
+  hmfValue            Float?
+  hmfLimit            String?   @default("<= 40.0 mg/kg")
+  hmfStatus           String?   @default("PASS")
+
+  diastaseValue       Float?
+  diastaseLimit       String?   @default(">= 8.0 Schade Units")
+  diastaseStatus      String?   @default("PASS")
+
+  purityValue         Float?
+  purityLimit         String?   @default(">= 0.95 F/G Ratio")
+  purityStatus        String?   @default("PASS")
+
+  residuesValue       String?   @default("None Detected")
+  residuesLimit       String?   @default("0.0 ppm")
+  residuesStatus      String?   @default("PASS")
+
+  pollenValue         String?   @default("Authentic Floral Matrix")
+  pollenLimit         String?   @default("Botanical Authentic")
+  pollenStatus        String?   @default("PASS")
+
+  labTesterName       String?
+  labName             String?
+  testDate            DateTime? @default(now())
+  sampleCode          String?
+  remarks             String?
+  testerSignatureHash String?
+  notes               String?
+  createdAt           DateTime  @default(now())
 
   batch   Batch            @relation(fields: [batchId], references: [id])
   lab     User             @relation(fields: [labId], references: [id])
@@ -277,6 +326,11 @@ model HarvesterVerification {
   registrationVerified    String    @default("Not Started") // Not Started, Pending, Verified, Rejected
   registrationSubmittedAt DateTime?
 
+  // 3.5 FSSAI License
+  fssaiLicense            String?
+  fssaiLicenseVerified    String    @default("Not Started") // Not Started, Pending, Verified, Rejected
+  fssaiLicenseSubmittedAt DateTime?
+
   // 4. Apiary Location
   apiaryName          String?
   apiaryLocation      String? // Public Generalized Region
@@ -310,3 +364,159 @@ model MobileOtp {
   verified      Boolean  @default(false)
   createdAt     DateTime @default(now())
 }
+
+model CollectorVerification {
+  id                    String    @id @default(uuid())
+  collectorId           String    @unique
+  collector             User      @relation(fields: [collectorId], references: [id], onDelete: Cascade)
+
+  // 1. Identity Verification (Full Name & Mobile OTP)
+  fullName              String?
+  mobileNumber          String?
+  mobileVerified        String    @default("Not Started") // Not Started, Pending, Verified
+  mobileVerifiedAt      DateTime?
+
+  // 2. Business Verification (Center Name & Center Address)
+  organizationName      String?
+  facilityLocation      String?
+  businessDetails       String?
+  businessVerified      String    @default("Not Started") // Not Started, Pending, Verified
+  businessVerifiedAt    DateTime?
+
+  // 3. License & KYC (Government ID & Verification via Real KYC Provider)
+  governmentIdType      String?   // AADHAAR, PAN, PASSPORT, DRIVERS_LICENSE, FSSAI_LICENSE
+  governmentIdReference String?   // Masked reference
+  governmentIdDocHash   String?
+  licenseNumber         String?
+  kycProvider           String?   // DIGIO, SIGNZY, HYPERVERGE, SANDBOX
+  kycStatus             String    @default("Not Started") // Not Started, Pending, Verified, Failed
+  kycVerifiedAt         DateTime?
+
+  // Overall Profile Verification Status (3/3)
+  verificationStatus    String    @default("Not Started") // Not Started, In Progress, Verified
+  verifiedAt            DateTime?
+  reviewNotes           String?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model LabVerification {
+  id                       String    @id @default(uuid())
+  labId                    String    @unique
+  lab                      User      @relation(fields: [labId], references: [id], onDelete: Cascade)
+
+  // 1. Identity & Contact (Full Name & Mobile OTP)
+  fullName                 String?
+  mobileNumber             String?
+  mobileVerified           String    @default("Not Started") // Not Started, Pending, Verified
+  mobileVerifiedAt         DateTime?
+
+  // 2. Laboratory Details (Name, Address, Registration)
+  labName                  String?
+  labAddress               String?
+  labRegistrationNumber    String?   // NABL, FSSAI, ISO/IEC 17025
+  accreditation            String?   // Accreditation board / scope
+  labDetailsVerified       String    @default("Not Started") // Not Started, Pending, Verified
+  labDetailsVerifiedAt     DateTime?
+
+  // 3. KYC & Certification (Government ID + Real KYC + Qualification)
+  governmentIdType         String?   // AADHAAR, PAN, PASSPORT, DRIVERS_LICENSE
+  governmentIdReference    String?   // Masked reference
+  governmentIdDocHash      String?
+  qualification            String?   // e.g. Lead Food Safety Chemist / M.Sc Analytical Chemistry
+  authorizedTestingDetails String?   // Scope: Moisture, HMF, Diastase, Pollen, Antibiotic residues
+  kycProvider              String?   // DIGIO, SIGNZY, HYPERVERGE, SANDBOX
+  kycStatus                String    @default("Not Started") // Not Started, Pending, Verified, Failed
+  kycVerifiedAt            DateTime?
+
+  // Overall Profile Verification Status (3/3)
+  verificationStatus       String    @default("Not Started") // Not Started, In Progress, Verified
+  verifiedAt               DateTime?
+  reviewNotes              String?
+
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+}
+
+model PackagingVerification {
+  id                         String    @id @default(uuid())
+  packagerId                 String    @unique
+  packager                   User      @relation(fields: [packagerId], references: [id], onDelete: Cascade)
+
+  // 1. Identity & Contact (Full Name & Mobile OTP)
+  fullName                   String?
+  mobileNumber               String?
+  mobileVerified             String    @default("Not Started") // Not Started, Pending, Verified
+  mobileVerifiedAt           DateTime?
+
+  // 2. Packaging Facility Details (Organization, Address, License)
+  organizationName           String?
+  facilityLocation           String?
+  packagingLicenseNumber     String?   // FSSAI Packaging License, Legal Metrology, AGMARK
+  facilityDetailsVerified    String    @default("Not Started") // Not Started, Pending, Verified
+  facilityDetailsVerifiedAt  DateTime?
+
+  // 3. License & KYC (Government ID + Real KYC + Operational Specs)
+  governmentIdType           String?   // AADHAAR, PAN, GSTIN, FSSAI_LICENSE
+  governmentIdReference      String?
+  governmentIdDocHash        String?
+  authorizedPackagingDetails String?   // Packaging capacity, glass jars / tamper-evident seals
+  kycProvider                String?
+  kycStatus                  String    @default("Not Started") // Not Started, Pending, Verified, Failed
+  kycVerifiedAt              DateTime?
+
+  // Overall Profile Verification Status (3/3)
+  verificationStatus         String    @default("Not Started") // Not Started, In Progress, Verified
+  verifiedAt                 DateTime?
+  reviewNotes                String?
+
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+}
+
+model HiveTelemetry {
+  id               String   @id @default(uuid())
+  hiveId           String
+  hiveCode         String?
+  temperature      Float
+  humidity         Float
+  weightKg         Float
+  beeActivity      Float    // percentage or index (0-100)
+  soundFrequencyHz Float?
+  batteryLevel     Float?   @default(100.0)
+  signalStrength   Float?   @default(-65.0)
+  recordedAt       DateTime @default(now())
+
+  hive Hive @relation(fields: [hiveId], references: [id], onDelete: Cascade)
+
+  @@index([hiveId])
+  @@index([recordedAt])
+}
+
+model HiveAlert {
+  id             String    @id @default(uuid())
+  hiveId         String
+  hiveCode       String
+  parameter      String    // Temperature, Humidity, Hive weight, Bee activity, Sound Frequency
+  previousValue  String
+  currentValue   String
+  changeValue    String    // e.g. +7.4°C
+  unit           String    // °C, %, kg, /min, Hz
+  severity       String    @default("CRITICAL") // CRITICAL, WARNING
+  message        String
+  status         String    @default("ACTIVE")   // ACTIVE, ACKNOWLEDGED
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  createdAt      DateTime  @default(now())
+
+  hive Hive @relation(fields: [hiveId], references: [id], onDelete: Cascade)
+
+  @@index([hiveId])
+  @@index([status])
+  @@index([detectedAt])
+}
+
+
+

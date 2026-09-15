@@ -36,44 +36,64 @@ async function runE2ETests() {
     // ── Setup Users ──
     console.log('--- 0. Setup Test Roles & Hive ---');
     const harvester = await prisma.user.upsert({
-      where: { email: `harvester_${timestamp}@honeychain.test` },
+      where: {
+        email_role: {
+          email: `harvester_${timestamp}@honeychain.test`,
+          role: 'HARVESTER',
+        },
+      },
       update: {},
       create: {
         email: `harvester_${timestamp}@honeychain.test`,
         phone: harvesterPhone,
         name: 'Maria Harvester',
-        role: 'HARVESTER'
-      }
+        role: 'HARVESTER',
+      },
     });
     const processor = await prisma.user.upsert({
-      where: { email: `processor_${timestamp}@honeychain.test` },
+      where: {
+        email_role: {
+          email: `processor_${timestamp}@honeychain.test`,
+          role: 'COLLECTOR_PROCESSOR',
+        },
+      },
       update: {},
       create: {
         email: `processor_${timestamp}@honeychain.test`,
         phone: processorPhone,
         name: 'Dev Processing Unit',
-        role: 'COLLECTOR_PROCESSOR'
-      }
+        role: 'COLLECTOR_PROCESSOR',
+      },
     });
     const labTech = await prisma.user.upsert({
-      where: { email: `lab_${timestamp}@honeychain.test` },
+      where: {
+        email_role: {
+          email: `lab_${timestamp}@honeychain.test`,
+          role: 'LAB',
+        },
+      },
       update: {},
       create: {
         email: `lab_${timestamp}@honeychain.test`,
         phone: labPhone,
         name: 'Dr. Sarah Lab Analyst',
-        role: 'LAB'
-      }
+        role: 'LAB',
+      },
     });
     const packager = await prisma.user.upsert({
-      where: { email: `packager_${timestamp}@honeychain.test` },
+      where: {
+        email_role: {
+          email: `packager_${timestamp}@honeychain.test`,
+          role: 'PACKAGING',
+        },
+      },
       update: {},
       create: {
         email: `packager_${timestamp}@honeychain.test`,
         phone: packagerPhone,
         name: 'Raj Packaging Facility',
-        role: 'PACKAGING'
-      }
+        role: 'PACKAGING',
+      },
     });
 
     const hive = await prisma.hive.upsert({

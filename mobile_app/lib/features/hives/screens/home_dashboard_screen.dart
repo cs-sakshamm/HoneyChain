@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
+import '../../../core/widgets/auto_image_slider.dart';
 import '../../authentication/auth_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
@@ -29,39 +30,11 @@ class HomeDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildHeroImage(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      width: double.infinity,
+    return const AutoImageSlider(
+      role: 'HARVESTER',
       height: 165,
-      margin: const EdgeInsets.only(bottom: AppConstants.space20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.12) : context.borderColor,
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Image.asset(
-          'assets/images/beekeeping_hero.jpg',
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: context.primarySoftColor,
-              alignment: Alignment.center,
-              child: Icon(Icons.hive_rounded, size: 48, color: context.colors.primary),
-            );
-          },
-        ),
-      ),
+      borderRadius: 20,
+      margin: EdgeInsets.only(bottom: AppConstants.space20),
     );
   }
 

@@ -91,7 +91,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                   controller: quantityCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    hintText: 'e.g. 15.5',
+                    hintText: 'Enter quantity in kg',
                     filled: true,
                     fillColor: context.scaffoldBg,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
@@ -127,6 +127,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
                 final qty = double.tryParse(quantityCtrl.text.trim()) ?? 0.0;
                 if (qty <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(

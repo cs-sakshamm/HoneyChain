@@ -21,6 +21,7 @@ enum AuthMode {
   login,
   register,
   forgotPassword,
+  resetPassword,
 }
 
 /// Roles in the HoneyChain supply chain
@@ -29,6 +30,30 @@ enum UserRole {
   collectionProcessing,
   labTesting,
   packaging,
+}
+
+String userRoleToString(UserRole? role) {
+  switch (role) {
+    case UserRole.harvester:
+      return 'HARVESTER';
+    case UserRole.collectionProcessing:
+      return 'COLLECTOR_PROCESSOR';
+    case UserRole.labTesting:
+      return 'LAB';
+    case UserRole.packaging:
+      return 'PACKAGING';
+    default:
+      return 'HARVESTER';
+  }
+}
+
+UserRole userRoleFromString(String? roleStr) {
+  if (roleStr == null) return UserRole.harvester;
+  final r = roleStr.toUpperCase();
+  if (r.contains('COLLECT') || r.contains('PROCESS')) return UserRole.collectionProcessing;
+  if (r.contains('LAB')) return UserRole.labTesting;
+  if (r.contains('PKG') || r.contains('PACKAG')) return UserRole.packaging;
+  return UserRole.harvester;
 }
 
 /// Production Controller managing business authentication & session state backed by PostgreSQL API
@@ -44,6 +69,7 @@ class AuthController extends ChangeNotifier {
   String? _infoMessage;
   User? _currentUser;
   bool _isDemoMode = false;
+  String? _resetToken;
 
   // Role State
   UserRole? _selectedRole;
@@ -87,6 +113,7 @@ class AuthController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get infoMessage => _infoMessage;
   User? get currentUser => _currentUser;
+  String? get resetToken => _resetToken;
   bool get isAuthenticated =>
       _currentUser != null || (_isDemoMode && _status == AuthStateStatus.authenticated);
   bool get isPasswordVisible => _isPasswordVisible;
@@ -123,9 +150,11 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Email Sign In Handler with validation against PostgreSQL backend API
-  Future<void> loginWithEmail(String email, String password) async {
+  Future<void> loginWithEmail(String email, String password, [UserRole? role]) async {
     final identifier = email.trim();
     final pass = password.trim();
+    final activeRole = role ?? _selectedRole ?? UserRole.harvester;
+    final roleStr = userRoleToString(activeRole);
 
     if (identifier.isEmpty || pass.isEmpty) {
       _status = AuthStateStatus.error;
@@ -147,6 +176,7 @@ class AuthController extends ChangeNotifier {
             body: jsonEncode({
               'emailOrPhone': identifier,
               'password': pass,
+              'role': roleStr,
             }),
           )
           .timeout(const Duration(seconds: 4));
@@ -193,10 +223,13 @@ class AuthController extends ChangeNotifier {
     required String name,
     required String email,
     required String password,
+    UserRole? role,
   }) async {
     final cleanName = name.trim();
     final cleanEmail = email.trim().toLowerCase();
     final cleanPassword = password.trim();
+    final activeRole = role ?? _selectedRole ?? UserRole.harvester;
+    final roleStr = userRoleToString(activeRole);
 
     if (cleanName.isEmpty || cleanEmail.isEmpty || cleanPassword.isEmpty) {
       _status = AuthStateStatus.error;
@@ -219,7 +252,7 @@ class AuthController extends ChangeNotifier {
               'name': cleanName,
               'email': cleanEmail,
               'password': cleanPassword,
-              'role': 'HARVESTER',
+              'role': roleStr,
             }),
           )
           .timeout(const Duration(seconds: 4));
@@ -270,7 +303,10 @@ class AuthController extends ChangeNotifier {
       );
 
   /// Google Sign-In
-  Future<void> signInWithGoogle() async {
+  Future<void> signInWithGoogle([UserRole? role]) async {
+    final activeRole = role ?? _selectedRole ?? UserRole.harvester;
+    final roleStr = userRoleToString(activeRole);
+
     _status = AuthStateStatus.authenticating;
     _errorMessage = null;
     notifyListeners();
@@ -300,13 +336,14 @@ class AuthController extends ChangeNotifier {
             await prefs.setString('user_profile_email', _currentUser!.email!);
           }
           if (_currentUser!.photoURL != null && _currentUser!.photoURL!.isNotEmpty) {
+            await prefs.setString('user_profile_google_photo_url', _currentUser!.photoURL!);
             await prefs.setString('user_profile_photo_url', _currentUser!.photoURL!);
           }
           if (_currentUser!.phoneNumber != null && _currentUser!.phoneNumber!.isNotEmpty) {
             await prefs.setString('user_profile_phone', _currentUser!.phoneNumber!);
           }
 
-          // Sync Google Account details to backend PostgreSQL
+          // Sync Google Account details to backend PostgreSQL for this role
           try {
             final syncUrl = Uri.parse('$_baseUrl/api/auth/google');
             final response = await _client.post(
@@ -316,6 +353,8 @@ class AuthController extends ChangeNotifier {
                 'name': _currentUser!.displayName,
                 'email': _currentUser!.email,
                 'phone': _currentUser!.phoneNumber,
+                'role': roleStr,
+                'photoUrl': _currentUser!.photoURL,
               }),
             ).timeout(const Duration(seconds: 4));
 
@@ -327,6 +366,10 @@ class AuthController extends ChangeNotifier {
                 if (u['beekeeperId'] != null) await prefs.setString('user_profile_beekeeper_id', u['beekeeperId']);
                 if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
                 if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
+                if (u['role'] != null) await prefs.setString('user_profile_role', u['role']);
+                if (u['googlePhotoUrl'] != null) await prefs.setString('user_profile_google_photo_url', u['googlePhotoUrl']);
+                if (u['avatarUrl'] != null) await prefs.setString('user_profile_avatar_url', u['avatarUrl']);
+                if (u['photoUrl'] != null) await prefs.setString('user_profile_photo_url', u['photoUrl']);
               }
             }
           } catch (e) {
@@ -372,10 +415,68 @@ class AuthController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final url = Uri.parse('$_baseUrl/api/auth/forgot-password');
+      final response = await _client
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({'email': target}),
+          )
+          .timeout(const Duration(seconds: 4));
 
-    _status = AuthStateStatus.passwordResetSent;
-    _infoMessage = 'Reset instructions sent to $target.';
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.passwordResetSent;
+        _infoMessage = 'Reset instructions sent to $target.';
+        if (data['devToken'] != null) {
+          _resetToken = data['devToken'];
+          _mode = AuthMode.resetPassword;
+        }
+      } else {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.error;
+        _errorMessage = data['error'] ?? data['message'] ?? 'Failed to send reset link.';
+      }
+    } catch (e) {
+      debugPrint('[AuthController] Backend reset error: $e');
+      _status = AuthStateStatus.error;
+      _errorMessage = 'Unable to connect to server. Please try again.';
+    }
+    notifyListeners();
+  }
+
+  /// Reset Password with Token
+  Future<void> resetPasswordWithToken(String token, String newPassword) async {
+    _status = AuthStateStatus.authenticating;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('$_baseUrl/api/auth/reset-password');
+      final response = await _client
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({'token': token, 'newPassword': newPassword}),
+          )
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        _status = AuthStateStatus.idle;
+        _mode = AuthMode.login;
+        _infoMessage = 'Password reset successfully. Please log in.';
+        _resetToken = null;
+      } else {
+        final data = jsonDecode(response.body);
+        _status = AuthStateStatus.error;
+        _errorMessage = data['error'] ?? data['message'] ?? 'Failed to reset password.';
+      }
+    } catch (e) {
+      debugPrint('[AuthController] Reset password error: $e');
+      _status = AuthStateStatus.error;
+      _errorMessage = 'Unable to connect to server. Please try again.';
+    }
     notifyListeners();
   }
 

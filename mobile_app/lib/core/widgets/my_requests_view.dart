@@ -677,8 +677,8 @@ class _MyRequestsViewState extends State<MyRequestsView> {
 
   void _showProcessAndSendToLabDialog(BuildContext context, WorkflowRequest req) {
     if (!ProfileGuard.checkOrPrompt(context)) return;
-    final qtyController = TextEditingController(text: req.estimatedQuantityKg.toString());
-    final methodController = TextEditingController(text: 'Standard Cold Extraction');
+    final qtyController = TextEditingController(text: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg.toString() : '');
+    final methodController = TextEditingController();
 
     showDialog(
       context: context,
@@ -693,6 +693,7 @@ class _MyRequestsViewState extends State<MyRequestsView> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: 'Extracted Quantity (kg)',
+                hintText: 'e.g. ${req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg : "25.0"}',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
@@ -701,6 +702,7 @@ class _MyRequestsViewState extends State<MyRequestsView> {
               controller: methodController,
               decoration: InputDecoration(
                 labelText: 'Extraction Method',
+                hintText: 'e.g. Standard Cold Extraction',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
@@ -755,8 +757,8 @@ class _MyRequestsViewState extends State<MyRequestsView> {
 
   void _showFinalizePackagingDialog(BuildContext context, WorkflowRequest req) {
     if (!ProfileGuard.checkOrPrompt(context)) return;
-    final qtyController = TextEditingController(text: req.estimatedQuantityKg.toString());
-    final pkgsController = TextEditingController(text: '50');
+    final qtyController = TextEditingController(text: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg.toString() : '');
+    final pkgsController = TextEditingController();
 
     showDialog(
       context: context,
@@ -771,6 +773,7 @@ class _MyRequestsViewState extends State<MyRequestsView> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: 'Total Quantity (kg)',
+                hintText: 'e.g. ${req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg : "15.0"}',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
@@ -780,6 +783,7 @@ class _MyRequestsViewState extends State<MyRequestsView> {
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 labelText: 'Number of Packages (Jars)',
+                hintText: 'e.g. 30',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),

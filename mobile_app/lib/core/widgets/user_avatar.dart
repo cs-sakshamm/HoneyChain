@@ -41,7 +41,7 @@ class UserAvatar extends StatelessWidget {
     final userCtrl = context.watch<UserController>();
 
     final effectivePhotoUrl = photoUrl ??
-        userCtrl.user.photoUrl ??
+        userCtrl.user.effectivePhotoUrl ??
         authCtrl.currentUser?.photoURL;
 
     final effectiveName = name ??

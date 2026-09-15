@@ -8,18 +8,19 @@ import '../theme/app_theme.dart';
 import '../../features/profile/controllers/user_controller.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/verification/controllers/verification_controller.dart';
+import '../../features/verification/screens/collector_verification_screen.dart';
 import '../../features/verification/screens/harvester_verification_screen.dart';
+import '../../features/verification/screens/lab_verification_screen.dart';
+import '../../features/verification/screens/packaging_verification_screen.dart';
 
-/// Centralized profile and harvester verification completion guard for HoneyChain.
-/// Enforces mandatory profile completion before allowing any workflow actions
-/// across Harvester, Collection & Processing, Lab Testing, and Packaging roles.
-/// Also enforces mandatory 5-parameter Harvester Verification for Harvester actions.
+/// Centralized profile and role verification completion guard for HoneyChain.
+/// Enforces mandatory profile completion and backend profile verification
+/// before allowing any role-specific workflow actions across Harvester,
+/// Collection & Processing, Lab Testing, and Packaging Manager roles.
 class ProfileGuard {
   ProfileGuard._();
 
-  /// Checks if the current user's profile is complete.
-  /// If complete, returns `true`.
-  /// If incomplete, displays the standardized HoneyChain profile completion dialog and returns `false`.
+  /// Checks if the current user's basic profile is complete.
   static bool checkOrPrompt(BuildContext context) {
     final userCtrl = context.read<UserController>();
     if (userCtrl.user.isProfileComplete) {
@@ -30,10 +31,8 @@ class ProfileGuard {
     return false;
   }
 
-  /// Checks if a Harvester has completed BOTH profile completeness AND 5-parameter Harvester Verification.
-  /// If complete and fully verified on-chain, returns `true`.
-  /// If profile is incomplete, prompts to complete profile.
-  /// If profile is complete but verification is not 'Verified', prompts to complete Harvester Verification.
+  /// 1. Harvester Verification Guard
+  /// Checks if a Harvester has completed both profile and 3-step Harvester Verification.
   static bool checkHarvesterVerificationOrPrompt(BuildContext context) {
     final userCtrl = context.read<UserController>();
     if (!userCtrl.user.isProfileComplete) {
@@ -43,14 +42,68 @@ class ProfileGuard {
 
     final verCtrl = context.read<VerificationController>();
     if (!verCtrl.verification.isFullyVerified) {
-      showIncompleteVerificationDialog(context);
+      showHarvesterVerificationDialog(context);
       return false;
     }
 
     return true;
   }
 
-  /// Displays the standardized modern modal dialog prompting the user to complete their profile.
+  /// 2. Collection & Processing Verification Guard
+  /// Checks if a Collector/Processor has completed 3/3 profile verification.
+  static bool checkCollectorVerificationOrPrompt(BuildContext context) {
+    final userCtrl = context.read<UserController>();
+    if (!userCtrl.user.isProfileComplete) {
+      showIncompleteProfileDialog(context);
+      return false;
+    }
+
+    final verCtrl = context.read<VerificationController>();
+    if (!verCtrl.collectorVerification.isFullyVerified) {
+      showCollectorVerificationDialog(context);
+      return false;
+    }
+
+    return true;
+  }
+
+  /// 3. Lab Tester Verification Guard
+  /// Checks if a Lab Tester has completed 3/3 profile verification.
+  static bool checkLabVerificationOrPrompt(BuildContext context) {
+    final userCtrl = context.read<UserController>();
+    if (!userCtrl.user.isProfileComplete) {
+      showIncompleteProfileDialog(context);
+      return false;
+    }
+
+    final verCtrl = context.read<VerificationController>();
+    if (!verCtrl.labVerification.isFullyVerified) {
+      showLabVerificationDialog(context);
+      return false;
+    }
+
+    return true;
+  }
+
+  /// 4. Packaging Manager Verification Guard
+  /// Checks if a Packaging Manager has completed 3/3 profile verification.
+  static bool checkPackagingVerificationOrPrompt(BuildContext context) {
+    final userCtrl = context.read<UserController>();
+    if (!userCtrl.user.isProfileComplete) {
+      showIncompleteProfileDialog(context);
+      return false;
+    }
+
+    final verCtrl = context.read<VerificationController>();
+    if (!verCtrl.packagingVerification.isFullyVerified) {
+      showPackagingVerificationDialog(context);
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Displays the modal dialog prompting the user to complete their profile.
   static void showIncompleteProfileDialog(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -82,7 +135,6 @@ class ProfileGuard {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Warning / Shield Icon
                 Container(
                   width: 56,
                   height: 56,
@@ -97,12 +149,8 @@ class ProfileGuard {
                   ),
                 ),
                 const SizedBox(height: 18),
-
-                // Title
                 Text(
-                  dialogContext.tr('profile_incomplete_title') != 'profile_incomplete_title'
-                      ? dialogContext.tr('profile_incomplete_title')
-                      : 'Please Complete Your Profile First',
+                  'Please Complete Your Profile First',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(
                     fontSize: 18,
@@ -112,10 +160,8 @@ class ProfileGuard {
                   ),
                 ),
                 const SizedBox(height: 10),
-
-                // Description
                 Text(
-                  'Complete your profile and required details (Name, Email, Phone) before you can continue with this action.',
+                  'Complete your profile and required details before continuing with this role action.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 14,
@@ -124,23 +170,13 @@ class ProfileGuard {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Actions: Cancel & Complete Profile
                 Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(dialogContext),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
                         child: Text(
-                          dialogContext.tr('cancel') != 'cancel'
-                              ? dialogContext.tr('cancel')
-                              : 'Cancel',
+                          'Cancel',
                           style: GoogleFonts.manrope(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -190,8 +226,74 @@ class ProfileGuard {
     );
   }
 
-  /// Displays the standardized modern modal dialog prompting the harvester to complete Harvester Verification.
+  /// Dialog prompting the harvester to complete Harvester Verification.
+  static void showHarvesterVerificationDialog(BuildContext context) {
+    _showVerificationRequiredDialog(
+      context: context,
+      title: 'Harvester Verification Required',
+      description: 'Complete profile verification to add hives and start harvesting activities.',
+      buttonLabel: 'Verify Profile',
+      onConfirm: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
+      ),
+    );
+  }
+
+  /// Alias for backward compatibility
   static void showIncompleteVerificationDialog(BuildContext context) {
+    showHarvesterVerificationDialog(context);
+  }
+
+  /// Dialog prompting the collector to complete Collection & Processing Verification.
+  static void showCollectorVerificationDialog(BuildContext context) {
+    _showVerificationRequiredDialog(
+      context: context,
+      title: 'Collection & Processing Verification Required',
+      description: 'Complete profile verification to start collection & processing activities.',
+      buttonLabel: 'Complete Verification',
+      onConfirm: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()),
+      ),
+    );
+  }
+
+  /// Dialog prompting the lab tester to complete Laboratory Verification.
+  static void showLabVerificationDialog(BuildContext context) {
+    _showVerificationRequiredDialog(
+      context: context,
+      title: 'Laboratory Testing Verification Required',
+      description: 'Complete profile verification to accept and perform laboratory testing requests.',
+      buttonLabel: 'Complete Verification',
+      onConfirm: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LabVerificationScreen()),
+      ),
+    );
+  }
+
+  /// Dialog prompting the packaging manager to complete Packaging Verification.
+  static void showPackagingVerificationDialog(BuildContext context) {
+    _showVerificationRequiredDialog(
+      context: context,
+      title: 'Packaging Verification Required',
+      description: 'Complete profile verification to start packaging activities.',
+      buttonLabel: 'Complete Verification',
+      onConfirm: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()),
+      ),
+    );
+  }
+
+  static void _showVerificationRequiredDialog({
+    required BuildContext context,
+    required String title,
+    required String description,
+    required String buttonLabel,
+    required VoidCallback onConfirm,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
@@ -222,7 +324,6 @@ class ProfileGuard {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Shield / Verification Icon
                 Container(
                   width: 56,
                   height: 56,
@@ -231,16 +332,14 @@ class ProfileGuard {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.verified_user_outlined,
+                    Icons.shield_outlined,
                     color: AppConstants.warning,
                     size: 28,
                   ),
                 ),
                 const SizedBox(height: 18),
-
-                // Title
                 Text(
-                  'Harvester Verification Required',
+                  title,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(
                     fontSize: 18,
@@ -250,10 +349,8 @@ class ProfileGuard {
                   ),
                 ),
                 const SizedBox(height: 10),
-
-                // Description
                 Text(
-                  'You must complete the 5-parameter Harvester Verification before you can register hives or initiate harvest sessions on HoneyChain.',
+                  description,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 14,
@@ -262,19 +359,11 @@ class ProfileGuard {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Actions: Cancel & Verify Now
                 Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(dialogContext),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
                         child: Text(
                           'Cancel',
                           style: GoogleFonts.manrope(
@@ -291,12 +380,7 @@ class ProfileGuard {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(dialogContext);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const HarvesterVerificationScreen(),
-                            ),
-                          );
+                          onConfirm();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: dialogContext.colors.primary,
@@ -308,7 +392,7 @@ class ProfileGuard {
                           ),
                         ),
                         child: Text(
-                          'Verify Now',
+                          buttonLabel,
                           style: GoogleFonts.manrope(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,

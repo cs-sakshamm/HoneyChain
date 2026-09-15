@@ -7,6 +7,7 @@ import '../../../core/localization/localization_service.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../collection/screens/nearest_centres_screen.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
@@ -295,7 +296,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isEditing ? 'Hive updated successfully' : 'Hive added successfully',
+            isEditing ? 'Hive updated successfully' : 'Hive added successfully! Find nearest collection centers:',
           ),
           backgroundColor: AppConstants.success,
           behavior: SnackBarBehavior.floating,
@@ -304,7 +305,21 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
           ),
         ),
       );
-      Navigator.pop(context);
+      final savedHiveId = isEditing
+          ? widget.hive!.id
+          : (controller.hives.isNotEmpty ? controller.hives.first.id : null);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NearestCentresScreen(
+            targetRole: 'COLLECTOR_PROCESSOR',
+            originLocation: hiveData.apiaryLocation,
+            originHiveId: savedHiveId,
+            quantity: hiveData.expectedProductionKg,
+            harvesterName: userController.user.name,
+          ),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -332,13 +347,16 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                 children: [
                   const _PillBackButton(),
                   const SizedBox(width: 14),
-                  Text(
-                    isEditing ? context.tr('edit_hive') : context.tr('add_new_hive'),
-                    style: GoogleFonts.manrope(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: context.textPrimaryColor,
-                      letterSpacing: -0.3,
+                  Expanded(
+                    child: Text(
+                      isEditing ? context.tr('edit_hive') : context.tr('add_new_hive'),
+                      style: GoogleFonts.manrope(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: context.textPrimaryColor,
+                        letterSpacing: -0.3,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -371,7 +389,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     Expanded(
                       child: _buildTextField(
                         label: '${context.tr('hive_code')} *',
-                        hint: 'e.g. HIVE-A1B2C3',
+                        hint: 'e.g. HIVE_001',
                         controller: _hiveCodeController,
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {

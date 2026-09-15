@@ -13,6 +13,7 @@ import 'features/lab/lab_navigation_screen.dart';
 import 'features/navigation/main_navigation_screen.dart';
 import 'features/packaging/packaging_navigation_screen.dart';
 import 'features/profile/controllers/user_controller.dart';
+import 'features/notifications/critical_alert_modal.dart';
 
 /// Root HoneyChain Mobile Application
 class HoneyChainApp extends StatelessWidget {
@@ -29,6 +30,9 @@ class HoneyChainApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeController.themeMode,
+      builder: (context, child) {
+        return CriticalAlertModalWrapper(child: child!);
+      },
       home: const AuthRouter(),
     );
   }

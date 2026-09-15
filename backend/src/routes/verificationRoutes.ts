@@ -98,9 +98,11 @@ router.post('/harvester/government-id', async (req: Request, res: Response) => {
 
 /**
  * POST /api/verification/harvester/mobile/send-otp
+ * POST /api/verification/mobile/send-otp
+ * POST /api/verification/send-otp
  * Step 2a: Send Mobile OTP
  */
-router.post('/harvester/mobile/send-otp', async (req: Request, res: Response) => {
+const handleGenericSendOtp = async (req: Request, res: Response) => {
   try {
     const { mobile } = req.body;
     if (!mobile) {
@@ -115,7 +117,11 @@ router.post('/harvester/mobile/send-otp', async (req: Request, res: Response) =>
   } catch (error: any) {
     res.status(500).json({ success: false, error: error?.message || String(error) });
   }
-});
+};
+
+router.post('/harvester/mobile/send-otp', handleGenericSendOtp);
+router.post('/mobile/send-otp', handleGenericSendOtp);
+router.post('/send-otp', handleGenericSendOtp);
 
 /**
  * POST /api/verification/harvester/mobile/verify-otp
@@ -138,6 +144,31 @@ router.post('/harvester/mobile/verify-otp', async (req: Request, res: Response) 
     res.status(400).json({ success: false, error: error?.message || String(error) });
   }
 });
+
+/**
+ * POST /api/verification/mobile/verify-otp
+ * POST /api/verification/verify-otp
+ * Generic standalone OTP verification endpoint
+ */
+const handleGenericVerifyOtp = async (req: Request, res: Response) => {
+  try {
+    const { mobile, otp, sessionId } = req.body;
+    if (!mobile || !otp) {
+      return res.status(400).json({ success: false, error: 'mobile and otp are required' });
+    }
+
+    const result = await otpService.verifyOtp(mobile, otp, sessionId);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+};
+
+router.post('/mobile/verify-otp', handleGenericVerifyOtp);
+router.post('/verify-otp', handleGenericVerifyOtp);
 
 /**
  * POST /api/verification/harvester/registration
@@ -252,4 +283,256 @@ router.get('/verify/harvester/:verificationId', async (req: Request, res: Respon
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// COLLECTOR & PROCESSOR VERIFICATION ENDPOINTS (3/3 PARAMETERS)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/verification/collector/status/:collectorId
+ * Get current verification record and status for Collector / Processor
+ */
+router.get('/collector/status/:collectorId', async (req: Request, res: Response) => {
+  try {
+    const collectorId = String(req.params.collectorId);
+    const verification = await verificationService.getOrCreateCollectorVerification(collectorId);
+    res.json({ success: true, verification });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * POST /api/verification/collector/mobile/send-otp
+ * Step 1a: Send OTP to collector mobile number
+ */
+router.post('/collector/mobile/send-otp', async (req: Request, res: Response) => {
+  try {
+    const { collectorId, mobile } = req.body;
+    if (!collectorId || !mobile) {
+      return res.status(400).json({ success: false, error: 'collectorId and mobile are required' });
+    }
+
+    const result = await verificationService.sendCollectorMobileOtp(collectorId, mobile);
+    if (!result.success) {
+      return res.status(429).json(result);
+    }
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * POST /api/verification/collector/mobile/verify-otp
+ * Step 1b: Verify OTP and save collector identity
+ */
+router.post('/collector/mobile/verify-otp', async (req: Request, res: Response) => {
+  try {
+    const { collectorId, mobile, otp, fullName } = req.body;
+    if (!collectorId || !mobile || !otp) {
+      return res.status(400).json({ success: false, error: 'collectorId, mobile, and otp are required' });
+    }
+
+    const verification = await verificationService.verifyCollectorMobileOtp(collectorId, mobile, otp, fullName);
+    res.json({ success: true, message: 'Identity verified successfully.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * POST /api/verification/collector/business
+ * Step 2: Submit and verify Business Information (Center Name & Center Address)
+ */
+router.post('/collector/business', async (req: Request, res: Response) => {
+  try {
+    const { collectorId, organizationName, facilityLocation, businessDetails } = req.body;
+    if (!collectorId || !organizationName || !facilityLocation) {
+      return res.status(400).json({ success: false, error: 'collectorId, organizationName, and facilityLocation are required' });
+    }
+
+    const verification = await verificationService.submitCollectorBusiness(
+      collectorId,
+      organizationName,
+      facilityLocation,
+      businessDetails
+    );
+    res.json({ success: true, message: 'Business details verified.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
+ * POST /api/verification/collector/kyc
+ * Step 3: Real KYC / ID Verification (Government ID / Regulatory License)
+ */
+router.post('/collector/kyc', async (req: Request, res: Response) => {
+  try {
+    const { collectorId, governmentIdType, governmentIdNumber, licenseNumber } = req.body;
+    if (!collectorId || !governmentIdNumber) {
+      return res.status(400).json({ success: false, error: 'collectorId and governmentIdNumber are required' });
+    }
+
+    const verification = await verificationService.submitCollectorKyc(
+      collectorId,
+      governmentIdType,
+      governmentIdNumber,
+      licenseNumber
+    );
+    res.json({ success: true, message: 'KYC / License verified successfully.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// LAB TESTER VERIFICATION ENDPOINTS (3/3)
+// ═════════════════════════════════════════════════════════════════════
+
+router.get('/lab/status/:labId', async (req: Request, res: Response) => {
+  try {
+    const labId = String(req.params.labId);
+    const verification = await verificationService.getOrCreateLabVerification(labId);
+    res.json({ success: true, verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/lab/mobile/send-otp', async (req: Request, res: Response) => {
+  try {
+    const { labId, mobile } = req.body;
+    if (!labId || !mobile) {
+      return res.status(400).json({ success: false, error: 'labId and mobile are required' });
+    }
+    const result = await verificationService.sendLabMobileOtp(labId, mobile);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/lab/mobile/verify-otp', async (req: Request, res: Response) => {
+  try {
+    const { labId, mobile, otp, fullName } = req.body;
+    if (!labId || !otp) {
+      return res.status(400).json({ success: false, error: 'labId and otp are required' });
+    }
+    const verification = await verificationService.verifyLabMobileOtp(labId, otp, mobile, fullName);
+    res.json({ success: true, message: 'Identity verified successfully.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/lab/details', async (req: Request, res: Response) => {
+  try {
+    const { labId, labName, labAddress, labRegistrationNumber, accreditation } = req.body;
+    if (!labId || !labName || !labAddress || !labRegistrationNumber) {
+      return res.status(400).json({ success: false, error: 'labId, labName, labAddress, and labRegistrationNumber are required' });
+    }
+    const verification = await verificationService.submitLabDetails(labId, labName, labAddress, labRegistrationNumber, accreditation);
+    res.json({ success: true, message: 'Laboratory details verified.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/lab/kyc', async (req: Request, res: Response) => {
+  try {
+    const { labId, governmentIdType, governmentIdNumber, qualification, authorizedTestingDetails } = req.body;
+    if (!labId || !governmentIdNumber) {
+      return res.status(400).json({ success: false, error: 'labId and governmentIdNumber are required' });
+    }
+    const verification = await verificationService.submitLabKyc(
+      labId,
+      governmentIdType,
+      governmentIdNumber,
+      qualification,
+      authorizedTestingDetails
+    );
+    res.json({ success: true, message: 'Lab Tester KYC & Qualification verified.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// PACKAGING MANAGER VERIFICATION ENDPOINTS (3/3)
+// ═════════════════════════════════════════════════════════════════════
+
+router.get('/packaging/status/:packagerId', async (req: Request, res: Response) => {
+  try {
+    const packagerId = String(req.params.packagerId);
+    const verification = await verificationService.getOrCreatePackagingVerification(packagerId);
+    res.json({ success: true, verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/packaging/mobile/send-otp', async (req: Request, res: Response) => {
+  try {
+    const { packagerId, mobile } = req.body;
+    if (!packagerId || !mobile) {
+      return res.status(400).json({ success: false, error: 'packagerId and mobile are required' });
+    }
+    const result = await verificationService.sendPackagingMobileOtp(packagerId, mobile);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/packaging/mobile/verify-otp', async (req: Request, res: Response) => {
+  try {
+    const { packagerId, mobile, otp, fullName } = req.body;
+    if (!packagerId || !otp) {
+      return res.status(400).json({ success: false, error: 'packagerId and otp are required' });
+    }
+    const verification = await verificationService.verifyPackagingMobileOtp(packagerId, otp, mobile, fullName);
+    res.json({ success: true, message: 'Identity verified successfully.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/packaging/details', async (req: Request, res: Response) => {
+  try {
+    const { packagerId, organizationName, facilityLocation, packagingLicenseNumber } = req.body;
+    if (!packagerId || !organizationName || !facilityLocation || !packagingLicenseNumber) {
+      return res.status(400).json({ success: false, error: 'packagerId, organizationName, facilityLocation, and packagingLicenseNumber are required' });
+    }
+    const verification = await verificationService.submitPackagingDetails(
+      packagerId,
+      organizationName,
+      facilityLocation,
+      packagingLicenseNumber
+    );
+    res.json({ success: true, message: 'Packaging facility details verified.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+router.post('/packaging/kyc', async (req: Request, res: Response) => {
+  try {
+    const { packagerId, governmentIdType, governmentIdNumber, authorizedPackagingDetails } = req.body;
+    if (!packagerId || !governmentIdNumber) {
+      return res.status(400).json({ success: false, error: 'packagerId and governmentIdNumber are required' });
+    }
+    const verification = await verificationService.submitPackagingKyc(
+      packagerId,
+      governmentIdType,
+      governmentIdNumber,
+      authorizedPackagingDetails
+    );
+    res.json({ success: true, message: 'Packaging Manager KYC & Scope verified.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
 export default router;
+

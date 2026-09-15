@@ -103,3 +103,157 @@ class AppConstants {
   static const String bsidPrefix = 'BSID';
   static const String bspPassPrefix = 'BSP';
 }
+
+class RoleImageItem {
+  final String url;
+  final String label;
+  final String localAssetFallback;
+
+  const RoleImageItem({
+    required this.url,
+    required this.label,
+    required this.localAssetFallback,
+  });
+}
+
+class RoleImages {
+  // 1. HARVESTER: Beekeeping, Beehives, Bees, Honey Harvesting, Pure Honeycomb (Exactly 5 Unique Images)
+  static const List<RoleImageItem> harvesterImages = [
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1473081556163-2a17de81fc97?auto=format&fit=crop&w=1200&q=80',
+      label: 'Beekeeping and hive inspection in active apiary',
+      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1576402187878-974f70c890a5?auto=format&fit=crop&w=1200&q=80',
+      label: 'Pure raw honeycomb frames and natural honey',
+      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=1200&q=80',
+      label: 'Honey bees actively producing fresh honey on honeycomb frames',
+      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1587049352851-8d4e89133924?auto=format&fit=crop&w=1200&q=80',
+      label: 'Raw honey harvesting directly from honeycomb frame',
+      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1568644396922-5c3bfae12521?auto=format&fit=crop&w=1200&q=80',
+      label: 'Beekeeping smoker and honeycomb harvesting frame',
+      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
+    ),
+  ];
+
+  // 2. COLLECTION & PROCESSING: Honey Collection, Extraction, Processing, Collection Centre, Facility (Exactly 5 Unique Images)
+  static const List<RoleImageItem> collectionProcessingImages = [
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1587049352847-4a222e784d38?auto=format&fit=crop&w=1200&q=80',
+      label: 'Regional honey collection centre receiving raw batches',
+      localAssetFallback: 'assets/images/collection_processing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1587049633312-d628ae50a8ae?auto=format&fit=crop&w=1200&q=80',
+      label: 'Centrifugal stainless steel honey extraction machinery',
+      localAssetFallback: 'assets/images/collection_processing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1584727638096-042c45049ebe?auto=format&fit=crop&w=1200&q=80',
+      label: 'Multi-mesh temperature-controlled honey filtration and processing',
+      localAssetFallback: 'assets/images/collection_processing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80',
+      label: 'Certified bulk honey collection and aggregation depot',
+      localAssetFallback: 'assets/images/collection_processing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80',
+      label: 'Hygienic industrial honey processing facility',
+      localAssetFallback: 'assets/images/collection_processing_hero.jpg',
+    ),
+  ];
+
+  // 3. LAB TESTER: Food Laboratory, Quality Testing, Sample Analysis, Equipment, Scientific Testing (Exactly 5 Unique Images)
+  static const List<RoleImageItem> labTesterImages = [
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=1200&q=80',
+      label: 'Advanced food laboratory testing honey purity and safety',
+      localAssetFallback: 'assets/images/lab_testing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80',
+      label: 'Scientist conducting chemical quality testing on honey samples',
+      localAssetFallback: 'assets/images/lab_testing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=1200&q=80',
+      label: 'Analytical sample evaluation and purity analysis',
+      localAssetFallback: 'assets/images/lab_testing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+      label: 'Precision laboratory glassware and diagnostic instruments',
+      localAssetFallback: 'assets/images/lab_testing_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1518152006812-edab29b069ac?auto=format&fit=crop&w=1200&q=80',
+      label: 'Scientific microbiological testing and authenticity assay',
+      localAssetFallback: 'assets/images/lab_testing_hero.jpg',
+    ),
+  ];
+
+  // 4. PACKAGING: Honey Bottling, Filling, Jar Sealing, Labeling, Packaging Facility (Exactly 5 Unique Images)
+  static const List<RoleImageItem> packagingImages = [
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
+      label: 'Automated honey bottling and liquid filling line',
+      localAssetFallback: 'assets/images/packaging_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1563178406-4cdc2923acbc?auto=format&fit=crop&w=1200&q=80',
+      label: 'Precision volumetric honey filling into glass jars',
+      localAssetFallback: 'assets/images/packaging_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1587293852726-70cdb56c2866?auto=format&fit=crop&w=1200&q=80',
+      label: 'Hermetic jar sealing and tamper-evident capping process',
+      localAssetFallback: 'assets/images/packaging_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1589927986089-35812388d1f4?auto=format&fit=crop&w=1200&q=80',
+      label: 'Automated QR code batch traceability labeling',
+      localAssetFallback: 'assets/images/packaging_hero.jpg',
+    ),
+    RoleImageItem(
+      url: 'https://images.unsplash.com/photo-1586528116493-a029325540fa?auto=format&fit=crop&w=1200&q=80',
+      label: 'Cleanroom honey packaging and boxed dispatch facility',
+      localAssetFallback: 'assets/images/packaging_hero.jpg',
+    ),
+  ];
+
+  static List<RoleImageItem> getImagesForRole(String role) {
+    final r = role.toUpperCase();
+    if (r.contains('COLLECT') || r.contains('PROCESS')) {
+      return collectionProcessingImages;
+    } else if (r.contains('LAB')) {
+      return labTesterImages;
+    } else if (r.contains('PKG') || r.contains('PACKAG')) {
+      return packagingImages;
+    }
+    return harvesterImages;
+  }
+
+  static IconData getRoleIcon(String role) {
+    final r = role.toUpperCase();
+    if (r.contains('COLLECT') || r.contains('PROCESS')) {
+      return Icons.precision_manufacturing_rounded;
+    } else if (r.contains('LAB')) {
+      return Icons.science_rounded;
+    } else if (r.contains('PKG') || r.contains('PACKAG')) {
+      return Icons.inventory_2_rounded;
+    }
+    return Icons.hive_rounded;
+  }
+}

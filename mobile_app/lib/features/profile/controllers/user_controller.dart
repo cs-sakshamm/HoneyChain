@@ -13,7 +13,9 @@ class UserProfile {
   final String email;
   final String phone;
   final String role; // 'HARVESTER', 'COLLECTOR_PROCESSOR', 'LAB', 'PACKAGING', 'ADMIN'
-  final String? photoUrl;
+  final String? avatarUrl; // Tier 1: Custom user-uploaded picture
+  final String? googlePhotoUrl; // Tier 2: Google profile picture
+  final String? photoUrl; // Backward-compatible alias
   final String? organizationName;
   final String? facilityLocation;
   final String? licenseNumber;
@@ -26,7 +28,7 @@ class UserProfile {
   final String? bsid;
   final String? bspPass;
 
-  final String? authProvider; // 'google', 'password', etc.
+  final String? authProvider; // 'google', 'local', etc.
 
   // Authoritative status from backend if available
   final bool? isBackendComplete;
@@ -37,6 +39,8 @@ class UserProfile {
     required this.email,
     required this.phone,
     this.role = 'HARVESTER',
+    this.avatarUrl,
+    this.googlePhotoUrl,
     this.photoUrl,
     this.organizationName,
     this.facilityLocation,
@@ -48,6 +52,23 @@ class UserProfile {
     this.authProvider,
     this.isBackendComplete,
   });
+
+  /// Effective profile photo URL following 3-tier priority:
+  /// Tier 1: User-uploaded custom profile picture (`avatarUrl`)
+  /// Tier 2: Google profile picture (`googlePhotoUrl` or legacy `photoUrl`)
+  /// Tier 3: null (falls back to initial letters / placeholder)
+  String? get effectivePhotoUrl {
+    if (avatarUrl != null && avatarUrl!.trim().isNotEmpty) {
+      return avatarUrl!.trim();
+    }
+    if (googlePhotoUrl != null && googlePhotoUrl!.trim().isNotEmpty) {
+      return googlePhotoUrl!.trim();
+    }
+    if (photoUrl != null && photoUrl!.trim().isNotEmpty) {
+      return photoUrl!.trim();
+    }
+    return null;
+  }
 
   /// Role-based profile completion calculation.
   /// Backend remains the authoritative validator.
@@ -102,12 +123,78 @@ class UserProfile {
   }
 
   String get initials {
-    if (name.trim().isEmpty) return initial;
-    final parts = name.trim().split(' ');
-    if (parts.length > 1 && parts[1].isNotEmpty) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
     return name[0].toUpperCase();
+  }
+}
+
+/// Summary of a role-specific account for multi-role switching
+class RoleAccountSummary {
+  final String id;
+  final String role;
+  final String email;
+  final String name;
+  final String? phone;
+  final String? avatarUrl;
+  final String? googlePhotoUrl;
+  final String? photoUrl;
+  final String? authProvider;
+  final String? organizationName;
+  final String? facilityLocation;
+  final String? licenseNumber;
+  final bool isProfileComplete;
+  final bool isVerified;
+  final String verificationStatus;
+  final int completedSteps;
+  final int totalSteps;
+
+  const RoleAccountSummary({
+    required this.id,
+    required this.role,
+    required this.email,
+    required this.name,
+    this.phone,
+    this.avatarUrl,
+    this.googlePhotoUrl,
+    this.photoUrl,
+    this.authProvider,
+    this.organizationName,
+    this.facilityLocation,
+    this.licenseNumber,
+    required this.isProfileComplete,
+    required this.isVerified,
+    required this.verificationStatus,
+    this.completedSteps = 0,
+    this.totalSteps = 3,
+  });
+
+  /// Effective profile photo URL following 3-tier priority
+  String? get effectivePhotoUrl {
+    if (avatarUrl != null && avatarUrl!.trim().isNotEmpty) return avatarUrl!.trim();
+    if (googlePhotoUrl != null && googlePhotoUrl!.trim().isNotEmpty) return googlePhotoUrl!.trim();
+    if (photoUrl != null && photoUrl!.trim().isNotEmpty) return photoUrl!.trim();
+    return null;
+  }
+
+  factory RoleAccountSummary.fromJson(Map<String, dynamic> json) {
+    return RoleAccountSummary(
+      id: json['id'] ?? '',
+      role: json['role'] ?? 'HARVESTER',
+      email: json['email'] ?? '',
+      name: json['name'] ?? '',
+      phone: json['phone'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+      googlePhotoUrl: json['googlePhotoUrl'] as String?,
+      photoUrl: json['photoUrl'] as String?,
+      authProvider: json['authProvider'] as String?,
+      organizationName: json['organizationName'] as String?,
+      facilityLocation: json['facilityLocation'] as String?,
+      licenseNumber: json['licenseNumber'] as String?,
+      isProfileComplete: json['isProfileComplete'] == true,
+      isVerified: json['isVerified'] == true,
+      verificationStatus: json['verificationStatus'] ?? 'Not Started',
+      completedSteps: json['completedSteps'] is int ? json['completedSteps'] : 0,
+      totalSteps: json['totalSteps'] is int ? json['totalSteps'] : 3,
+    );
   }
 }
 
@@ -119,6 +206,8 @@ class UserController extends ChangeNotifier {
   static const String _emailKey = 'user_profile_email';
   static const String _phoneKey = 'user_profile_phone';
   static const String _roleKey = 'user_profile_role';
+  static const String _avatarUrlKey = 'user_profile_avatar_url';
+  static const String _googlePhotoUrlKey = 'user_profile_google_photo_url';
   static const String _photoUrlKey = 'user_profile_photo_url';
   static const String _orgKey = 'user_profile_organization';
   static const String _locKey = 'user_profile_location';
@@ -140,7 +229,10 @@ class UserController extends ChangeNotifier {
     role: 'HARVESTER',
   );
 
+  List<RoleAccountSummary> _roleAccounts = [];
+
   UserProfile get user => _user;
+  List<RoleAccountSummary> get roleAccounts => _roleAccounts;
 
   UserController({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
@@ -178,6 +270,8 @@ class UserController extends ChangeNotifier {
     final email = prefs.getString(_emailKey) ?? '';
     final phone = prefs.getString(_phoneKey) ?? '';
     final role = roleOverride ?? prefs.getString(_roleKey) ?? 'HARVESTER';
+    final avatarUrl = prefs.getString(_avatarUrlKey);
+    final googlePhotoUrl = prefs.getString(_googlePhotoUrlKey);
     final photoUrl = prefs.getString(_photoUrlKey);
     final org = prefs.getString(_orgKey);
     final loc = prefs.getString(_locKey);
@@ -192,6 +286,8 @@ class UserController extends ChangeNotifier {
       email: email,
       phone: phone,
       role: role,
+      avatarUrl: avatarUrl,
+      googlePhotoUrl: googlePhotoUrl,
       photoUrl: photoUrl,
       organizationName: org,
       facilityLocation: loc,
@@ -217,6 +313,8 @@ class UserController extends ChangeNotifier {
     required String email,
     String? phone,
     String? role,
+    String? avatarUrl,
+    String? googlePhotoUrl,
     String? photoUrl,
     String? beekeeperId,
     String? bsid,
@@ -229,6 +327,8 @@ class UserController extends ChangeNotifier {
       email: email,
       phone: phone ?? '',
       role: role ?? 'HARVESTER',
+      avatarUrl: avatarUrl ?? _user.avatarUrl,
+      googlePhotoUrl: googlePhotoUrl ?? _user.googlePhotoUrl,
       photoUrl: photoUrl ?? _user.photoUrl,
       beekeeperId: beekeeperId,
       bsid: bsid,
@@ -243,6 +343,8 @@ class UserController extends ChangeNotifier {
     await prefs.setString(_emailKey, email);
     if (phone != null) await prefs.setString(_phoneKey, phone);
     if (role != null) await prefs.setString(_roleKey, role);
+    if (avatarUrl != null) await prefs.setString(_avatarUrlKey, avatarUrl);
+    if (googlePhotoUrl != null) await prefs.setString(_googlePhotoUrlKey, googlePhotoUrl);
     if (photoUrl != null) await prefs.setString(_photoUrlKey, photoUrl);
     if (beekeeperId != null) await prefs.setString(_beekeeperIdKey, beekeeperId);
     if (bsid != null) await prefs.setString(_bsidKey, bsid);
@@ -262,6 +364,8 @@ class UserController extends ChangeNotifier {
       email: _user.email,
       phone: _user.phone,
       role: newRole,
+      avatarUrl: _user.avatarUrl,
+      googlePhotoUrl: _user.googlePhotoUrl,
       photoUrl: _user.photoUrl,
       organizationName: _user.organizationName,
       facilityLocation: _user.facilityLocation,
@@ -299,7 +403,10 @@ class UserController extends ChangeNotifier {
             email: p['email'] ?? _user.email,
             phone: p['phone'] ?? _user.phone,
             role: p['role'] ?? _user.role,
-            photoUrl: p['photoUrl'] ?? _user.photoUrl,
+            avatarUrl: p['avatarUrl'] as String?,
+            googlePhotoUrl: p['googlePhotoUrl'] as String?,
+            photoUrl: p['photoUrl'] as String? ?? _user.photoUrl,
+            authProvider: p['authProvider'] as String? ?? _user.authProvider,
             organizationName: p['organizationName'] ?? _user.organizationName,
             facilityLocation: p['facilityLocation'] ?? _user.facilityLocation,
             licenseNumber: p['licenseNumber'] ?? _user.licenseNumber,
@@ -318,6 +425,22 @@ class UserController extends ChangeNotifier {
           await prefs.setString(_emailKey, _user.email);
           await prefs.setString(_phoneKey, _user.phone);
           await prefs.setString(_roleKey, _user.role);
+          if (_user.avatarUrl != null) {
+            await prefs.setString(_avatarUrlKey, _user.avatarUrl!);
+          } else {
+            await prefs.remove(_avatarUrlKey);
+          }
+          if (_user.googlePhotoUrl != null) {
+            await prefs.setString(_googlePhotoUrlKey, _user.googlePhotoUrl!);
+          } else {
+            await prefs.remove(_googlePhotoUrlKey);
+          }
+          if (_user.photoUrl != null) {
+            await prefs.setString(_photoUrlKey, _user.photoUrl!);
+          }
+          if (_user.authProvider != null) {
+            await prefs.setString(_authProviderKey, _user.authProvider!);
+          }
           if (_user.organizationName != null) await prefs.setString(_orgKey, _user.organizationName!);
           if (_user.facilityLocation != null) await prefs.setString(_locKey, _user.facilityLocation!);
           if (_user.licenseNumber != null) await prefs.setString(_licKey, _user.licenseNumber!);
@@ -332,18 +455,96 @@ class UserController extends ChangeNotifier {
     }
   }
 
+  /// Fetch all registered role accounts associated with this email
+  Future<void> fetchRoleAccounts([String? email]) async {
+    final targetEmail = email ?? _user.email;
+    if (targetEmail.isEmpty) return;
+    try {
+      final uri = Uri.parse('$_baseUrl/api/auth/accounts').replace(
+        queryParameters: {'email': targetEmail},
+      );
+      final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['accounts'] is List) {
+          _roleAccounts = (data['accounts'] as List)
+              .map((acc) => RoleAccountSummary.fromJson(acc as Map<String, dynamic>))
+              .toList();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('[UserController] fetchRoleAccounts warning: $e');
+    }
+  }
+
+  /// Switch the active account to another role
+  Future<bool> switchAccountRole(String targetRole) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/auth/switch-role');
+      final res = await _client
+          .post(
+            uri,
+            headers: _headers,
+            body: jsonEncode({
+              'email': _user.email,
+              'targetRole': targetRole,
+              'createIfNotExists': true,
+              'name': _user.name,
+              'phone': _user.phone,
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['user'] != null) {
+          final u = data['user'];
+          final prefs = await SharedPreferences.getInstance();
+          if (u['id'] != null) await prefs.setString(_idKey, u['id']);
+          if (u['name'] != null) await prefs.setString(_nameKey, u['name']);
+          if (u['email'] != null) await prefs.setString(_emailKey, u['email']);
+          if (u['phone'] != null) await prefs.setString(_phoneKey, u['phone']);
+          if (u['role'] != null) await prefs.setString(_roleKey, u['role']);
+          if (u['avatarUrl'] != null) {
+            await prefs.setString(_avatarUrlKey, u['avatarUrl']);
+          } else {
+            await prefs.remove(_avatarUrlKey);
+          }
+          if (u['googlePhotoUrl'] != null) {
+            await prefs.setString(_googlePhotoUrlKey, u['googlePhotoUrl']);
+          } else {
+            await prefs.remove(_googlePhotoUrlKey);
+          }
+          if (u['photoUrl'] != null) await prefs.setString(_photoUrlKey, u['photoUrl']);
+          if (u['bsid'] != null) await prefs.setString(_bsidKey, u['bsid']);
+          if (u['bspPass'] != null) await prefs.setString(_bspKey, u['bspPass']);
+
+          await _loadProfile(u['role'] as String?);
+          await fetchRoleAccounts(_user.email);
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('[UserController] switchAccountRole error: $e');
+    }
+    return false;
+  }
+
   /// Update profile details across all role fields
   Future<bool> updateProfile({
     required String name,
     required String email,
     required String phone,
     String? role,
+    String? avatarUrl,
     String? organizationName,
     String? facilityLocation,
     String? licenseNumber,
     String? designation,
   }) async {
     final effectiveRole = role ?? _user.role;
+    final effectiveAvatarUrl = avatarUrl != null ? (avatarUrl.trim().isEmpty ? null : avatarUrl.trim()) : _user.avatarUrl;
 
     _user = UserProfile(
       id: _user.id,
@@ -351,7 +552,9 @@ class UserController extends ChangeNotifier {
       email: email.trim(),
       phone: phone.trim(),
       role: effectiveRole,
-      photoUrl: _user.photoUrl,
+      avatarUrl: effectiveAvatarUrl,
+      googlePhotoUrl: _user.googlePhotoUrl,
+      photoUrl: effectiveAvatarUrl ?? _user.googlePhotoUrl ?? _user.photoUrl,
       organizationName: organizationName?.trim(),
       facilityLocation: facilityLocation?.trim(),
       licenseNumber: licenseNumber?.trim(),
@@ -369,6 +572,11 @@ class UserController extends ChangeNotifier {
     await prefs.setString(_emailKey, _user.email);
     await prefs.setString(_phoneKey, _user.phone);
     await prefs.setString(_roleKey, _user.role);
+    if (effectiveAvatarUrl != null) {
+      await prefs.setString(_avatarUrlKey, effectiveAvatarUrl);
+    } else {
+      await prefs.remove(_avatarUrlKey);
+    }
     if (_user.organizationName != null) {
       await prefs.setString(_orgKey, _user.organizationName!);
     } else {
@@ -403,6 +611,7 @@ class UserController extends ChangeNotifier {
               'email': _user.email,
               'phone': _user.phone,
               'role': _user.role,
+              'avatarUrl': effectiveAvatarUrl ?? '',
               'organizationName': _user.organizationName,
               'facilityLocation': _user.facilityLocation,
               'licenseNumber': _user.licenseNumber,
@@ -421,6 +630,10 @@ class UserController extends ChangeNotifier {
             email: p['email'] ?? _user.email,
             phone: p['phone'] ?? _user.phone,
             role: p['role'] ?? _user.role,
+            avatarUrl: p['avatarUrl'] as String?,
+            googlePhotoUrl: p['googlePhotoUrl'] as String?,
+            photoUrl: p['photoUrl'] as String? ?? _user.photoUrl,
+            authProvider: p['authProvider'] as String? ?? _user.authProvider,
             organizationName: p['organizationName'] ?? _user.organizationName,
             facilityLocation: p['facilityLocation'] ?? _user.facilityLocation,
             licenseNumber: p['licenseNumber'] ?? _user.licenseNumber,
@@ -431,7 +644,6 @@ class UserController extends ChangeNotifier {
             isBackendComplete: p['isProfileComplete'] as bool?,
           );
           notifyListeners();
-          final prefs = await SharedPreferences.getInstance();
           if (_user.beekeeperId != null) await prefs.setString(_beekeeperIdKey, _user.beekeeperId!);
         }
       }
@@ -440,6 +652,26 @@ class UserController extends ChangeNotifier {
     }
 
     return true;
+  }
+
+  /// Sets or updates custom avatar URL
+  Future<bool> setAvatarUrl(String? url) async {
+    return updateProfile(
+      name: _user.name,
+      email: _user.email,
+      phone: _user.phone,
+      role: _user.role,
+      avatarUrl: url ?? '',
+      organizationName: _user.organizationName,
+      facilityLocation: _user.facilityLocation,
+      licenseNumber: _user.licenseNumber,
+      designation: _user.designation,
+    );
+  }
+
+  /// Removes custom avatar to revert back to Google Photo if available
+  Future<bool> clearCustomAvatar() async {
+    return setAvatarUrl('');
   }
 
   Future<bool> changePassword({

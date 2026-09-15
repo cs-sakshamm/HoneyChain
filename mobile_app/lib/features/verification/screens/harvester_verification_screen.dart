@@ -17,15 +17,16 @@ class HarvesterVerificationScreen extends StatefulWidget {
 }
 
 class _HarvesterVerificationScreenState extends State<HarvesterVerificationScreen> {
-  // Step 1 Form (Aadhaar Card ONLY)
-  final TextEditingController _aadhaarNumberController = TextEditingController();
-  final TextEditingController _aadhaarOtpController = TextEditingController();
-
-  // Step 2 Form
+  // Step 1 Form (Harvester Full Name & Mobile OTP)
+  final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
 
-  // Step 3 Form (4 Exact Registration Authorities)
+  // Legacy Step 1 Form (Aadhaar Card ONLY)
+  final TextEditingController _aadhaarNumberController = TextEditingController();
+  final TextEditingController _aadhaarOtpController = TextEditingController();
+
+  // Step 2 Form (4 Exact Registration Authorities)
   final TextEditingController _registrationIdController = TextEditingController();
   String _selectedAuthority = 'STATE_AGRICULTURE';
 
@@ -36,7 +37,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
     'OTHER_LOCAL': 'Other / Local Registration',
   };
 
-  // Step 4 Form (Simple State, District, Village/City Location)
+  // Step 3 Form (Simple State, District, Village/City Location)
   String _selectedState = 'Uttar Pradesh';
   final TextEditingController _districtController = TextEditingController();
   final TextEditingController _villageCityController = TextEditingController();
@@ -87,6 +88,9 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
           ? user.id!
           : (user.beekeeperId ?? 'harvester');
       context.read<VerificationController>().loadVerification(harvesterId);
+      if (user.name.isNotEmpty) {
+        _fullNameController.text = user.name;
+      }
       if (user.phone.isNotEmpty) {
         String digits = user.phone.replaceAll(RegExp(r'\D'), '');
         if (digits.startsWith('91') && digits.length > 10) {
@@ -125,6 +129,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
   @override
   void dispose() {
+    _fullNameController.dispose();
     _aadhaarNumberController.dispose();
     _aadhaarOtpController.dispose();
     _phoneController.dispose();
@@ -141,7 +146,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
   Widget build(BuildContext context) {
     final verCtrl = context.watch<VerificationController>();
     final ver = verCtrl.verification;
-    final progress = ver.completedStepsCount / 5.0;
+    final progress = ver.completedStepsCount / 3.0;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -168,7 +173,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
               ),
             ),
             Text(
-              '5-Parameter Trust & Provenance Protocol',
+              '3-Parameter Trust & Provenance Protocol',
               style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -218,10 +223,10 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Verification Progress',
+                          'Profile Verification',
                           style: GoogleFonts.manrope(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
                             color: context.textPrimaryColor,
                           ),
                         ),
@@ -234,7 +239,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           child: Text(
                             ver.isFullyVerified
                                 ? 'Verified ✓'
-                                : '${ver.completedStepsCount} of 5 Completed',
+                                : '${ver.completedStepsCount}/3 Completed',
                             style: GoogleFonts.manrope(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -254,6 +259,49 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                         valueColor: AlwaysStoppedAnimation<Color>(
                           ver.isFullyVerified ? context.successColor : context.primaryColor,
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: AppConstants.space16),
+
+                    // 4-Parameter Checklist
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: context.scaffoldBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildChecklistItem(
+                            context,
+                            title: 'Full Name',
+                            isDone: context.watch<UserController>().user.name.trim().isNotEmpty,
+                            missingHint: 'Enter your Harvester Full Name below',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildChecklistItem(
+                            context,
+                            title: 'Mobile OTP',
+                            isDone: ver.isStep2Complete,
+                            missingHint: 'Verify mobile OTP in Step 1',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildChecklistItem(
+                            context,
+                            title: 'Required Profile Details',
+                            isDone: ver.isStep3Complete && ver.isStep4Complete,
+                            missingHint: 'Complete Beekeeper Registration & Apiary Location',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildChecklistItem(
+                            context,
+                            title: 'Verified',
+                            isDone: ver.isFullyVerified,
+                            isFinal: true,
+                            missingHint: 'Complete above items to unlock full role access',
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -521,24 +569,51 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
               const SizedBox(height: AppConstants.space16),
               */
 
-              // ── STEP 2: Mobile Number + OTP ──
+              // ── STEP 1: Identity & Mobile Verification (Full Name + Mobile OTP) ──
               _buildStepCard(
-                stepNumber: 2,
-                title: 'Mobile Number Verification',
-                subtitle: '2Factor SMS Gateway · India DLT Compliant OTP',
-                icon: Icons.phone_android_rounded,
-                isCompleted: ver.isStep2Complete,
-                statusText: ver.mobileVerified == 'Verified' ? 'Mobile Verified ✓' : ver.mobileVerified,
-                content: ver.isStep2Complete
+                stepNumber: 1,
+                title: 'Harvester Identity & Mobile Verification',
+                subtitle: 'Full Legal Name & DLT-Compliant Mobile OTP',
+                icon: Icons.person_pin_rounded,
+                isCompleted: ver.isStep2Complete && context.watch<UserController>().user.name.trim().isNotEmpty,
+                statusText: (ver.isStep2Complete && context.watch<UserController>().user.name.trim().isNotEmpty)
+                    ? 'Identity Verified ✓'
+                    : ver.mobileVerified == 'Verified'
+                        ? 'Name Required'
+                        : ver.mobileVerified,
+                content: (ver.isStep2Complete && context.watch<UserController>().user.name.trim().isNotEmpty)
                     ? _buildVerifiedStepInfo(
-                        label: 'Verified Phone Number',
-                        value: ver.mobileNumber ?? '+91 XXXXX XXXXX',
-                        subtext: 'Mobile identity confirmed with 2FA OTP Gateway',
-                        verifiedBadgeText: 'Mobile Number — Verified ✓',
+                        label: 'Verified Harvester Identity',
+                        value: '${context.watch<UserController>().user.name} (${ver.mobileNumber ?? context.watch<UserController>().user.phone})',
+                        subtext: 'Harvester full name & mobile identity confirmed with 2FA OTP Gateway',
+                        verifiedBadgeText: 'Full Name & Mobile — Verified ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Full Name field
+                          Text(
+                            'Full Name of Harvester',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _fullNameController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Rajesh Kumar',
+                              prefixIcon: Icon(Icons.person_outline_rounded, size: 20, color: context.textSecondaryColor),
+                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                              filled: true,
+                              fillColor: context.scaffoldBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -615,6 +690,13 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                               icon: Icons.send_rounded,
                               isLoading: verCtrl.isLoading,
                               onTap: () {
+                                final name = _fullNameController.text.trim();
+                                if (name.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter Full Name of Harvester.')),
+                                  );
+                                  return;
+                                }
                                 final phone = _phoneController.text.trim();
                                 final digits = phone.replaceAll(RegExp(r'\D'), '');
                                 if (digits.length < 10) {
@@ -752,10 +834,17 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                             ),
                             const SizedBox(height: 12),
                               _ActionButton(
-                                label: 'Verify OTP',
+                                label: 'Verify OTP & Save Identity',
                                 icon: Icons.verified_user_outlined,
                                 isLoading: verCtrl.isLoading,
                                 onTap: () async {
+                                  final name = _fullNameController.text.trim();
+                                  if (name.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Please enter Full Name of Harvester.')),
+                                    );
+                                    return;
+                                  }
                                   final code = _otpController.text.trim();
                                   if (code.length != 6) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -766,6 +855,11 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                   final ok = await verCtrl.verifyMobileOtp(code);
                                   if (ok && context.mounted) {
                                     final userCtrl = context.read<UserController>();
+                                    await userCtrl.updateProfile(
+                                      name: name,
+                                      email: userCtrl.user.email,
+                                      phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : userCtrl.user.phone,
+                                    );
                                     userCtrl.reloadProfile();
                                   }
                                 },
@@ -777,9 +871,9 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 3: Beekeeper Registration ──
+              // ── STEP 2: Beekeeper Registration ──
               _buildStepCard(
-                stepNumber: 3,
+                stepNumber: 2,
                 title: 'Beekeeper Registration',
                 subtitle: 'Authority Accreditation & HoneyChain Beekeeper ID',
                 icon: Icons.workspace_premium_outlined,
@@ -974,9 +1068,9 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
-              // ── STEP 4: Location (State, District, Village/City) ──
+              // ── STEP 3: Location (State, District, Village/City) ──
               _buildStepCard(
-                stepNumber: 4,
+                stepNumber: 3,
                 title: 'Location',
                 subtitle: 'State, District & Village / City Registry',
                 icon: Icons.pin_drop_outlined,
@@ -1390,6 +1484,63 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildChecklistItem(
+    BuildContext context, {
+    required String title,
+    required bool isDone,
+    required String missingHint,
+    bool isFinal = false,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          size: 18,
+          color: isDone
+              ? context.successColor
+              : isFinal
+                  ? context.textMutedColor
+                  : context.warningColor,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.manrope(
+              fontSize: 13,
+              fontWeight: isFinal ? FontWeight.w800 : FontWeight.w600,
+              color: isDone ? context.textPrimaryColor : (isFinal ? context.textMutedColor : context.textPrimaryColor),
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: isDone
+                ? context.successBgColor
+                : (isFinal ? context.surfaceColor : context.warningBgColor),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDone
+                  ? context.successColor.withValues(alpha: 0.3)
+                  : (isFinal ? context.borderColor : context.warningColor.withValues(alpha: 0.3)),
+            ),
+          ),
+          child: Text(
+            isDone ? 'Done ✓' : 'Missing',
+            style: GoogleFonts.manrope(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: isDone
+                  ? context.successColor
+                  : (isFinal ? context.textMutedColor : context.warningColor),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

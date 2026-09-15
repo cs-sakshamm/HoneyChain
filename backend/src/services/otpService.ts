@@ -9,11 +9,16 @@ export class OtpService {
     if (!mobileRaw) return '';
     let cleaned = mobileRaw.replace(/[^\d+]/g, '').trim();
 
+    // Strip leading 0 if 11 digits (e.g. 09876543210 -> 9876543210)
+    if (cleaned.startsWith('0') && cleaned.length === 11) {
+      cleaned = cleaned.substring(1);
+    }
+
     // If starts with 91 and length is 12 digits (e.g. 919876543210), add +
     if (cleaned.length === 12 && cleaned.startsWith('91')) {
       cleaned = `+${cleaned}`;
-    } else if (cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned)) {
-      // 10-digit Indian mobile number
+    } else if (cleaned.length === 10 && /^\d{10}$/.test(cleaned)) {
+      // 10-digit mobile number -> default to +91
       cleaned = `+91${cleaned}`;
     } else if (!cleaned.startsWith('+')) {
       cleaned = `+${cleaned}`;

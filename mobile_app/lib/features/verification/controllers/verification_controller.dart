@@ -1,13 +1,19 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import '../models/collector_verification_model.dart';
 import '../models/harvester_verification_model.dart';
+import '../models/lab_tester_verification_model.dart';
+import '../models/packaging_manager_verification_model.dart';
 import '../services/verification_api_service.dart';
 
 class VerificationController extends ChangeNotifier {
   final VerificationApiService _apiService;
 
   HarvesterVerificationModel _verification = HarvesterVerificationModel.initial('default_harvester');
+  CollectorVerificationModel _collectorVerification = CollectorVerificationModel.initial('default_collector');
+  LabTesterVerificationModel _labVerification = LabTesterVerificationModel.initial('default_lab');
+  PackagingManagerVerificationModel _packagingVerification = PackagingManagerVerificationModel.initial('default_packaging');
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
@@ -95,6 +101,21 @@ class VerificationController extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Generic verification loader by role
+  Future<void> loadVerificationStatus({String? role, String? userId}) async {
+    final effectiveId = userId ?? 'default_user';
+    final r = (role ?? 'HARVESTER').toUpperCase();
+    if (r.contains('COLLECT') || r.contains('PROCESS')) {
+      await loadCollectorVerification(effectiveId);
+    } else if (r.contains('LAB')) {
+      await loadLabVerification(effectiveId);
+    } else if (r.contains('PKG') || r.contains('PACKAG')) {
+      await loadPackagingVerification(effectiveId);
+    } else {
+      await loadVerification(effectiveId);
     }
   }
 
@@ -351,4 +372,448 @@ class VerificationController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COLLECTOR & PROCESSOR PROFILE VERIFICATION (3/3 PARAMETERS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  CollectorVerificationModel get collectorVerification => _collectorVerification;
+
+  /// Load Collector verification status
+  Future<void> loadCollectorVerification(String collectorId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _collectorVerification = await _apiService.getCollectorVerificationStatus(collectorId);
+    } catch (e) {
+      _errorMessage = 'Failed to load collector verification status.';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Collector Step 1a: Send Mobile OTP for Identity Verification
+  Future<bool> sendCollectorMobileOtp(String collectorId, String mobile) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      final cleanMobile = mobile.trim();
+      final res = await _apiService.sendCollectorMobileOtp(
+        collectorId: collectorId,
+        mobile: cleanMobile,
+      );
+      if (res['success'] == true) {
+        _pendingMobileNumber = cleanMobile;
+        _mobileOtpSent = true;
+        _otpCooldown = res['cooldownSeconds'] ?? 60;
+        _devOtp = res['devOtp'];
+        _successMessage = res['message'] ?? 'OTP code sent to $cleanMobile';
+        _startCooldownTimer();
+        return true;
+      } else {
+        _errorMessage = res['message'] ?? 'Failed to send OTP.';
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Collector Step 1b: Verify Mobile OTP for Identity Verification
+  Future<bool> verifyCollectorMobileOtp({
+    required String collectorId,
+    required String mobile,
+    required String otp,
+    String? fullName,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _collectorVerification = await _apiService.verifyCollectorMobileOtp(
+        collectorId: collectorId,
+        mobile: mobile,
+        otp: otp,
+        fullName: fullName,
+      );
+      _successMessage = 'Identity verified successfully.';
+      resetMobileOtpState();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Collector Step 2: Submit Business Verification (Center Name & Center Address)
+  Future<bool> submitCollectorBusiness({
+    required String collectorId,
+    required String organizationName,
+    required String facilityLocation,
+    String? businessDetails,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _collectorVerification = await _apiService.submitCollectorBusiness(
+        collectorId: collectorId,
+        organizationName: organizationName,
+        facilityLocation: facilityLocation,
+        businessDetails: businessDetails,
+      );
+      _successMessage = 'Business details verified successfully.';
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Collector Step 3: Real KYC / ID Verification
+  Future<bool> submitCollectorKyc({
+    required String collectorId,
+    required String governmentIdType,
+    required String governmentIdNumber,
+    String? licenseNumber,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _collectorVerification = await _apiService.submitCollectorKyc(
+        collectorId: collectorId,
+        governmentIdType: governmentIdType,
+        governmentIdNumber: governmentIdNumber,
+        licenseNumber: licenseNumber,
+      );
+      _successMessage = 'License & KYC verification completed successfully.';
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LAB TESTER PROFILE VERIFICATION (3/3 PARAMETERS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  LabTesterVerificationModel get labVerification => _labVerification;
+
+  /// Load Lab Tester verification status
+  Future<void> loadLabVerification(String labId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _labVerification = await _apiService.getLabVerificationStatus(labId);
+    } catch (e) {
+      _errorMessage = 'Failed to load lab tester verification status.';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Lab Step 1a: Send Mobile OTP
+  Future<bool> sendLabMobileOtp(String labId, String mobile) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      final cleanMobile = mobile.trim();
+      final res = await _apiService.sendLabMobileOtp(
+        labId: labId,
+        mobile: cleanMobile,
+      );
+      if (res['success'] == true) {
+        _pendingMobileNumber = cleanMobile;
+        _mobileOtpSent = true;
+        _otpCooldown = res['cooldownSeconds'] ?? 60;
+        _devOtp = res['devOtp'];
+        _successMessage = res['message'] ?? 'OTP code sent to $cleanMobile';
+        _startCooldownTimer();
+        return true;
+      } else {
+        _errorMessage = res['message'] ?? 'Failed to send OTP.';
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Lab Step 1b: Verify Mobile OTP
+  Future<bool> verifyLabMobileOtp({
+    required String labId,
+    required String mobile,
+    required String otp,
+    String? fullName,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _labVerification = await _apiService.verifyLabMobileOtp(
+        labId: labId,
+        mobile: mobile,
+        otp: otp,
+        fullName: fullName,
+      );
+      _successMessage = 'Identity verified successfully.';
+      resetMobileOtpState();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Lab Step 2: Submit Laboratory Details
+  Future<bool> submitLabDetails({
+    required String labId,
+    required String labName,
+    required String labAddress,
+    required String labRegistrationNumber,
+    String? accreditation,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _labVerification = await _apiService.submitLabDetails(
+        labId: labId,
+        labName: labName,
+        labAddress: labAddress,
+        labRegistrationNumber: labRegistrationNumber,
+        accreditation: accreditation,
+      );
+      _successMessage = 'Laboratory details verified successfully.';
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Lab Step 3: KYC, Qualification & Scope
+  Future<bool> submitLabKyc({
+    required String labId,
+    required String governmentIdType,
+    required String governmentIdNumber,
+    String? qualification,
+    String? authorizedTestingDetails,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _labVerification = await _apiService.submitLabKyc(
+        labId: labId,
+        governmentIdType: governmentIdType,
+        governmentIdNumber: governmentIdNumber,
+        qualification: qualification,
+        authorizedTestingDetails: authorizedTestingDetails,
+      );
+      _successMessage = 'License, KYC & Qualification verified successfully.';
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PACKAGING MANAGER PROFILE VERIFICATION (3/3 PARAMETERS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  PackagingManagerVerificationModel get packagingVerification => _packagingVerification;
+
+  /// Load Packaging Manager verification status
+  Future<void> loadPackagingVerification(String packagerId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _packagingVerification = await _apiService.getPackagingVerificationStatus(packagerId);
+    } catch (e) {
+      _errorMessage = 'Failed to load packaging verification status.';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Packaging Step 1a: Send Mobile OTP
+  Future<bool> sendPackagingMobileOtp(String packagerId, String mobile) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      final cleanMobile = mobile.trim();
+      final res = await _apiService.sendPackagingMobileOtp(
+        packagerId: packagerId,
+        mobile: cleanMobile,
+      );
+      if (res['success'] == true) {
+        _pendingMobileNumber = cleanMobile;
+        _mobileOtpSent = true;
+        _otpCooldown = res['cooldownSeconds'] ?? 60;
+        _devOtp = res['devOtp'];
+        _successMessage = res['message'] ?? 'OTP code sent to $cleanMobile';
+        _startCooldownTimer();
+        return true;
+      } else {
+        _errorMessage = res['message'] ?? 'Failed to send OTP.';
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Packaging Step 1b: Verify Mobile OTP
+  Future<bool> verifyPackagingMobileOtp({
+    required String packagerId,
+    required String mobile,
+    required String otp,
+    String? fullName,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _packagingVerification = await _apiService.verifyPackagingMobileOtp(
+        packagerId: packagerId,
+        mobile: mobile,
+        otp: otp,
+        fullName: fullName,
+      );
+      _successMessage = 'Identity verified successfully.';
+      resetMobileOtpState();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Packaging Step 2: Submit Packaging Facility Details
+  Future<bool> submitPackagingDetails({
+    required String packagerId,
+    required String organizationName,
+    required String facilityLocation,
+    required String packagingLicenseNumber,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _packagingVerification = await _apiService.submitPackagingDetails(
+        packagerId: packagerId,
+        organizationName: organizationName,
+        facilityLocation: facilityLocation,
+        packagingLicenseNumber: packagingLicenseNumber,
+      );
+      _successMessage = 'Packaging facility details verified successfully.';
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Packaging Step 3: Real KYC / ID Verification
+  Future<bool> submitPackagingKyc({
+    required String packagerId,
+    required String governmentIdType,
+    required String governmentIdNumber,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _successMessage = null;
+    notifyListeners();
+
+    try {
+      _packagingVerification = await _apiService.submitPackagingKyc(
+        packagerId: packagerId,
+        governmentIdType: governmentIdType,
+        governmentIdNumber: governmentIdNumber,
+      );
+      _successMessage = 'License & KYC verification completed successfully.';
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }
+

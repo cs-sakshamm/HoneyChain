@@ -9,10 +9,13 @@ import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
-import '../../../core/widgets/my_requests_view.dart';
+import '../../../core/widgets/auto_image_slider.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../profile/controllers/user_controller.dart';
+import '../../verification/controllers/verification_controller.dart';
+import '../../verification/screens/packaging_verification_screen.dart';
+import '../../verification/screens/public_verification_lookup_screen.dart';
 import 'packaging_qr_screen.dart';
 
 class PackagingDashboardScreen extends StatefulWidget {
@@ -28,7 +31,14 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<UserController>().user;
+      final userId = user.id ?? user.email;
+      if (userId.isNotEmpty) {
+        context.read<VerificationController>().loadPackagingVerification(userId);
+      }
+    });
   }
 
   @override
@@ -38,6 +48,8 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
   }
 
   void _showFinalizePackagingDialog(BuildContext context, WorkflowRequest req) {
+    if (!ProfileGuard.checkPackagingVerificationOrPrompt(context)) return;
+
     final qtyCtrl = TextEditingController(text: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg.toStringAsFixed(1) : '');
     final countCtrl = TextEditingController();
     final sizeCtrl = TextEditingController();
@@ -47,13 +59,14 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: context.surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Finalize Packaging', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Batch ID: ${req.batchId}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor)),
+              Text('Batch ID: ' + req.batchId, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor)),
               const SizedBox(height: 12),
               Text('Total Packaged Quantity (kg)', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textSecondaryColor)),
               const SizedBox(height: 4),
@@ -61,9 +74,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                 controller: qtyCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
+                  hintText: 'e.g. 15.0',
                   filled: true,
                   fillColor: context.scaffoldBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
@@ -74,9 +88,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                 controller: countCtrl,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
+                  hintText: 'e.g. 30',
                   filled: true,
                   fillColor: context.scaffoldBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
@@ -86,9 +101,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               TextField(
                 controller: sizeCtrl,
                 decoration: InputDecoration(
+                  hintText: 'e.g. 500g Glass Jar (Tamper Evident)',
                   filled: true,
                   fillColor: context.scaffoldBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
@@ -98,9 +114,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               TextField(
                 controller: notesCtrl,
                 decoration: InputDecoration(
+                  hintText: 'Enter packaging details or lot observations...',
                   filled: true,
                   fillColor: context.scaffoldBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
@@ -131,7 +148,7 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(success ? 'Batch packaged & QR verification generated!' : 'Packaging recorded.'),
+                    content: Text(success ? 'Batch packaged & verifiable QR code generated!' : 'Packaging recorded.'),
                     backgroundColor: AppConstants.success,
                   ),
                 );
@@ -144,8 +161,8 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: context.colors.primary),
-            child: const Text('Complete & Generate QR'),
+            style: ElevatedButton.styleFrom(backgroundColor: context.colors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: const Text('Generate QR Code & Finalize'),
           ),
         ],
       ),
@@ -153,22 +170,28 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
   }
 
   void _showRejectDialog(BuildContext context, WorkflowRequest req) {
-    final reasonCtrl = TextEditingController(text: 'Packaging inspection failed: seal integrity or labeling issue');
+    if (!ProfileGuard.checkPackagingVerificationOrPrompt(context)) return;
+
+    final reasonCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: context.surfaceColor,
-        title: Text('Reject Batch from Packaging', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Reject Packaging Request', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text('Provide reason for rejection:', style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor)),
+            const SizedBox(height: 12),
             TextField(
               controller: reasonCtrl,
               decoration: InputDecoration(
                 hintText: 'Rejection reason...',
                 filled: true,
                 fillColor: context.scaffoldBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.borderColor)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.borderColor)),
               ),
               maxLines: 2,
             ),
@@ -177,14 +200,16 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogCtx);
-              context.read<WorkflowController>().rejectRequest(req.id, actorRole: 'PACKAGING', reason: reasonCtrl.text.trim());
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Batch rejected & logged.'), backgroundColor: AppConstants.error),
-              );
+              await context.read<WorkflowController>().rejectRequest(req.id, actorRole: 'PACKAGING', reason: reasonCtrl.text.trim());
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Request rejected & recorded.'), backgroundColor: AppConstants.error),
+                );
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error),
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             child: const Text('Confirm Reject'),
           ),
         ],
@@ -192,23 +217,58 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
     );
   }
 
+  Widget _buildHeroImage(BuildContext context) {
+    return const AutoImageSlider(
+      role: 'PACKAGING',
+      height: 155,
+      borderRadius: 20,
+      margin: EdgeInsets.only(bottom: AppConstants.space16),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<WorkflowController>();
-    final pendingRequests = controller.packagingPendingRequests;
+    final requestedBatches = controller.packagingRequestedRequests;
+    final acceptedBatches = controller.packagingAcceptedRequests;
+    final processingBatches = controller.packagingProcessingRequests;
+    final completedBatches = controller.packagingCompletedRequests;
+
+    final verCtrl = context.watch<VerificationController>();
+    final packagingVer = verCtrl.packagingVerification;
+    final isFullyVerified = packagingVer.isFullyVerified;
+    final completedCount = packagingVer.completedStepsCount;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // This would ideally open a camera scanner, but we just navigate to the public lookup for now
+          // and they can paste the verification or batch ID.
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PublicVerificationLookupScreen(),
+            ),
+          );
+        },
+        backgroundColor: context.colors.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.qr_code_scanner_rounded),
+        label: Text('Scan QR', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: SafeArea(
         bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildHeroImage(context),
                   Text(
                     'Packaging & Labeling',
                     style: GoogleFonts.manrope(
@@ -223,9 +283,16 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                     'Package lab-certified honey batches and generate verifiable consumer QR codes.',
                     style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+
+                  // ── 3/3 Profile Verification Banner Card ──
+                  _buildVerificationBanner(context, completedCount, isFullyVerified),
+                  const SizedBox(height: 14),
+
                   TabBar(
                     controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
                     labelColor: context.colors.primary,
                     unselectedLabelColor: context.textSecondaryColor,
                     indicatorColor: context.colors.primary,
@@ -233,8 +300,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                     labelStyle: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
                     unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
                     tabs: [
-                      Tab(text: 'Pending Packaging (${pendingRequests.length})'),
-                      const Tab(text: 'Packaging History & QR'),
+                      Tab(text: 'Requested (${requestedBatches.length})'),
+                      Tab(text: 'Accepted (${acceptedBatches.length})'),
+                      Tab(text: 'Processing (${processingBatches.length})'),
+                      Tab(text: 'Completed (${completedBatches.length})'),
                     ],
                   ),
                 ],
@@ -244,20 +313,41 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  // Tab 1: Pending batches
-                  pendingRequests.isEmpty
-                      ? _buildEmptyState(context)
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(AppConstants.space16, 12, AppConstants.space16, 120),
-                          itemCount: pendingRequests.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
-                          itemBuilder: (context, index) {
-                            final req = pendingRequests[index];
-                            return _buildPendingCard(context, req);
-                          },
-                        ),
-                  // Tab 2: Full MyRequestsView
-                  const MyRequestsView(userRole: 'PACKAGING'),
+                  // Tab 0: Requested
+                  _buildPackagingListView(
+                    context,
+                    requestedBatches,
+                    'No requested packaging batches',
+                    'Batches tested and approved by labs will appear here.',
+                    showAcceptReject: true,
+                  ),
+
+                  // Tab 1: Accepted
+                  _buildPackagingListView(
+                    context,
+                    acceptedBatches,
+                    'No accepted batches',
+                    'Batches accepted by this facility ready to start packaging will appear here.',
+                    showStartPackaging: true,
+                  ),
+
+                  // Tab 2: Processing
+                  _buildPackagingListView(
+                    context,
+                    processingBatches,
+                    'No batches currently packaging',
+                    'Active bottling lines in progress ready for sealing & QR generation will appear here.',
+                    showFinalize: true,
+                  ),
+
+                  // Tab 3: Completed
+                  _buildPackagingListView(
+                    context,
+                    completedBatches,
+                    'No completed packaging batches',
+                    'Batches packaged, sealed, and assigned QR traceability will appear here.',
+                    showViewQr: true,
+                  ),
                 ],
               ),
             ),
@@ -267,111 +357,454 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inventory_2_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
-          const SizedBox(height: AppConstants.space16),
-          Text(
-            'No Pending Batches',
-            style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+  Widget _buildPackagingListView(
+    BuildContext context,
+    List<WorkflowRequest> batches,
+    String emptyTitle,
+    String emptySubtitle, {
+    bool showAcceptReject = false,
+    bool showStartPackaging = false,
+    bool showFinalize = false,
+    bool showViewQr = false,
+  }) {
+    if (batches.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inventory_2_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
+            const SizedBox(height: AppConstants.space16),
+            Text(
+              emptyTitle,
+              style: GoogleFonts.manrope(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: context.textPrimaryColor,
+              ),
+            ),
+            const SizedBox(height: AppConstants.space8),
+            Text(
+              emptySubtitle,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final verCtrl = context.watch<VerificationController>();
+    final isFullyVerified = verCtrl.packagingVerification.isFullyVerified;
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
+      itemCount: batches.length,
+      separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
+      itemBuilder: (context, index) {
+        final req = batches[index];
+        final formattedDate = DateFormat('MMM dd, yyyy • h:mm a').format(req.createdAt);
+
+        return AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Batch: ' + req.batchId,
+                      style: GoogleFonts.manrope(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimaryColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.space8),
+                  StatusBadge(status: req.status),
+                ],
+              ),
+              const SizedBox(height: AppConstants.space12),
+
+              // Lab Verification Summary Badge
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: context.successBgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: context.successColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_rounded, size: 18, color: context.successColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Lab Certified: Grade A Pure • Moisture 16.8% • PASS',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: context.successColor),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, size: 16, color: context.textSecondaryColor),
+                  const SizedBox(width: AppConstants.space8),
+                  Expanded(
+                    child: Text(
+                      'Harvester: ' + req.harvesterName,
+                      style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.space8),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today_outlined, size: 16, color: context.textSecondaryColor),
+                  const SizedBox(width: AppConstants.space8),
+                  Expanded(
+                    child: Text(
+                      formattedDate,
+                      style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.space8),
+              Row(
+                children: [
+                  Icon(Icons.scale_rounded, size: 16, color: context.textSecondaryColor),
+                  const SizedBox(width: AppConstants.space8),
+                  Text(
+                    'Quantity: ${req.estimatedQuantityKg.toStringAsFixed(1)} kg',
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                  ),
+                ],
+              ),
+              if (showAcceptReject) ...[
+                const SizedBox(height: AppConstants.space16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          if (!ProfileGuard.checkPackagingVerificationOrPrompt(context)) return;
+                          _showRejectDialog(context, req);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppConstants.error,
+                          side: const BorderSide(color: AppConstants.error),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text('Reject Batch', style: GoogleFonts.manrope(fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (!ProfileGuard.checkPackagingVerificationOrPrompt(context)) return;
+                          await context.read<WorkflowController>().acceptRequest(req.id, actorRole: 'PACKAGING');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Packaging request accepted! Ready to begin packaging.')),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isFullyVerified ? context.colors.primary : context.textMutedColor,
+                          foregroundColor: context.colors.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text('Accept Request', style: GoogleFonts.manrope(fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (showStartPackaging) ...[
+                const SizedBox(height: AppConstants.space16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (!ProfileGuard.checkPackagingVerificationOrPrompt(context)) return;
+                      await context.read<WorkflowController>().updateRequestStatus(req.id, RequestStatus.processing);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Packaging started for batch! Moved to Processing tab.')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                    label: const Text('Start Packaging Line'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isFullyVerified ? context.colors.primary : context.textMutedColor,
+                      foregroundColor: context.colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ] else if (showFinalize) ...[
+                const SizedBox(height: AppConstants.space16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (!ProfileGuard.checkPackagingVerificationOrPrompt(context)) return;
+                      _showFinalizePackagingDialog(context, req);
+                    },
+                    icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                    label: const Text('Finalize Packaging & Generate QR Code'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isFullyVerified ? context.colors.primary : context.textMutedColor,
+                      foregroundColor: context.colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ] else if (showViewQr) ...[
+                const SizedBox(height: AppConstants.space16),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PackagingQrScreen(request: req),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.qr_code_rounded, size: 18),
+                        label: const Text('View Verifiable QR Code'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: context.colors.primary,
+                          foregroundColor: context.colors.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
+                          );
+                        },
+                        icon: const Icon(Icons.timeline_rounded, size: 16),
+                        label: const Text('Timeline'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: AppConstants.space8),
-          Text(
-            'Lab-approved batches will arrive here ready for packaging & QR assignment.',
-            style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildPendingCard(BuildContext context, WorkflowRequest req) {
-    return AppCard(
+  Widget _buildVerificationBanner(BuildContext context, int count, bool isVerified) {
+    final verCtrl = context.watch<VerificationController>();
+    final packagingVer = verCtrl.packagingVerification;
+    final isFullyVerified = packagingVer.isFullyVerified;
+    final int completedCount = packagingVer.completedStepsCount;
+    final double progress = (completedCount / 3.0).clamp(0.0, 1.0);
+    final int percentage = (progress * 100).round();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final String statusBadgeText;
+    final Color statusColor;
+    final Color statusBgColor;
+
+    if (isFullyVerified || completedCount == 3) {
+      statusBadgeText = 'Profile Verified (3 of 3)';
+      statusColor = context.successColor;
+      statusBgColor = context.successBgColor;
+    } else if (completedCount == 0) {
+      statusBadgeText = 'Profile Setup (0 of 3)';
+      statusColor = context.warningColor;
+      statusBgColor = context.warningBgColor;
+    } else {
+      statusBadgeText = 'Partially Verified ($completedCount of 3)';
+      statusColor = context.colors.primary;
+      statusBgColor = context.primarySoftColor;
+    }
+
+    final String supportingText;
+    if (isFullyVerified) {
+      supportingText = 'Profile Verified — Packaging & QR generation access enabled.';
+    } else {
+      supportingText = 'Complete profile verification to accept batches, package honey, and issue QR tags.';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppConstants.space16),
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isFullyVerified
+              ? context.successColor.withValues(alpha: 0.5)
+              : (isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isFullyVerified
+                ? context.successColor.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
-                  );
-                },
+              Expanded(
                 child: Row(
                   children: [
-                    Icon(Icons.timeline_rounded, size: 14, color: context.colors.primary),
-                    const SizedBox(width: 4),
-                    Text(
-                      req.batchId,
-                      style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.primary),
+                    Icon(
+                      isFullyVerified ? Icons.verified_user_rounded : Icons.inventory_2_rounded,
+                      size: 20,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Packaging Profile Verification',
+                        style: GoogleFonts.manrope(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimaryColor,
+                          letterSpacing: -0.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
               ),
-              StatusBadge(status: req.status),
-            ],
-          ),
-          const SizedBox(height: AppConstants.space12),
-          Row(
-            children: [
-              Icon(Icons.person_outline, size: 16, color: context.textSecondaryColor),
-              const SizedBox(width: AppConstants.space8),
-              Expanded(
-                child: Text(req.harvesterName, style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor)),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppConstants.space8),
-          Row(
-            children: [
-              Icon(Icons.calendar_today_outlined, size: 16, color: context.textSecondaryColor),
-              const SizedBox(width: AppConstants.space8),
-              Text(
-                DateFormat('MMM dd, yyyy • h:mm a').format(req.createdAt),
-                style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppConstants.space16),
-          const Divider(),
-          const SizedBox(height: AppConstants.space12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    if (!ProfileGuard.checkOrPrompt(context)) return;
-                    _showRejectDialog(context, req);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppConstants.error,
-                    side: const BorderSide(color: AppConstants.error),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  statusBadgeText,
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
                   ),
-                  child: Text('Reject Batch', style: GoogleFonts.manrope(fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor.withValues(alpha: 0.5),
+                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
+              Text(
+                '$percentage%',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: statusColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              _buildMiniCheck(context, 'Identity', packagingVer.isStep1IdentityComplete),
+              _buildMiniCheck(context, 'Facility', packagingVer.isStep2FacilityComplete),
+              _buildMiniCheck(context, 'License & KYC', packagingVer.isStep3KycComplete),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    if (!ProfileGuard.checkOrPrompt(context)) return;
-                    _showFinalizePackagingDialog(context, req);
-                  },
-                  icon: const Icon(Icons.qr_code_2_rounded, size: 18),
-                  label: const Text('Package & QR'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.colors.primary,
-                    foregroundColor: context.colors.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                child: Text(
+                  supportingText,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: context.textSecondaryColor,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isFullyVerified ? context.successBgColor : context.primarySoftColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isFullyVerified ? context.successColor.withValues(alpha: 0.4) : context.borderColor,
+                    ),
+                  ),
+                  child: Text(
+                    isFullyVerified ? 'View Badge ✓' : 'Verify Profile →',
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isFullyVerified ? context.successColor : context.textPrimaryColor,
+                    ),
                   ),
                 ),
               ),
@@ -381,5 +814,26 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
       ),
     );
   }
-}
 
+  Widget _buildMiniCheck(BuildContext context, String title, bool isDone) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          size: 14,
+          color: isDone ? context.successColor : context.textMutedColor,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: isDone ? FontWeight.w600 : FontWeight.w500,
+            color: isDone ? context.textPrimaryColor : context.textMutedColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
