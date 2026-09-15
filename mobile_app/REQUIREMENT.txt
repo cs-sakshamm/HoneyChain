@@ -1,0 +1,4 @@
+mobile_app Integration Requirements
+- Must use unified entity IDs (batch_id, product_id, hive_id).
+- Must communicate via the central backend API (no direct DB/Blockchain connections unless designed as such).
+- Preserve state machine consistency across all modules.

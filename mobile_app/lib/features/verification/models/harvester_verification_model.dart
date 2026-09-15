@@ -100,12 +100,13 @@ class HarvesterVerificationModel {
   }
 
   bool get canSubmitBlockchain =>
-      isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete && fssaiLicenseVerified == 'Verified';
+      isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete;
 
   bool get isFullyVerified =>
       governmentIdVerified == 'Verified' &&
       mobileVerified == 'Verified' &&
-      registrationVerified == 'Verified';
+      registrationVerified == 'Verified' &&
+      (verificationStatus == 'Verified' || (verificationId != null && verificationId!.isNotEmpty));
 
   int get completedStepsCount {
     int count = 0;

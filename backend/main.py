@@ -461,6 +461,7 @@ def update_profile(payload: ProfileUpdateRequest, db: Session = Depends(get_db))
 # ============================================================
 # 2. HIVES & DEVICE MAPPING
 # ============================================================
+@app.get("/api/hives/code/generate")
 @app.get("/api/hives/unique-code")
 def get_unique_hive_code(db: Session = Depends(get_db)):
     code = f"HIVE-{uuid.uuid4().hex[:6].upper()}"
@@ -549,6 +550,22 @@ def get_hive_detail(hive_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Hive not found")
     return {"success": True, "hive": get_hive_dict(hive)}
 
+@app.put("/api/hives/{hive_id}")
+@app.put("/hives/{hive_id}")
+def update_hive(hive_id: str, payload: HiveCreateRequest, db: Session = Depends(get_db)):
+    hive = db.query(Hive).filter((Hive.id == hive_id) | (Hive.hive_code == hive_id)).first()
+    if not hive:
+        raise HTTPException(status_code=404, detail="Hive not found")
+    hive.name = payload.name
+    hive.apiary_location = payload.apiary_location
+    hive.bee_breed = payload.bee_breed
+    hive.honey_type = payload.honey_type
+    hive.target_production_kg = payload.target_production_kg
+    if payload.device_id:
+        hive.device_id = payload.device_id
+    db.commit()
+    db.refresh(hive)
+    return {"success": True, "hive": get_hive_dict(hive)}
 
 @app.delete("/api/hives/{hive_id}")
 @app.delete("/hives/{hive_id}")
@@ -715,21 +732,42 @@ def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)):
 # 4. WORKFLOW: REQUESTS, HARVESTS, PROCESSING, LAB, PACKAGING
 # ============================================================
 @app.get("/api/requests/nearest-centers")
-def get_nearest_centers(db: Session = Depends(get_db)):
+def get_nearest_centers(
+    lat: float = None,
+    lon: float = None,
+    db: Session = Depends(get_db)
+):
+    # Helper to calculate haversine distance in kilometers
+    def haversine(lat1, lon1, lat2, lon2):
+        from math import radians, cos, sin, asin, sqrt
+        if None in (lat1, lon1, lat2, lon2):
+            return None
+        r = 6371.0  # Earth radius in km
+        dlat = radians(lat2 - lat1)
+        dlon = radians(lon2 - lon1)
+        a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+        c = 2 * asin(sqrt(a))
+        return r * c
+
     centres = db.query(CollectionCentre).filter(CollectionCentre.is_active == True).all()
-    results = [
-        {
+    results = []
+    for c in centres:
+        distance = None
+        if lat is not None and lon is not None and c.latitude is not None and c.longitude is not None:
+            distance = haversine(lat, lon, c.latitude, c.longitude)
+        distance_display = f"{distance:.1f} km away" if distance is not None else "Distance unknown"
+        results.append({
             "id": c.id,
             "name": c.name,
             "location": c.location,
-            "distanceKm": 4.2,
-            "distanceDisplay": "4.2 km away",
+            "distanceKm": distance,
+            "distanceDisplay": distance_display,
             "contactPhone": c.contact_phone,
             "latitude": c.latitude,
             "longitude": c.longitude,
-        }
-        for c in centres
-    ]
+        })
+    # Sort by distance if available, otherwise keep original order
+    results.sort(key=lambda x: (x["distanceKm"] is None, x["distanceKm"]))
     return {"success": True, "centres": results}
 
 
@@ -979,9 +1017,14 @@ def create_packaging_batch(payload: Dict[str, Any], db: Session = Depends(get_db
 # ============================================================
 # 5. PUBLIC QR VERIFICATION & BLOCKCHAIN PROVENANCE
 # ============================================================
+@app.get("/api/verify")
+@app.get("/verify")
 @app.get("/api/verify/{batch_id}")
 @app.get("/verify/{batch_id}")
-def verify_batch(batch_id: str, db: Session = Depends(get_db)):
+def verify_batch(batch_id: Optional[str] = None, batch: Optional[str] = None, db: Session = Depends(get_db)):
+    batch_id = batch_id or batch
+    if not batch_id:
+        raise HTTPException(status_code=400, detail="Missing batch parameter")
     # Look up batch or request or lab report matching batch_id
     batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
     hive = None
@@ -1080,6 +1123,92 @@ def verify_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
     if otp_val in ("123456", "000000") or len(otp_val) == 6:
         return {"success": True, "message": "Mobile number successfully verified."}
     return {"success": False, "error": "Invalid OTP"}
+
+
+@app.get("/api/verification/{role}/status/{user_id}")
+def get_verification_status(role: str, user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if not profile:
+        profile = Profile(user_id=user_id)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    
+    # Map overall status to granular steps expected by Flutter
+    verified_str = "Verified" if user.is_verified else "Not Started"
+    
+    return {
+        "success": True,
+        "verification": {
+            "harvesterId": user_id,
+            "collectorId": user_id,
+            "labId": user_id,
+            "packagerId": user_id,
+            "verificationStatus": verified_str,
+            "governmentIdVerified": verified_str,
+            "mobileVerified": verified_str,
+            "registrationVerified": verified_str,
+            "locationVerified": verified_str,
+            "fssaiLicenseVerified": verified_str,
+            "businessVerified": verified_str,
+            "kycStatus": verified_str,
+            "labDetailsVerified": verified_str,
+            "facilityDetailsVerified": verified_str,
+        }
+    }
+
+
+@app.post("/api/verification/{role}/{step}")
+@app.post("/api/verification/{role}/{sub}/{step}")
+def handle_generic_verification(
+    role: str, 
+    step: str, 
+    payload: Dict[str, Any], 
+    sub: str = None,
+    db: Session = Depends(get_db)
+):
+    # For send-otp steps
+    if "send-otp" in step:
+        return {"success": True, "message": "OTP sent successfully", "sessionId": str(uuid.uuid4())}
+
+    # Identify user ID from payload based on role
+    user_id = payload.get("harvesterId") or payload.get("collectorId") or payload.get("labId") or payload.get("packagerId")
+    if not user_id:
+        return {"success": False, "error": "User ID not found in payload"}
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return {"success": False, "error": "User not found"}
+
+    # Mark user as verified
+    user.is_verified = True
+    # Also update profile verification status if exists
+    if user.profile:
+        user.profile.verification_status = "Verified"
+    db.commit()
+    db.refresh(user)
+
+    verified_str = "Verified"
+    return {
+        "success": True,
+        "verification": {
+            "harvesterId": user_id,
+            "verificationStatus": verified_str,
+            "governmentIdVerified": verified_str,
+            "mobileVerified": verified_str,
+            "registrationVerified": verified_str,
+            "locationVerified": verified_str,
+            "fssaiLicenseVerified": verified_str,
+            "businessVerified": verified_str,
+            "kycStatus": verified_str,
+            "labDetailsVerified": verified_str,
+            "facilityDetailsVerified": verified_str,
+        }
+    }
 
 
 @app.post("/api/verification/harvester")

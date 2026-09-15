@@ -9,7 +9,7 @@ class AppConstants {
   static const String appTagline = 'Supply chain management simplified for business owners.';
 
   // Backend / API base (single source of truth for mobile → backend calls)
-  static const String backendBaseUrl = 'http://127.0.0.1:3000';
+  static const String backendBaseUrl = 'http://127.0.0.1:8000';
   static const String legalDisclaimer =
       'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
 
@@ -129,7 +129,7 @@ class RoleImages {
   // 2. COLLECTION & PROCESSING: Honey Collection, Extraction, Processing, Collection Centre, Facility (Exactly 5 Unique Images)
   static const List<RoleImageItem> collectionProcessingImages = [
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1587049352847-4a222e784d38?auto=format&fit=crop&w=1200&q=80',
+      url: 'https://images.unsplash.com/photo-1587049633312-d628ae50a8ae?auto=format&fit=crop&w=1200&q=80',
       label: 'Regional honey collection centre receiving raw batches',
       localAssetFallback: 'assets/images/collection_processing_hero.jpg',
     ),

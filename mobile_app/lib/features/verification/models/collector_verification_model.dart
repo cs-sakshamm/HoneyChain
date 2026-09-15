@@ -67,7 +67,7 @@ class CollectorVerificationModel {
   bool get isStep3KycComplete => kycStatus == 'Verified';
 
   bool get isFullyVerified =>
-      isStep1IdentityComplete && isStep2BusinessComplete && isStep3KycComplete;
+      isStep1IdentityComplete && isStep2BusinessComplete && isStep3KycComplete && verificationStatus == 'Verified';
 
   int get completedStepsCount {
     int count = 0;

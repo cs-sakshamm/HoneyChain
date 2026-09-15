@@ -108,7 +108,7 @@ class HomeDashboardScreen extends StatelessWidget {
                             child: _buildStatCard(
                               context, 
                               title: 'Total Yield', 
-                              value: '0 kg', // TODO: Calculate real yield from backend
+                              value: '${hiveController.hives.fold(0.0, (sum, hive) => sum + hive.currentYearProductionKg).toStringAsFixed(1)} kg',
                               icon: Icons.water_drop_rounded,
                             ),
                           ),

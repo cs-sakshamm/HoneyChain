@@ -186,7 +186,7 @@ class Hive {
       diseaseStatus: json['diseaseStatus'] as String? ?? 'None',
       feedingRequired: json['feedingRequired'] as bool? ?? false,
       queenCondition: json['queenCondition'] as String? ?? 'Good',
-      overallHealth: json['overallHealth'] as String? ?? 'Healthy',
+      overallHealth: json['overallHealth']?.toString() ?? '',
       notes: json['notes'] as String? ?? '',
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
           DateTime.now(),

@@ -1,4 +1,4 @@
-﻿/// Packaging Manager Verification Data Model matching backend schema
+/// Packaging Manager Verification Data Model matching backend schema
 /// Enforces the 3 verification parameters (3/3):
 /// 1. Identity Verification (Full Name & Mobile OTP)
 /// 2. Facility Details (Facility/Company Name & Plant Address)
@@ -65,7 +65,7 @@ class PackagingManagerVerificationModel {
   bool get isStep3KycComplete => kycStatus == 'Verified';
 
   bool get isFullyVerified =>
-      isStep1IdentityComplete && isStep2FacilityComplete && isStep3KycComplete;
+      isStep1IdentityComplete && isStep2FacilityComplete && isStep3KycComplete && verificationStatus == 'Verified';
 
   int get completedStepsCount {
     int count = 0;

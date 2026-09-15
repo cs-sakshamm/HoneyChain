@@ -73,6 +73,10 @@ class UserProfile {
   /// Role-based profile completion calculation.
   /// Backend remains the authoritative validator.
   bool get isProfileComplete {
+    if (isBackendComplete != null) {
+      return isBackendComplete!;
+    }
+    
     final nameOk = name.trim().isNotEmpty && name.trim().toLowerCase() != 'unknown';
     final emailOk = email.trim().isNotEmpty && !email.contains('anonymous');
     final phoneOk = phone.trim().isNotEmpty;
@@ -246,7 +250,7 @@ class UserController extends ChangeNotifier {
     }
     try {
       if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000';
+        return 'http://10.0.2.2:8000';
       }
     } catch (_) {}
     return AppConstants.backendBaseUrl;

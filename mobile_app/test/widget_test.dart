@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/app.dart';
 import 'package:mobile_app/core/constants/app_constants.dart';
@@ -9,6 +10,10 @@ import 'package:mobile_app/features/profile/controllers/user_controller.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  setUpAll(() {
+    HttpOverrides.global = null;
+  });
+
   testWidgets('HoneyChainApp renders cleanly', (WidgetTester tester) async {
     await tester.pumpWidget(
       MultiProvider(

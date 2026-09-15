@@ -95,7 +95,7 @@ class AuthController extends ChangeNotifier {
     }
     try {
       if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000';
+        return 'http://10.0.2.2:8000';
       }
     } catch (_) {}
     return AppConstants.backendBaseUrl;
