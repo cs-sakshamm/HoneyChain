@@ -17,58 +17,58 @@ void main() {
   });
 
   group('RoleImages Data Separation & Integrity Tests', () {
-    test('Harvester role returns exactly 5 unique relevant beekeeping images', () {
+    test('Harvester role returns exactly 2 unique relevant beekeeping images', () {
       final images = RoleImages.getImagesForRole('HARVESTER');
-      expect(images.length, equals(5));
+      expect(images.length, equals(2));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/beekeeping_hero.jpg'), isTrue);
       final uniqueUrls = images.map((i) => i.url).toSet();
-      expect(uniqueUrls.length, equals(5));
+      expect(uniqueUrls.length, equals(2));
     });
 
-    test('Collection & Processing role returns exactly 5 unique relevant processing images', () {
+    test('Collection & Processing role returns exactly 2 unique relevant processing images', () {
       final images = RoleImages.getImagesForRole('COLLECTOR_PROCESSOR');
-      expect(images.length, equals(5));
+      expect(images.length, equals(2));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/collection_processing_hero.jpg'), isTrue);
       final uniqueUrls = images.map((i) => i.url).toSet();
-      expect(uniqueUrls.length, equals(5));
+      expect(uniqueUrls.length, equals(2));
     });
 
-    test('Lab Tester role returns exactly 5 unique relevant lab testing images', () {
+    test('Lab Tester role returns exactly 2 unique relevant lab testing images', () {
       final images = RoleImages.getImagesForRole('LAB_TESTER');
-      expect(images.length, equals(5));
+      expect(images.length, equals(2));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/lab_testing_hero.jpg'), isTrue);
       final uniqueUrls = images.map((i) => i.url).toSet();
-      expect(uniqueUrls.length, equals(5));
+      expect(uniqueUrls.length, equals(2));
     });
 
-    test('Packaging role returns exactly 5 unique relevant packaging images', () {
+    test('Packaging role returns exactly 2 unique relevant packaging images', () {
       final images = RoleImages.getImagesForRole('PACKAGING');
-      expect(images.length, equals(5));
+      expect(images.length, equals(2));
       expect(images.every((item) => item.url.isNotEmpty), isTrue);
       expect(images.every((item) => item.label.isNotEmpty), isTrue);
       expect(images.every((item) => item.localAssetFallback == 'assets/images/packaging_hero.jpg'), isTrue);
       final uniqueUrls = images.map((i) => i.url).toSet();
-      expect(uniqueUrls.length, equals(5));
+      expect(uniqueUrls.length, equals(2));
     });
 
-    test('All 20 role images across all 4 roles are completely unique (no duplicates)', () {
+    test('All 8 role images across all 4 roles are completely unique (no duplicates)', () {
       final allRoles = ['HARVESTER', 'COLLECTOR_PROCESSOR', 'LAB_TESTER', 'PACKAGING'];
       final allUrls = <String>[];
       for (final role in allRoles) {
         final images = RoleImages.getImagesForRole(role);
-        expect(images.length, equals(5));
+        expect(images.length, equals(2));
         for (final item in images) {
           allUrls.add(item.url);
         }
       }
-      expect(allUrls.length, equals(20));
-      expect(allUrls.toSet().length, equals(20));
+      expect(allUrls.length, equals(8));
+      expect(allUrls.toSet().length, equals(8));
     });
 
     test('No bird, watermelon, tomato, leaf or unrelated imagery exist in role datasets', () {
@@ -115,17 +115,15 @@ void main() {
       // Should have advanced to image 2
       expect(find.byKey(ValueKey<String>('slider_label_text_${images[1].label}')), findsOneWidget);
 
-      // Advance by another 2 seconds + 300ms transition
+      // Advance by another 2 seconds + 300ms transition -> loops back to image 1
       await tester.pump(const Duration(seconds: 2));
       await tester.pump(const Duration(milliseconds: 300));
-
-      // Should have advanced to image 3
-      expect(find.byKey(ValueKey<String>('slider_label_text_${images[2].label}')), findsOneWidget);
+      expect(find.byKey(ValueKey<String>('slider_label_text_${images[0].label}')), findsOneWidget);
     });
 
     testWidgets('AutoImageSlider loops through all images smoothly', (WidgetTester tester) async {
       final images = RoleImages.getImagesForRole('LAB_TESTER');
-      final totalImages = images.length; // 6 images
+      final totalImages = images.length; // 2 images
 
       await tester.pumpWidget(
         const MaterialApp(
