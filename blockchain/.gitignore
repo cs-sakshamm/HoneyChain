@@ -1,8 +1,27 @@
-*.log
+# Node dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Hardhat compilation & deployment artifacts
+artifacts/
+cache/
+typechain/
+typechain-types/
+
+# Code coverage and testing outputs
+coverage/
+coverage.json
+
+# Environment files
 .env
+.env.*
+!.env.example
+
+# OS and Editor artifacts
 .DS_Store
-__pycache__/
-*.pyc
-.dart_tool/
-build/
+Thumbs.db
+.vscode/
+.idea/
+*.log

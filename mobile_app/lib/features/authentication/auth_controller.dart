@@ -68,7 +68,6 @@ class AuthController extends ChangeNotifier {
   String? _errorMessage;
   String? _infoMessage;
   User? _currentUser;
-  bool _isDemoMode = false;
   String? _resetToken;
 
   // Role State
@@ -115,7 +114,7 @@ class AuthController extends ChangeNotifier {
   User? get currentUser => _currentUser;
   String? get resetToken => _resetToken;
   bool get isAuthenticated =>
-      _currentUser != null || (_isDemoMode && _status == AuthStateStatus.authenticated);
+      _currentUser != null || _status == AuthStateStatus.authenticated;
   bool get isPasswordVisible => _isPasswordVisible;
   UserRole? get selectedRole => _selectedRole;
 
@@ -314,12 +313,7 @@ class AuthController extends ChangeNotifier {
     try {
       final credential = await _authService.signInWithGoogle();
       if (credential == null) {
-        if (!_authService.isFirebaseInitialized) {
-          _isDemoMode = true;
-          _status = AuthStateStatus.authenticated;
-        } else {
-          _status = AuthStateStatus.idle;
-        }
+        _status = AuthStateStatus.idle;
       } else {
         _currentUser = credential.user;
         _status = AuthStateStatus.authenticated;
@@ -378,26 +372,16 @@ class AuthController extends ChangeNotifier {
         }
       }
     } catch (e) {
-      if (kIsWeb) {
-        _isDemoMode = true;
-        _status = AuthStateStatus.authenticated;
-      } else {
-        _status = AuthStateStatus.error;
-        _errorMessage = 'Unable to complete Google authentication.';
-      }
+      _status = AuthStateStatus.error;
+      _errorMessage = 'Unable to complete Google authentication.';
     }
     notifyListeners();
   }
 
   /// Apple Sign-In
   Future<void> signInWithApple() async {
-    _status = AuthStateStatus.authenticating;
-    _errorMessage = null;
-    notifyListeners();
-
-    await Future.delayed(const Duration(milliseconds: 500));
-    _isDemoMode = true;
-    _status = AuthStateStatus.authenticated;
+    _status = AuthStateStatus.error;
+    _errorMessage = 'Apple Sign-In is not currently supported.';
     notifyListeners();
   }
 
@@ -484,7 +468,6 @@ class AuthController extends ChangeNotifier {
   Future<void> signOut() async {
     await _authService.signOut();
     _currentUser = null;
-    _isDemoMode = false;
     _selectedRole = null;
     _status = AuthStateStatus.idle;
     _mode = AuthMode.login;

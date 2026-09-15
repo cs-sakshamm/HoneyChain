@@ -884,7 +884,24 @@ def update_workflow_request(request_id: str, payload: WorkflowUpdateRequest, db:
 
 @app.post("/api/harvests")
 def create_harvest(payload: Dict[str, Any], db: Session = Depends(get_db)):
-    batch_id = f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}"
+    batch_id = payload.get("batchId") or f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}"
+    harvester_id = payload.get("harvesterId") or "harvester-1"
+    hive_id = payload.get("hiveId")
+    quantity = payload.get("quantity", 0.0)
+    
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+    if not batch:
+        batch = CollectionBatch(
+            batch_id=batch_id,
+            harvester_id=harvester_id,
+            hive_id=hive_id,
+            quantity_kg=float(quantity),
+            current_stage="HARVESTED",
+            status="COMPLETED",
+        )
+        db.add(batch)
+        db.commit()
+    
     return {"success": True, "batchId": batch_id, "status": "HARVESTED"}
 
 
@@ -1213,6 +1230,14 @@ def handle_generic_verification(
 
 @app.post("/api/verification/harvester")
 def verify_harvester(payload: Dict[str, Any], db: Session = Depends(get_db)):
+    harvester_id = payload.get("harvesterId")
+    if harvester_id:
+        user = db.query(User).filter(User.id == harvester_id).first()
+        if user:
+            user.is_verified = True
+            if user.profile:
+                user.profile.verification_status = "Verified"
+            db.commit()
     verif_id = f"HC-VERIF-HARVESTER-{uuid.uuid4().hex[:6].upper()}"
     return {"success": True, "verificationId": verif_id, "status": "VERIFIED"}
 

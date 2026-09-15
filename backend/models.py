@@ -226,6 +226,20 @@ class CollectionCentre(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Harvest(Base):
+    __tablename__ = "harvests"
+
+    id = Column(String(64), primary_key=True, default=generate_uuid)
+    harvester_id = Column(String(64), ForeignKey("users.id"), nullable=False)
+    hive_id = Column(String(64), ForeignKey("hives.id", ondelete="SET NULL"), nullable=True)
+    quantity_kg = Column(Float, default=0.0)
+    unit = Column(String(16), default="kg")
+    location = Column(String(256), nullable=True)
+    status = Column(String(32), default="HARVESTED")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class CollectionRequest(Base):
     __tablename__ = "collection_requests"
 
@@ -233,6 +247,7 @@ class CollectionRequest(Base):
     request_id = Column(String(64), unique=True, nullable=False)  # REQ-COL-2026-XXXX
     harvester_id = Column(String(64), ForeignKey("users.id"), nullable=False)
     hive_id = Column(String(64), ForeignKey("hives.id", ondelete="SET NULL"), nullable=True)
+    harvest_id = Column(String(64), nullable=True)
     collection_centre_id = Column(String(64), nullable=True)
     collection_centre_name = Column(String(128), nullable=True)
     batch_id = Column(String(64), nullable=True)
@@ -241,6 +256,7 @@ class CollectionRequest(Base):
     actual_quantity_kg = Column(Float, default=0.0)
     location = Column(String(256), nullable=True)
     notes = Column(Text, nullable=True)
+    accepted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -288,8 +304,28 @@ class Lab(Base):
     user_id = Column(String(64), ForeignKey("users.id"), unique=True, nullable=False)
     lab_name = Column(String(128), nullable=False)
     facility_location = Column(String(256), nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    contact_phone = Column(String(32), nullable=True)
+    contact_email = Column(String(128), nullable=True)
     registration_number = Column(String(128), nullable=True)
     accreditation = Column(String(128), default="NABL / FSSAI / ISO 17025")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PackagingFacility(Base):
+    __tablename__ = "packaging_facilities"
+
+    id = Column(String(64), primary_key=True, default=generate_uuid)
+    name = Column(String(128), nullable=False)
+    location = Column(String(256), nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    contact_phone = Column(String(32), nullable=True)
+    contact_email = Column(String(128), nullable=True)
+    license_number = Column(String(128), nullable=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -301,9 +337,15 @@ class LabRequest(Base):
     batch_id = Column(String(64), nullable=False)
     requested_by_id = Column(String(64), nullable=False)
     lab_id = Column(String(64), nullable=True)
+    harvest_id = Column(String(64), nullable=True)
+    hive_id = Column(String(64), nullable=True)
+    collection_center_id = Column(String(64), nullable=True)
+    processing_id = Column(String(64), nullable=True)
     sample_code = Column(String(64), nullable=True)
     status = Column(String(32), default="PENDING")  # PENDING, TESTING, COMPLETED, REJECTED
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class LabReport(Base):

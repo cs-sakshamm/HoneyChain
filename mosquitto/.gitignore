@@ -1,8 +1,27 @@
+# Mosquitto persistence database & storage
+*.db
+data/
+mosquitto.db
+
+# Broker logs
 *.log
-node_modules/
+logs/
+
+# TLS / SSL credentials and password files
+certs/
+*.crt
+*.key
+*.pem
+pwfile
+aclfile
+
+# Environment files
 .env
+.env.*
+!.env.example
+
+# OS and Editor artifacts
 .DS_Store
-__pycache__/
-*.pyc
-.dart_tool/
-build/
+Thumbs.db
+.vscode/
+.idea/

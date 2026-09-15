@@ -1,4 +1,25 @@
-blockchain Integration Requirements
-- Must use unified entity IDs (batch_id, product_id, hive_id).
-- Must communicate via the central backend API (no direct DB/Blockchain connections unless designed as such).
-- Preserve state machine consistency across all modules.
+# ==============================================================================
+# HoneyChain Blockchain - Dependencies & Runtime Requirements
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Runtime & Compiler Environment
+# ------------------------------------------------------------------------------
+# Node.js: >= 18.0.0 LTS (with npm >= 9.0.0)
+# Solidity Compiler: ^0.8.20 (hardhat.config.js configured for 0.8.20+)
+# EVM Network: Ganache CLI / UI (v7.9+) or Hardhat Network (localhost:8545)
+
+# ------------------------------------------------------------------------------
+# 2. Package Dependencies (from blockchain/package.json)
+# ------------------------------------------------------------------------------
+# Core Development & Compilation Framework
+hardhat>=3.16.0,<4.0.0
+
+# Smart Contract Interface & Web3 Library
+ethers>=6.17.0,<7.0.0
+
+# Standalone Solidity Compiler
+solc>=0.8.20,<0.9.0
+
+# Local EVM Blockchain Emulator for Fast Testing
+ganache>=7.9.2,<8.0.0

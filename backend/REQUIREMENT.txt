@@ -1,4 +1,64 @@
-backend Integration Requirements
-- Must use unified entity IDs (batch_id, product_id, hive_id).
-- Must communicate via the central backend API (no direct DB/Blockchain connections unless designed as such).
-- Preserve state machine consistency across all modules.
+# ==============================================================================
+# HoneyChain Backend Dependencies (Python FastAPI & Node.js Subsystems)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Python FastAPI Backend Dependencies
+# ------------------------------------------------------------------------------
+# Framework & ASGI Server
+fastapi>=0.110.0,<1.0.0
+uvicorn[standard]>=0.28.0,<1.0.0
+
+# Data Validation & Serialization
+pydantic>=2.6.0,<3.0.0
+pydantic-settings>=2.2.0,<3.0.0
+
+# Relational Database & ORM
+sqlalchemy>=2.0.28,<3.0.0
+psycopg2-binary>=2.9.9,<3.0.0
+
+# Blockchain / Web3 Integration
+web3>=6.15.0,<7.0.0
+eth-account>=0.11.0,<1.0.0
+
+# IoT & MQTT Ingestion
+paho-mqtt>=2.0.0,<3.0.0
+
+# QR Code Generation & Imaging
+qrcode[pil]>=7.4.2,<8.0.0
+pillow>=10.2.0,<11.0.0
+
+# HTTP & WebSockets
+requests>=2.31.0,<3.0.0
+httpx>=0.27.0,<1.0.0
+websockets>=12.0,<13.0
+
+# Environment Management
+python-dotenv>=1.0.1,<2.0.0
+
+# Testing & Quality Assurance
+pytest>=8.0.0,<9.0.0
+pytest-asyncio>=0.23.0,<1.0.0
+
+# ------------------------------------------------------------------------------
+# 2. Node.js & TypeScript Subsystem Dependencies (from backend/package.json)
+# ------------------------------------------------------------------------------
+# Node Runtime: >=18.0.0 LTS
+#
+# Production Dependencies:
+#   @prisma/client: ^5.11.0
+#   cors: ^2.8.6
+#   dotenv: ^17.4.2
+#   ethers: ^6.17.0
+#   express: ^5.2.1
+#   prisma: ^5.11.0
+#   qrcode: ^1.5.4
+#
+# Development Dependencies:
+#   @types/cors: ^2.8.19
+#   @types/express: ^5.0.6
+#   @types/node: ^22.20.2
+#   @types/qrcode: ^1.5.6
+#   nodemon: ^3.1.14
+#   ts-node: ^10.9.2
+#   typescript: ^5.4.5

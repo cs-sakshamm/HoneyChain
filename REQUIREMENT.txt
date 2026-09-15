@@ -1,0 +1,68 @@
+# ==============================================================================
+# HoneyChain Ecosystem - System & Environment Requirements
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. System Runtime Requirements
+# ------------------------------------------------------------------------------
+# Operating System: Linux (Ubuntu 22.04+), macOS (12+), or Windows 10/11 (PowerShell/WSL2)
+# Python Runtime: Python 3.10 or 3.11 (3.11 recommended for AI/ML and FastAPI backend)
+# Node.js Runtime: Node.js >= 18.0.0 LTS (with npm >= 9.0.0)
+# Flutter SDK: Flutter >= 3.0.0 < 4.0.0 (Dart SDK >= 3.0.0 < 4.0.0)
+# Containerization: Docker 24.0+ & Docker Compose v2.20+
+# MQTT Broker: Eclipse Mosquitto >= 2.0.0 (running on port 1883)
+# Relational Database: SQLite 3 (development default) or PostgreSQL 16+ (Docker service)
+# Local Blockchain Node: Ganache CLI / UI (v7.9+) or Hardhat Network Node (RPC port 8545)
+
+# ------------------------------------------------------------------------------
+# 2. Subsystem Quick Reference
+# ------------------------------------------------------------------------------
+
+# [Backend - FastAPI & Python Microservices]
+# Refer to backend/REQUIREMENT.txt for complete specification:
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+sqlalchemy>=2.0.28
+web3>=6.15.0
+paho-mqtt>=2.0.0
+qrcode[pil]>=7.4.2
+pillow>=10.2.0
+python-dotenv>=1.0.1
+psycopg2-binary>=2.9.9
+requests>=2.31.0
+pytest>=8.0.0
+
+# [Backend - TypeScript / Express Service (KYC & Auth)]
+# Refer to backend/package.json:
+# - express: ^5.2.1
+# - @prisma/client: ^5.11.0
+# - prisma: ^5.11.0
+# - ethers: ^6.17.0
+# - typescript: ^5.4.5
+
+# [Mobile Application - Flutter & Dart]
+# Refer to mobile_app/REQUIREMENT.txt and mobile_app/pubspec.yaml:
+# - Flutter SDK: >=3.0.0 <4.0.0
+# - provider: ^6.1.2
+# - firebase_auth: ^5.5.1
+# - qr_flutter: ^4.1.0
+# - http: ^1.6.0
+# - shared_preferences: ^2.5.5
+
+# [Blockchain - Smart Contracts & Hardhat]
+# Refer to blockchain/REQUIREMENT.txt and blockchain/package.json:
+# - Solidity: ^0.8.20
+# - hardhat: ^3.16.0
+# - ethers: ^6.17.0
+# - ganache: ^7.9.2
+# - solc: ^0.8.37
+
+# [IoT & Edge Telemetry - ESP32 Firmware]
+# Refer to iot/REQUIREMENT.txt:
+# - Espressif ESP32 Dev Module (ESP-WROOM-32)
+# - Arduino IDE 2.x / PlatformIO
+# - PubSubClient library (v2.8+)
+# - ArduinoJson library (v6.x/7.x)
+# - DHT sensor library & Adafruit Unified Sensor
+# - HX711 library (by bogde)

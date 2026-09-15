@@ -9,7 +9,7 @@ import io
 import os
 import qrcode
 
-BASE_URL = os.getenv("PUBLIC_APP_URL", "http://127.0.0.1:3000")
+BASE_URL = os.getenv("PUBLIC_APP_URL", "http://127.0.0.1:8000")
 
 
 def generate_qr_data_uri(batch_id: str) -> tuple[str, str]:

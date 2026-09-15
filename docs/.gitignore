@@ -1,0 +1,12 @@
+# Documentation build outputs
+site/
+_site/
+.docusaurus/
+build/
+
+# Temporary and editor files
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

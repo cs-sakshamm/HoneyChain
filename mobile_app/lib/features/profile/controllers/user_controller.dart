@@ -682,7 +682,7 @@ class UserController extends ChangeNotifier {
     required String currentPassword,
     required String newPassword,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
+    // Backend API logic goes here
     return true;
   }
 

@@ -1,8 +1,59 @@
+# Miscellaneous
+*.class
 *.log
-node_modules/
-.env
-.DS_Store
-__pycache__/
 *.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+.idea/
+.idea_modules/
+
+# Visual Studio Code
+.vscode/
+
+# Flutter / Dart specific
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
 build/
+
+# Android Studio / Android specific
+android/.gradle/
+android/local.properties
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/gradle/wrapper/gradle-wrapper.jar
+**/android/app/release/
+**/android/app/debug/
+.cxx/
+
+# iOS / Xcode specific
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/ephemeral/
+ios/.symlinks/
+ios/Pods/
+ios/Podfile.lock
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+
+# Environment files
+.env
+.env.*
+!.env.example
