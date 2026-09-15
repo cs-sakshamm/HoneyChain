@@ -193,7 +193,6 @@ class AuthController extends ChangeNotifier {
           if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
           if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
         }
-        _isDemoMode = true;
         _status = AuthStateStatus.authenticated;
         notifyListeners();
         return;
@@ -269,7 +268,6 @@ class AuthController extends ChangeNotifier {
           if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
           if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
         }
-        _isDemoMode = true;
         _status = AuthStateStatus.authenticated;
         notifyListeners();
         return;

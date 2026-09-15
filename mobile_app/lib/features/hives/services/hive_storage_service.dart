@@ -81,7 +81,10 @@ class HiveStorageService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return Hive.fromJson(data);
+        final hiveMap = (data['hive'] is Map<String, dynamic>)
+            ? data['hive'] as Map<String, dynamic>
+            : data;
+        return Hive.fromJson(hiveMap);
       } else {
         debugPrint('[HiveStorageService] Backend create rejected: ${response.statusCode} - ${response.body}');
       }

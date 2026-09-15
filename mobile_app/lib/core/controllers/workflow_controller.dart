@@ -315,7 +315,7 @@ class WorkflowController extends ChangeNotifier {
 
       if (harvestRes.statusCode == 200 || harvestRes.statusCode == 201) {
         final data = json.decode(harvestRes.body);
-        final batchId = data['batch']?['id'];
+        final batchId = data['batchId'] ?? data['batch']?['id'] ?? data['batch']?['batch_id'] ?? data['id'];
 
         if (batchId != null) {
           // Step 2: Create Workflow Request targeting specific collection center

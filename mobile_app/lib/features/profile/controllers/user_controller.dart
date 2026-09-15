@@ -399,8 +399,8 @@ class UserController extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['success'] == true && data['profile'] != null) {
-          final p = data['profile'];
+        final p = data['profile'] ?? data['user'];
+        if (data['success'] == true && p != null) {
           _user = UserProfile(
             id: p['id'] ?? _user.id,
             name: p['name'] ?? _user.name,
