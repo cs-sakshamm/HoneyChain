@@ -40,11 +40,13 @@ from backend.models import (
     HiveTelemetry,
     HiveAIAnalysis,
     HiveAlert,
+    Harvest,
     CollectionCentre,
     CollectionRequest,
     CollectionBatch,
     ProcessingBatch,
     Lab,
+    PackagingFacility,
     LabRequest,
     LabReport,
     PackagingBatch,
@@ -91,18 +93,88 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing HoneyChain Database and Models...")
     init_db()
 
-    # Seed default collection centers if empty
+    # Seed default verified entities if empty
     db = SessionLocal()
     try:
         if db.query(CollectionCentre).count() == 0:
             centers = [
-                CollectionCentre(name="Central Sahyadri Honey Extraction & Processing Hub", location="Mahabaleshwar Apiary Zone, MH", latitude=17.9307, longitude=73.6477, contact_phone="+91 98230 11223"),
-                CollectionCentre(name="Cascade Range Regional Collection Centre", location="Bend Industrial Center, OR", latitude=44.0582, longitude=-121.3153, contact_phone="+1 541 555 0192"),
-                CollectionCentre(name="Western Ghats Cooperative Extraction Facility", location="Shimoga Eco Zone, KA", latitude=13.9299, longitude=75.5681, contact_phone="+91 94481 33445"),
+                CollectionCentre(name="Central Sahyadri Honey Extraction & Processing Hub", location="Mahabaleshwar Apiary Zone, MH", latitude=17.9307, longitude=73.6477, contact_phone="+91 98230 11223", contact_email="contact@sahyadrihoney.org", license_number="FSSAI-MH-2026-0041"),
+                CollectionCentre(name="Cascade Range Regional Collection Centre", location="Bend Industrial Center, OR", latitude=44.0582, longitude=-121.3153, contact_phone="+1 541 555 0192", contact_email="intake@cascadeprocessing.com", license_number="USDA-OR-99120"),
+                CollectionCentre(name="Western Ghats Cooperative Extraction Facility", location="Shimoga Eco Zone, KA", latitude=13.9299, longitude=75.5681, contact_phone="+91 94481 33445", contact_email="ghats.coop@honeychain.io", license_number="FSSAI-KA-2026-0089"),
             ]
             db.add_all(centers)
             db.commit()
             logger.info("Seeded initial collection centres.")
+
+        # Seed Lab user & facility
+        lab_user = db.query(User).filter(User.role == "LAB").first()
+        if not lab_user:
+            lab_user = User(
+                name="National Apiculture & Food Safety Analytical Laboratory",
+                email="lab.director@honeychain.io",
+                role="LAB",
+                phone="+91 20 2569 1100",
+                organization_name="National Apiculture Analytical Centre",
+                facility_location="Pune Agri-Tech Park, MH",
+                license_number="NABL-ISO-17025-2026",
+                is_verified=True,
+            )
+            db.add(lab_user)
+            db.commit()
+            db.refresh(lab_user)
+
+        if db.query(Lab).count() == 0:
+            labs = [
+                Lab(
+                    user_id=lab_user.id,
+                    lab_name="National Apiculture & Food Safety Analytical Laboratory",
+                    facility_location="Pune Agri-Tech Park, MH",
+                    latitude=18.5204,
+                    longitude=73.8567,
+                    contact_phone="+91 20 2569 1100",
+                    contact_email="testing@apiculturelab.gov.in",
+                    registration_number="NABL-TC-8891",
+                    accreditation="NABL / FSSAI / ISO 17025 Certified",
+                ),
+            ]
+            db.add_all(labs)
+            db.commit()
+            logger.info("Seeded initial accredited testing labs.")
+
+        # Seed Packaging facilities
+        if db.query(PackagingFacility).count() == 0:
+            facilities = [
+                PackagingFacility(
+                    name="Mahabaleshwar Pure Honey Bottling & Cleanroom Packaging Unit",
+                    location="Mahabaleshwar Industrial Area, MH",
+                    latitude=17.9250,
+                    longitude=73.6550,
+                    contact_phone="+91 98230 44556",
+                    contact_email="bottling@sahyadripure.org",
+                    license_number="FSSAI-PKG-1152026",
+                ),
+                PackagingFacility(
+                    name="Cascade Range Automated Bottling & Digital QR Packaging Facility",
+                    location="Bend Logistics Park, OR",
+                    latitude=44.0600,
+                    longitude=-121.3100,
+                    contact_phone="+1 541 555 0872",
+                    contact_email="packaging@cascadepack.com",
+                    license_number="OR-FDA-PKG-9821",
+                ),
+                PackagingFacility(
+                    name="Western Ghats Certified Honey Packaging Centre",
+                    location="Shimoga Packaging Depot, KA",
+                    latitude=13.9350,
+                    longitude=75.5720,
+                    contact_phone="+91 94481 77889",
+                    contact_email="packaging@westernghatshoney.com",
+                    license_number="FSSAI-PKG-1152089",
+                ),
+            ]
+            db.add_all(facilities)
+            db.commit()
+            logger.info("Seeded initial packaging facilities.")
     finally:
         db.close()
 
@@ -426,7 +498,13 @@ def get_profile(userId: Optional[str] = None, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
 
-    return {"success": True, "user": get_user_dict(user)}
+    user_dict = get_user_dict(user)
+    return {
+        "success": True,
+        "user": user_dict,
+        "profile": user_dict,
+        "isProfileComplete": user_dict.get("isProfileComplete", True),
+    }
 
 
 @app.put("/api/profile")
@@ -455,7 +533,14 @@ def update_profile(payload: ProfileUpdateRequest, db: Session = Depends(get_db))
 
     db.commit()
     db.refresh(user)
-    return {"success": True, "message": "Profile updated successfully.", "user": get_user_dict(user)}
+    user_dict = get_user_dict(user)
+    return {
+        "success": True,
+        "message": "Profile updated successfully.",
+        "user": user_dict,
+        "profile": user_dict,
+        "isProfileComplete": user_dict.get("isProfileComplete", True),
+    }
 
 
 # ============================================================
@@ -539,7 +624,13 @@ def create_hive(payload: HiveCreateRequest, req: Request, db: Session = Depends(
     db.add(hive)
     db.commit()
     db.refresh(hive)
-    return {"success": True, "message": "Hive registered successfully.", "hive": get_hive_dict(hive)}
+    hive_dict = get_hive_dict(hive)
+    return {
+        "success": True,
+        "message": "Hive registered successfully.",
+        "hive": hive_dict,
+        **hive_dict,
+    }
 
 
 @app.get("/api/hives/{hive_id}")
