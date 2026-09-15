@@ -45,3 +45,21 @@ build/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# ML model files
+*.joblib
+*.pt
+*.pth
+
+# Large generated datasets
+*.csv

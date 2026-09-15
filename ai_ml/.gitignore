@@ -1,0 +1,23 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+
+# Node
+node_modules/
+
+# Generated ML files
+*.joblib
+*.pt
+*.pth
+
+# Large datasets
+*.csv

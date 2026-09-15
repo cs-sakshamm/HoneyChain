@@ -1,0 +1,10 @@
+paho-mqtt
+pandas
+numpy
+scikit-learn
+joblib
+pydantic
+python-dotenv
+matplotlib
+seaborn
+torch
