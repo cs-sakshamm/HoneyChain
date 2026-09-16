@@ -190,10 +190,14 @@ class AuthController extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         if (data['token'] != null) {
           await prefs.setString('auth_token', data['token']);
+          AuthTokenStore.set(token: data['token']);
         }
         if (data['user'] != null) {
           final u = data['user'];
-          if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
+          if (u['id'] != null) {
+            await prefs.setString('user_profile_id', u['id']);
+            AuthTokenStore.set(userId: u['id']);
+          }
           if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
           if (u['email'] != null) await prefs.setString('user_profile_email', u['email']);
           if (u['phone'] != null) await prefs.setString('user_profile_phone', u['phone']);
@@ -268,10 +272,14 @@ class AuthController extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         if (data['token'] != null) {
           await prefs.setString('auth_token', data['token']);
+          AuthTokenStore.set(token: data['token']);
         }
         if (data['user'] != null) {
           final u = data['user'];
-          if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
+          if (u['id'] != null) {
+            await prefs.setString('user_profile_id', u['id']);
+            AuthTokenStore.set(userId: u['id']);
+          }
           if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
           if (u['email'] != null) await prefs.setString('user_profile_email', u['email']);
           if (u['phone'] != null) await prefs.setString('user_profile_phone', u['phone']);
@@ -363,9 +371,16 @@ class AuthController extends ChangeNotifier {
 
             if (response.statusCode == 200) {
               final data = jsonDecode(response.body);
+              if (data['token'] != null) {
+                await prefs.setString('auth_token', data['token']);
+                AuthTokenStore.set(token: data['token']);
+              }
               if (data['user'] != null) {
                 final u = data['user'];
-                if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
+                if (u['id'] != null) {
+                  await prefs.setString('user_profile_id', u['id']);
+                  AuthTokenStore.set(userId: u['id']);
+                }
                 if (u['beekeeperId'] != null) await prefs.setString('user_profile_beekeeper_id', u['beekeeperId']);
                 if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
                 if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
@@ -479,6 +494,7 @@ class AuthController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('user_profile_id');
+    AuthTokenStore.clear();
     _currentUser = null;
     _selectedRole = null;
     _status = AuthStateStatus.idle;
