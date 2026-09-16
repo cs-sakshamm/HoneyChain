@@ -81,3 +81,7 @@ legacy/express_backend_node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Logs and Secrets
+*.log
+secrets/

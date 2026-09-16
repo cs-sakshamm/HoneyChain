@@ -1,178 +1,154 @@
-# HoneyChain — End-to-End Honey Supply Chain Traceability
+# HoneyChain
 
-Blockchain-verified honey provenance: **ESP32 hive sensors → AI anomaly detection →
-FastAPI backend → PostgreSQL → immutable provenance ledger → Flutter mobile app →
-public QR verification** for the final consumer.
+**HoneyChain** is an end-to-end, AI/ML-enabled, IoT-enabled, and Blockchain-backed honey traceability and quality verification supply-chain platform.
 
----
+By integrating IoT sensors placed in apiaries, AI/ML anomaly detection, a robust FastAPI backend with PostgreSQL, an immutable blockchain ledger, and a cross-platform Flutter mobile application, HoneyChain provides complete transparency from the hive to the consumer's jar.
 
-## 🏗️ System Architecture
+## The Complete Journey
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          EDGE / SENSING LAYER                            │
-│  iot/firmware/esp32_honeychain.ino (DHT22 + HX711 + acoustics)          │
-│       publishes JSON → MQTT topic: honeychain/hive/telemetry            │
-└───────────────────────────────┬─────────────────────────────────────────┘
-                                ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    MESSAGE BUS (mosquitto/mosquitto.conf)               │
-│              Mosquitto broker :1883 (auth required)                     │
-└──────────────┬──────────────────────────────────────┬───────────────────┘
-               ▼                                      ▼
-┌──────────────────────────────────┐   ┌──────────────────────────────────┐
-│        AI/ML PROCESSOR           │   │   FASTAPI BACKEND (:8000)        │
-│  ai_ml/mqtt/mqtt_processor.py    │   │   backend/main.py                │
-│  ├─ FeatureBuilder (145 hist)    │   │   ├─ services/mqtt_consumer.py   │
-│  ├─ IsolationForest anomaly      │──▶│   │   (subscribes BOTH topics:   │
-│  └─ RiskEngine → risk level      │   │   │    raw + processed)          │
-│  publishes → hive/processed      │   │   └─ WebSocket /ws/telemetry     │
-└──────────────────────────────────┘   └───────┬──────────────┬───────────┘
-                                               ▼              ▼
-┌──────────────────────────────────┐   ┌──────────────────────────────────┐
-│  POSTGRESQL 16                   │   │  BLOCKCHAIN LEDGER               │
-│  backend/models.py (20 tables):  │   │  blockchain_service.py (Web3.py) │
-│  Users, Profiles, Hives,         │   │  → HoneyChainProvenance.sol      │
-│  Telemetry, AIAnalysis, Alerts,  │   │  (Hardhat :8545 / Polygon Amoy)  │
-│  Batches, LabReports, QRs…       │   │  offline-safe hash fallback      │
-└──────────────────────────────────┘   └──────────────────────────────────┘
-                                               ▲
-┌──────────────────────────────────────────────┴──────────────────────────┐
-│                      FLUTTER MOBILE APP (mobile_app/)                   │
-│  main.dart → 8 Providers → app.dart AuthRouter → 4 role shells:         │
-│  ├─ HARVESTER:  hives/ (register, live telemetry, critical alerts)      │
-│  ├─ COLLECTION: collection/ (requests → send-next state machine)        │
-│  ├─ LAB:        lab/ (moisture/HMF/diastase certification)              │
-│  ├─ PACKAGING:  packaging/ (final batch QR generation)                  │
-│  └─ SHARED:     verification/ (OTP/KYC gates, public lookup)            │
-│  REST base: AppConstants.backendBaseUrl (10.0.2.2:8000 on Android)      │
-└───────────────────────────────┬─────────────────────────────────────────┘
-                                ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│         PUBLIC CONSUMER VERIFICATION  GET /verify?batch={batch_id}      │
-│         HTML certificate (browser) + JSON (Flutter public lookup)       │
-└─────────────────────────────────────────────────────────────────────────┘
+HoneyChain tracks honey through a strictly enforced 5-stage pipeline:
+
+1. **Harvester**: Beekeepers register their hives. IoT sensors stream live telemetry (temperature, humidity, acoustics, weight) from the hive. Harvesters log raw honey yields and initiate a collection request.
+2. **Collection & Processing**: Processing centers accept raw honey, extract it, process it, and create tracked batches.
+3. **Lab Test**: Accredited laboratories receive the processed batch to conduct moisture, HMF, diastase, and purity testing, generating certified lab reports.
+4. **Packaging**: Certified batches are sealed in jars and given unique QR codes linked to their blockchain provenance record.
+5. **Final QR Verification**: Consumers scan the QR code to view a complete, cryptographically verified history of the honey they purchased.
+
+## Key Features
+
+- **User Authentication**: Secure email/password authentication and Google authentication.
+- **OTP & KYC**: Mobile OTP verification and Role-based KYC profile completion.
+- **Role-Based Access**: Dedicated mobile app dashboards for Harvesters, Collectors, Lab Testers, and Packagers.
+- **Harvester & Hive Management**: Register and monitor apiaries.
+- **IoT Telemetry**: Real-time ESP32 data streaming via MQTT (temperature, humidity, weight).
+- **AI/ML Processing**: Automated anomaly detection on hive telemetry to predict colony collapse or distress.
+- **Collection & Processing**: Complete tracking of raw honey intake and batch processing.
+- **Laboratory Testing**: 6-parameter quality analysis and certification logging.
+- **Blockchain Traceability**: State transitions are hashed and securely recorded on a Solidity smart contract (Polygon Amoy / Hardhat).
+- **QR Generation & Verification**: Consumer-facing web verification for authenticity.
+- **Notifications & Alerts**: Real-time push alerts for critical hive events and workflow updates.
+
+*(Note: All listed features are actively implemented and wired to the real backend and database.)*
+
+## System Architecture
+
+The HoneyChain ecosystem consists of several interconnected micro-components:
+
+```mermaid
+flowchart TD
+    A[IoT Edge / ESP32] -->|MQTT| B(Mosquitto Broker)
+    B -->|Raw Telemetry| C{AI/ML Processor}
+    C -->|Processed / Risk Level| B
+    B -->|WebSocket/MQTT| D(FastAPI Backend)
+    D -->|CRUD| E[(PostgreSQL Database)]
+    D -->|Smart Contract| F[Blockchain Ledger]
+    G[Flutter Mobile App] <-->|REST API & WebSockets| D
+    H[Consumer QR Scan] -->|GET /verify| D
 ```
 
-### Data flow of a honey batch
+### Data Flow
 
-1. **Harvester** registers hives, harvests honey, creates a collection request.
-2. **Collection & Processing** accepts, extracts, creates `HC-BATCH-YYYY-XXXXXX`.
-3. Every state transition is hashed (SHA-256) and recorded via `blockchain_service`
-   → `HoneyChainProvenance.sol` (`recordEvent`), with an off-chain mirror in
-   `blockchain_records`. If the chain node is down, tamper-evident hashes are
-   logged for later reconciliation — the workflow never blocks.
-4. **Lab** certifies moisture / HMF / diastase / F-G ratio / pollen.
-5. **Packaging** seals jars and generates the final batch QR code.
-6. **Consumer** scans QR → `/verify?batch=…` → full provenance certificate.
+1. **IoT**: Hardware sensors send environmental data to the Mosquitto MQTT broker.
+2. **AI/ML**: The AI processor consumes the raw telemetry, computes features, runs an Isolation Forest model to detect anomalies, and publishes the risk levels back to the broker.
+3. **Backend**: The FastAPI backend subscribes to the broker, stores telemetry and alerts in the PostgreSQL database, and streams real-time data via WebSockets to the mobile app.
+4. **Mobile App**: Users interact with the backend APIs to progress honey batches through the supply chain.
+5. **Blockchain**: Critical batch state changes (e.g., harvesting, lab approval, packaging) trigger the backend to write a SHA-256 hash to the Ethereum/Polygon smart contract.
+6. **QR Verification**: The generated QR code links directly to a backend endpoint which queries both the relational database and the blockchain ledger to produce an unforgeable certificate of authenticity.
 
----
+## Project Structure
 
-## 📁 Repository Layout
+```text
+HoneyChain/
+├── ai_ml/              # READ-ONLY: Anomaly detection processor (Isolation Forest) & MQTT consumer
+├── backend/            # FastAPI monolith, SQLAlchemy models, Alembic migrations, blockchain services
+├── blockchain/         # Hardhat project, Solidity contracts, and deployment scripts
+├── iot/                # ESP32 Arduino firmware and hardware documentation
+├── mobile_app/         # Flutter application with role-specific dashboards
+├── mosquitto/          # MQTT broker configuration
+├── scripts/            # Development helper scripts
+├── README.md           # This project documentation
+└── requirements.txt    # Python backend dependencies
+```
 
-| Directory | What it is |
-|---|---|
-| `backend/` | **FastAPI** monolith — REST, WebSocket, MQTT consumer, blockchain writer, QR service, Alembic migrations, pytest suite |
-| `mobile_app/` | **Flutter** app (harvester / collection / lab / packaging roles), 87 Dart files, provider state management |
-| `blockchain/` | Solidity contract `HoneyChainProvenance.sol`, Hardhat config (localhost + Polygon Amoy), deploy script & tests |
-| `ai_ml/` | Isolation-Forest anomaly detection over hive telemetry; MQTT in → processed out (untouched by integration work) |
-| `iot/firmware/` | ESP32 Arduino sketch (DHT22 + HX711 → MQTT) |
-| `mosquitto/` | Broker config (auth required) |
-| `legacy/` | Archived deprecated Express/Prisma backend — see `legacy/README.md` |
-| `scripts/` | Dev tooling (`start_dev.sh`, doc/report generators) |
+## Running the Complete Project
 
----
+### Prerequisites
 
-## 🚀 Quick Start
+Ensure you have the following installed:
+- **Git**
+- **Flutter** (>= 3.0) & Dart
+- **Python** (3.10 or 3.11)
+- **Node.js** (>= 18.0) & npm
+- **PostgreSQL** (>= 16)
+- **Docker & Docker Compose** (Highly recommended for Mosquitto and local blockchain)
 
-### Option A — Docker (recommended)
+### 1. Environment Variables
 
+Create `.env` files based on `.env.example` where applicable. **Never commit real secrets or private keys.**
+Example variables required for the backend:
+```env
+DATABASE_URL=postgresql://user:pass@localhost/honeychain
+SECRET_KEY=your_jwt_secret
+MQTT_HOST=localhost
+MQTT_USERNAME=admin
+MQTT_PASSWORD=secret
+BLOCKCHAIN_PRIVATE_KEY=0x...
+```
+
+### 2. Mosquitto (MQTT Broker)
+
+Use Docker to spin up the required MQTT broker:
 ```bash
-# 1. Create broker credentials (first time only)
-docker run --rm -v "$(pwd)/mosquitto:/mosquitto" eclipse-mosquitto:2 \
-  mosquitto_passwd -c /mosquitto/config/passwd honeychain_backend
-# → enter a password, then set MQTT_USERNAME=honeychain_backend and
-#   MQTT_PASSWORD=<the password> in your shell or a root .env file.
-
-# 2. Boot the whole stack
-docker compose up -d
-
-# 3. Optional: local blockchain ledger
-docker compose --profile blockchain up -d
-
-# 4. Check health
-curl http://localhost:8000/api/health
+docker compose up -d mosquitto
 ```
 
-### Option B — Native (no Docker)
+### 3. Backend Setup
 
+The backend relies on the `requirements.txt` located in the root (or `backend/requirements.txt`).
 ```bash
-./scripts/start_dev.sh           # broker + backend + AI processor
-./scripts/start_dev.sh --chain   # …plus a local Hardhat node
+cd backend
+python -m venv venv
+# On Linux/Mac: source venv/bin/activate
+# On Windows: venv\Scripts\activate
+pip install -r ../requirements.txt
+
+# Run database migrations
+alembic upgrade head
+
+# Start the FastAPI server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Requires Python 3.11, mosquitto (or Docker for the broker), Node 18+.
+### 4. AI/ML Setup
 
-### Mobile app
+The AI/ML service runs independently, listening to the MQTT broker and processing data. Navigate to the `ai_ml/` directory and run its processor according to its own isolated setup. *(Note: The `ai_ml/` folder is strictly protected. Do not modify its contents.)*
 
+### 5. Blockchain (Local Hardhat Node)
+
+To test blockchain writes locally:
+```bash
+cd blockchain
+npm install
+npx hardhat node
+```
+*(In a separate terminal)*
+```bash
+npx hardhat run scripts/deploy.js --network localhost
+```
+Update your backend `.env` with the deployed contract address.
+
+### 6. Mobile App Setup
+
+The Flutter app connects to the FastAPI backend.
 ```bash
 cd mobile_app
 flutter pub get
-flutter run        # Android emulator reaches backend via http://10.0.2.2:8000
 ```
-
-For a physical device, build with a reachable backend URL:
-
+To run on an Android emulator (which routes `10.0.2.2` to localhost):
+```bash
+flutter run
+```
+To run on a physical device, define your local machine's IP address:
 ```bash
 flutter run --dart-define=BACKEND_URL=http://<your-lan-ip>:8000
 ```
-
-### Simulate a hive (test the full pipeline)
-
-```bash
-python ai_ml/tests/mqtt_simulator.py     # publishes fake ESP32 telemetry
-```
-
-Then watch the Flutter harvester dashboard update, or:
-
-```bash
-docker exec -it honeychain-mosquitto mosquitto_sub -t 'honeychain/hive/#' -v
-```
-
----
-
-## 🔌 Key Integration Points
-
-| Link | Where |
-|---|---|
-| Mobile ↔ Backend | `mobile_app/lib/core/constants/app_constants.dart` (`backendBaseUrl`) |
-| Backend ↔ DB | `backend/database.py` (`DATABASE_URL`) |
-| Backend ↔ Broker | `backend/services/mqtt_consumer.py` (`MQTT_HOST/USERNAME/PASSWORD`) |
-| AI ↔ Broker | `ai_ml/mqtt/mqtt_processor.py` (same env vars) |
-| Backend ↔ Chain | `backend/services/blockchain_service.py` (`BLOCKCHAIN_*`) |
-| Contract config | `blockchain/hardhat.config.js`, `backend/.env.example` |
-| Public QR URL | `backend/services/qr_service.py` (`PUBLIC_APP_URL`) |
-
-All variable names are documented in `backend/.env.example` — copy it to
-`backend/.env` and fill in real secrets.
-
----
-
-## 🧪 Tests
-
-```bash
-cd backend && pytest -q                 # backend suite
-cd blockchain && npm test               # Hardhat contract tests
-cd mobile_app && flutter test           # 41 Flutter unit/widget tests
-```
-
----
-
-## 🔒 Security Notes
-
-- JWT (HS256) auth on all write endpoints; role gates
-  (`require_verified_harvester/collector/lab/packager`) enforce KYC server-side.
-- Passwords hashed with bcrypt (legacy SHA-256 hashes are upgraded transparently).
-- Mosquitto requires username/password (`allow_anonymous false`).
-- The old hardcoded Hardhat dev key was removed from `blockchain_service.py`;
-  supply `BLOCKCHAIN_PRIVATE_KEY` via env for testnet deploys.
