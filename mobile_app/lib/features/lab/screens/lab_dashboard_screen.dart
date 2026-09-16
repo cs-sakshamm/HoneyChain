@@ -10,6 +10,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../collection/screens/nearest_centres_screen.dart';
@@ -214,33 +215,16 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
     bool showSendToPackaging = false,
   }) {
     if (samples.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.science_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
-            const SizedBox(height: AppConstants.space16),
-            Text(
-              emptyTitle,
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimaryColor,
-              ),
-            ),
-            const SizedBox(height: AppConstants.space8),
-            Text(
-              emptySubtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
-            ),
-          ],
-        ),
+      return EmptyStateWidget(
+        title: emptyTitle,
+        subtitle: '> No data available yet.',
+        icon: Icons.science_outlined,
       );
     }
 
     final verCtrl = context.watch<VerificationController>();
-    final isFullyVerified = verCtrl.labVerification.isFullyVerified;
+    final userCtrl = context.watch<UserController>();
+    final isFullyVerified = verCtrl.labVerification.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
 
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
@@ -462,9 +446,10 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
 
   Widget _buildVerificationBanner(BuildContext context, int count, bool isVerified) {
     final verCtrl = context.watch<VerificationController>();
+    final userCtrl = context.watch<UserController>();
     final labVer = verCtrl.labVerification;
-    final isFullyVerified = labVer.isFullyVerified;
-    final int completedCount = labVer.completedStepsCount;
+    final isFullyVerified = labVer.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
+    final int completedCount = isFullyVerified ? 3 : labVer.completedStepsCount;
     final double progress = (completedCount / 3.0).clamp(0.0, 1.0);
     final int percentage = (progress * 100).round();
     final isDark = Theme.of(context).brightness == Brightness.dark;

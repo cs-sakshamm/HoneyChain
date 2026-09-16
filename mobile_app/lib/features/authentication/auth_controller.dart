@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -68,7 +67,6 @@ class AuthController extends ChangeNotifier {
   String? _errorMessage;
   String? _infoMessage;
   User? _currentUser;
-  bool _isDemoMode = false;
   String? _resetToken;
 
   // Role State
@@ -90,14 +88,8 @@ class AuthController extends ChangeNotifier {
   }
 
   static String _resolveBaseUrl() {
-    if (kIsWeb) {
-      return AppConstants.backendBaseUrl;
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000';
-      }
-    } catch (_) {}
+    // Works on web, Android emulator (10.0.2.2), and physical devices
+    // (override with --dart-define=BACKEND_URL=...).
     return AppConstants.backendBaseUrl;
   }
 
@@ -115,7 +107,7 @@ class AuthController extends ChangeNotifier {
   User? get currentUser => _currentUser;
   String? get resetToken => _resetToken;
   bool get isAuthenticated =>
-      _currentUser != null || (_isDemoMode && _status == AuthStateStatus.authenticated);
+      _currentUser != null || _status == AuthStateStatus.authenticated;
   bool get isPasswordVisible => _isPasswordVisible;
   UserRole? get selectedRole => _selectedRole;
 
@@ -183,9 +175,12 @@ class AuthController extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final prefs = await SharedPreferences.getInstance();
+        if (data['token'] != null) {
+          await prefs.setString('auth_token', data['token']);
+        }
         if (data['user'] != null) {
           final u = data['user'];
-          final prefs = await SharedPreferences.getInstance();
           if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
           if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
           if (u['email'] != null) await prefs.setString('user_profile_email', u['email']);
@@ -194,7 +189,6 @@ class AuthController extends ChangeNotifier {
           if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
           if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
         }
-        _isDemoMode = true;
         _status = AuthStateStatus.authenticated;
         notifyListeners();
         return;
@@ -259,9 +253,12 @@ class AuthController extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
+        final prefs = await SharedPreferences.getInstance();
+        if (data['token'] != null) {
+          await prefs.setString('auth_token', data['token']);
+        }
         if (data['user'] != null) {
           final u = data['user'];
-          final prefs = await SharedPreferences.getInstance();
           if (u['id'] != null) await prefs.setString('user_profile_id', u['id']);
           if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
           if (u['email'] != null) await prefs.setString('user_profile_email', u['email']);
@@ -270,7 +267,6 @@ class AuthController extends ChangeNotifier {
           if (u['bsid'] != null) await prefs.setString('user_profile_bsid', u['bsid']);
           if (u['bspPass'] != null) await prefs.setString('user_profile_bsp_pass', u['bspPass']);
         }
-        _isDemoMode = true;
         _status = AuthStateStatus.authenticated;
         notifyListeners();
         return;
@@ -314,12 +310,7 @@ class AuthController extends ChangeNotifier {
     try {
       final credential = await _authService.signInWithGoogle();
       if (credential == null) {
-        if (!_authService.isFirebaseInitialized) {
-          _isDemoMode = true;
-          _status = AuthStateStatus.authenticated;
-        } else {
-          _status = AuthStateStatus.idle;
-        }
+        _status = AuthStateStatus.idle;
       } else {
         _currentUser = credential.user;
         _status = AuthStateStatus.authenticated;
@@ -378,26 +369,16 @@ class AuthController extends ChangeNotifier {
         }
       }
     } catch (e) {
-      if (kIsWeb) {
-        _isDemoMode = true;
-        _status = AuthStateStatus.authenticated;
-      } else {
-        _status = AuthStateStatus.error;
-        _errorMessage = 'Unable to complete Google authentication.';
-      }
+      _status = AuthStateStatus.error;
+      _errorMessage = 'Unable to complete Google authentication.';
     }
     notifyListeners();
   }
 
   /// Apple Sign-In
   Future<void> signInWithApple() async {
-    _status = AuthStateStatus.authenticating;
-    _errorMessage = null;
-    notifyListeners();
-
-    await Future.delayed(const Duration(milliseconds: 500));
-    _isDemoMode = true;
-    _status = AuthStateStatus.authenticated;
+    _status = AuthStateStatus.error;
+    _errorMessage = 'Apple Sign-In is not currently supported.';
     notifyListeners();
   }
 
@@ -484,7 +465,6 @@ class AuthController extends ChangeNotifier {
   Future<void> signOut() async {
     await _authService.signOut();
     _currentUser = null;
-    _isDemoMode = false;
     _selectedRole = null;
     _status = AuthStateStatus.idle;
     _mode = AuthMode.login;

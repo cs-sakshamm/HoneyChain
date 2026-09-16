@@ -221,7 +221,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                         ? 'Custom Avatar'
                                         : (user.googlePhotoUrl != null && user.googlePhotoUrl!.isNotEmpty
                                             ? 'Google Profile Picture'
-                                            : 'Initials Placeholder'),
+                                            : 'Default Initials'),
                                     style: GoogleFonts.manrope(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,

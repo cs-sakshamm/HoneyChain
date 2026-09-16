@@ -38,8 +38,8 @@ class HiveAlertModel {
     return HiveAlertModel(
       id: json['id']?.toString() ?? '',
       hiveId: json['hiveId']?.toString() ?? '',
-      hiveCode: json['hiveCode']?.toString() ?? 'HIVE-001',
-      parameter: json['parameter']?.toString() ?? 'Temperature',
+      hiveCode: json['hiveCode']?.toString() ?? '',
+      parameter: json['parameter']?.toString() ?? '',
       previousValue: json['previousValue']?.toString() ?? '',
       currentValue: json['currentValue']?.toString() ?? '',
       changeValue: json['changeValue']?.toString() ?? '',

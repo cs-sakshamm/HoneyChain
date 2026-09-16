@@ -10,6 +10,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../profile/controllers/user_controller.dart';
@@ -235,9 +236,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
     final completedBatches = controller.packagingCompletedRequests;
 
     final verCtrl = context.watch<VerificationController>();
+    final userCtrl = context.watch<UserController>();
     final packagingVer = verCtrl.packagingVerification;
-    final isFullyVerified = packagingVer.isFullyVerified;
-    final completedCount = packagingVer.completedStepsCount;
+    final isFullyVerified = packagingVer.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
+    final completedCount = isFullyVerified ? 3 : packagingVer.completedStepsCount;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -368,28 +370,10 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
     bool showViewQr = false,
   }) {
     if (batches.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inventory_2_outlined, size: 64, color: context.textMutedColor.withValues(alpha: 0.5)),
-            const SizedBox(height: AppConstants.space16),
-            Text(
-              emptyTitle,
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimaryColor,
-              ),
-            ),
-            const SizedBox(height: AppConstants.space8),
-            Text(
-              emptySubtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
-            ),
-          ],
-        ),
+      return EmptyStateWidget(
+        title: emptyTitle,
+        subtitle: '> No data available yet.',
+        icon: Icons.inventory_2_outlined,
       );
     }
 
@@ -430,25 +414,37 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               const SizedBox(height: AppConstants.space12),
 
               // Lab Verification Summary Badge
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: context.successBgColor,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: context.successColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.verified_rounded, size: 18, color: context.successColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Lab Certified: Grade A Pure • Moisture 16.8% • PASS',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: context.successColor),
-                      ),
+              Builder(
+                builder: (context) {
+                  final labDetails = <String>[];
+                  if (req.purityGrade != null && req.purityGrade! > 0) labDetails.add('Purity: ${req.purityGrade!.toStringAsFixed(1)}%');
+                  if (req.moistureContent != null && req.moistureContent! > 0) labDetails.add('Moisture: ${req.moistureContent!.toStringAsFixed(1)}%');
+                  if (req.qualityScore != null && req.qualityScore! > 0) labDetails.add('Score: ${req.qualityScore!.toStringAsFixed(1)}/100');
+                  final labSummaryText = labDetails.isNotEmpty
+                      ? 'Lab Certified: ${labDetails.join(" • ")} • PASS'
+                      : (req.notes.isNotEmpty ? 'Lab Certified: ${req.notes}' : 'Lab Certified: Quality Test Approved');
+
+                  return Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: context.successBgColor,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: context.successColor.withValues(alpha: 0.3)),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.verified_rounded, size: 18, color: context.successColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            labSummaryText,
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: context.successColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
 

@@ -12,7 +12,11 @@ MODEL_DIR = BASE_DIR / "models"
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
-MQTT_TOPIC = "honeychain/hive/+/sensors"
+# NOTE: The live pipeline (ai_ml/mqtt/mqtt_processor.py) subscribes to
+# "honeychain/hive/telemetry" and publishes to "honeychain/hive/processed".
+# MQTT_TOPIC below is only a legacy training-data collection topic and is
+# intentionally kept in sync with the standard HoneyChain topic namespace.
+MQTT_TOPIC = "honeychain/hive/telemetry"
 
 MODEL_PATH = MODEL_DIR / "hive_anomaly_model.joblib"
 

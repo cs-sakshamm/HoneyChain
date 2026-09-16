@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -36,7 +38,7 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
       if (data != null && mounted) {
         setState(() {
           workflowData = data;
-          events = (data['provenanceEvents'] as List? ?? []);
+          events = (data['provenanceEvents'] as List? ?? data['blockchainVerification']?['events'] as List? ?? data['events'] as List? ?? []);
           events.sort((a, b) => (a['timestamp'] ?? '').compareTo(b['timestamp'] ?? ''));
           isLoading = false;
         });
@@ -124,6 +126,11 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
                             // ── Lab Results Parameter Breakdown Card ──
                             _buildLabReportCard(context),
 
+                            const SizedBox(height: AppConstants.space16),
+
+                            // ── IoT Telemetry & AI Inspection Card ──
+                            _buildTelemetryAiCard(context),
+
                             const SizedBox(height: AppConstants.space20),
 
                             // ── Provenance & Blockchain Ledger Header ──
@@ -150,6 +157,11 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
                                   return _buildProvenanceCard(context, event, index + 1);
                                 },
                               ),
+
+                            const SizedBox(height: AppConstants.space20),
+
+                            // ── Raw Provenance JSON Card ──
+                            _buildRawJsonCard(context),
 
                             const SizedBox(height: 32),
                           ],
@@ -599,6 +611,124 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
             style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
           ),
         ],
+      ),
+    );
+  }
+
+  String _formatUnit(dynamic val, String unit) {
+    if (val == null) return 'No data available yet.';
+    final s = val.toString().trim();
+    if (s.isEmpty || s == '--') return 'No data available yet.';
+    if (s.endsWith(unit) || s.endsWith(unit.trim())) return s;
+    return '$s $unit';
+  }
+
+  Widget _buildTelemetryAiCard(BuildContext context) {
+    final telemetry = workflowData?['telemetry'] ?? workflowData?['iotTelemetry'];
+    final ai = workflowData?['aiAnalysis'] ?? workflowData?['ai'];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'IoT Telemetry & AI Inspection',
+                style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+              ),
+              Icon(Icons.sensors_rounded, size: 18, color: context.colors.primary),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (telemetry != null) ...[
+            _buildSpecRow('Temperature', _formatUnit(telemetry['temperature'] ?? telemetry['temperature_c'], '°C')),
+            _buildSpecRow('Humidity', _formatUnit(telemetry['humidity'] ?? telemetry['humidity_pct'], '%')),
+            _buildSpecRow('Hive Weight', _formatUnit(telemetry['weightKg'] ?? telemetry['weight_kg'], 'kg')),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Text(
+                'No IoT telemetry available yet.',
+                style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor, fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+          const Divider(height: 16),
+          if (ai != null) ...[
+            _buildSpecRow('AI Health Assessment', ai['overall_health'] ?? ai['healthStatus'] ?? 'No AI/ML analysis available yet.'),
+            _buildSpecRow('Swarm Risk Prediction', ai['swarming_probability'] != null ? '${((ai['swarming_probability'] as num) * 100).toStringAsFixed(1)}%' : 'No AI/ML analysis available yet.'),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Text(
+                'No AI/ML analysis available yet.',
+                style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor, fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRawJsonCard(BuildContext context) {
+    if (workflowData == null) return const SizedBox.shrink();
+
+    final jsonString = const JsonEncoder.withIndent('  ').convert(workflowData);
+
+    return AppCard(
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: Row(
+            children: [
+              Icon(Icons.data_object_rounded, size: 18, color: context.colors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Raw Provenance JSON',
+                style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            'Cryptographic payload as served by backend',
+            style: GoogleFonts.inter(fontSize: 11, color: context.textSecondaryColor),
+          ),
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.copy_rounded, size: 14),
+                label: const Text('Copy JSON', style: TextStyle(fontSize: 12)),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: jsonString));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Raw provenance JSON copied to clipboard')),
+                  );
+                },
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: context.borderColor),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Text(
+                  jsonString,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.textPrimaryColor),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

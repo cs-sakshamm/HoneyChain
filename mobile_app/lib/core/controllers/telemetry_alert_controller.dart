@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
@@ -31,14 +30,8 @@ class TelemetryAlertController extends ChangeNotifier {
   }
 
   static String _resolveApiUrl() {
-    if (kIsWeb) {
-      return '${AppConstants.backendBaseUrl}/api';
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000/api';
-      }
-    } catch (_) {}
+    // Works on web, Android emulator (10.0.2.2), and physical devices
+    // (override with --dart-define=BACKEND_URL=...).
     return '${AppConstants.backendBaseUrl}/api';
   }
 

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,14 +18,8 @@ class HiveStorageService {
         _baseUrl = baseUrl ?? _resolveBaseUrl();
 
   static String _resolveBaseUrl() {
-    if (kIsWeb) {
-      return AppConstants.backendBaseUrl;
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000';
-      }
-    } catch (_) {}
+    // Works on web, Android emulator (10.0.2.2), and physical devices
+    // (override with --dart-define=BACKEND_URL=...).
     return AppConstants.backendBaseUrl;
   }
 
@@ -81,7 +74,10 @@ class HiveStorageService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return Hive.fromJson(data);
+        final hiveMap = (data['hive'] is Map<String, dynamic>)
+            ? data['hive'] as Map<String, dynamic>
+            : data;
+        return Hive.fromJson(hiveMap);
       } else {
         debugPrint('[HiveStorageService] Backend create rejected: ${response.statusCode} - ${response.body}');
       }

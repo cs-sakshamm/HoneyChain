@@ -1,0 +1,19 @@
+# Keep images small and secrets out of builds
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.git
+legacy/
+mobile_app/
+docs/
+scripts/
+.freebuff/
+.agents/
+blockchain/cache
+blockchain/artifacts
+blockchain/node_modules
+backend/honeychain.db
+**/.env
+!backend/.env.example
+**/google-services.json

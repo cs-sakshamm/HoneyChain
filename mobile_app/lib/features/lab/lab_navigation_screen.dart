@@ -10,6 +10,7 @@ import '../../core/widgets/global_app_bar.dart';
 import '../profile/screens/profile_screen.dart';
 import 'screens/lab_dashboard_screen.dart';
 import 'screens/lab_history_screen.dart';
+import 'screens/send_to_packaging_screen.dart';
 
 class LabNavigationScreen extends StatefulWidget {
   const LabNavigationScreen({super.key});
@@ -161,10 +162,16 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
                         ),
                         _buildNavItem(
                           index: 1,
-                          icon: Icons.swap_horiz_rounded,
-                          activeIcon: Icons.swap_horiz_rounded,
-                          label: context.tr('history'),
+                          icon: Icons.add_circle_outline_rounded,
+                          activeIcon: Icons.add_circle_rounded,
+                          label: context.tr('create_request'),
                           isSelected: _currentIndex == 1,
+                          onTapOverride: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SendToPackagingScreen()),
+                            );
+                          },
                         ),
                         _buildNavItem(
                           index: 2,
@@ -191,6 +198,7 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
     required IconData activeIcon,
     required String label,
     required bool isSelected,
+    VoidCallback? onTapOverride,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final activeColor = context.textPrimaryColor;
@@ -208,7 +216,7 @@ class _LabNavigationScreenState extends State<LabNavigationScreen> with WidgetsB
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
+            onTap: onTapOverride ?? () {
               setState(() {
                 _currentIndex = index;
                 _showNav();

@@ -14,7 +14,7 @@ import '../../features/profile/controllers/user_controller.dart';
 /// 2. First letter of Name (e.g., 'Prabhakar Gupta' -> 'P')
 /// 3. First letter of Email (e.g., 'rahul@gmail.com' -> 'R')
 /// 4. Generic HoneyChain Hive/Honey Icon
-class UserAvatar extends StatelessWidget {
+class UserAvatar extends StatefulWidget {
   final double size;
   final String? photoUrl;
   final String? name;
@@ -33,6 +33,14 @@ class UserAvatar extends StatelessWidget {
   });
 
   @override
+  State<UserAvatar> createState() => _UserAvatarState();
+}
+
+class _UserAvatarState extends State<UserAvatar> {
+  bool _imageFailed = false;
+  String? _lastPhotoUrl;
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -40,16 +48,21 @@ class UserAvatar extends StatelessWidget {
     final authCtrl = context.watch<AuthController>();
     final userCtrl = context.watch<UserController>();
 
-    final effectivePhotoUrl = photoUrl ??
+    final effectivePhotoUrl = widget.photoUrl ??
         userCtrl.user.effectivePhotoUrl ??
         authCtrl.currentUser?.photoURL;
+        
+    if (effectivePhotoUrl != _lastPhotoUrl) {
+      _lastPhotoUrl = effectivePhotoUrl;
+      _imageFailed = false;
+    }
 
-    final effectiveName = name ??
+    final effectiveName = widget.name ??
         (userCtrl.user.name.isNotEmpty
             ? userCtrl.user.name
             : (authCtrl.currentUser?.displayName ?? ''));
 
-    final effectiveEmail = email ??
+    final effectiveEmail = widget.email ??
         (userCtrl.user.email.isNotEmpty
             ? userCtrl.user.email
             : (authCtrl.currentUser?.email ?? ''));
@@ -63,12 +76,12 @@ class UserAvatar extends StatelessWidget {
     }
 
     final avatarWidget = Container(
-      width: size,
-      height: size,
+      width: widget.size,
+      height: widget.size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isDark ? const Color(0xFF27272A) : context.primarySoftColor,
-        border: showBorder
+        border: widget.showBorder
             ? Border.all(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.15)
@@ -82,9 +95,9 @@ class UserAvatar extends StatelessWidget {
       ),
     );
 
-    if (onTap != null) {
+    if (widget.onTap != null) {
       return GestureDetector(
-        onTap: onTap,
+        onTap: widget.onTap,
         child: avatarWidget,
       );
     }
@@ -99,13 +112,20 @@ class UserAvatar extends StatelessWidget {
     bool isDark,
   ) {
     // 1. Photo URL (Google photo or custom profile photo)
-    if (photoUrl != null && photoUrl.trim().isNotEmpty && photoUrl.trim().startsWith('http')) {
+    if (!_imageFailed && photoUrl != null && photoUrl.trim().isNotEmpty && photoUrl.trim().startsWith('http')) {
       return Image.network(
         photoUrl.trim(),
-        width: size,
-        height: size,
+        width: widget.size,
+        height: widget.size,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_imageFailed) {
+              setState(() {
+                _imageFailed = true;
+              });
+            }
+          });
           return _buildInitialOrIcon(context, initial, isDark);
         },
         loadingBuilder: (context, child, loadingProgress) {
@@ -129,7 +149,7 @@ class UserAvatar extends StatelessWidget {
         child: Text(
           initial,
           style: GoogleFonts.manrope(
-            fontSize: size * 0.44,
+            fontSize: widget.size * 0.44,
             fontWeight: FontWeight.w800,
             color: context.textPrimaryColor,
             height: 1.0,
@@ -144,7 +164,7 @@ class UserAvatar extends StatelessWidget {
       alignment: Alignment.center,
       child: Icon(
         Icons.hive_rounded,
-        size: size * 0.52,
+        size: widget.size * 0.52,
         color: context.primaryDarkColor,
       ),
     );

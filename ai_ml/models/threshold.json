@@ -1,0 +1,5 @@
+{
+  "threshold": 0.021061657879493434,
+  "model": "IsolationForest",
+  "version": "1.0"
+}

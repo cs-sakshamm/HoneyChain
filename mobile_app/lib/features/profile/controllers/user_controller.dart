@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,6 +31,7 @@ class UserProfile {
 
   // Authoritative status from backend if available
   final bool? isBackendComplete;
+  final bool? isVerifiedStatus;
 
   const UserProfile({
     this.id,
@@ -51,7 +51,10 @@ class UserProfile {
     this.bspPass,
     this.authProvider,
     this.isBackendComplete,
+    this.isVerifiedStatus,
   });
+
+  bool get isVerified => isVerifiedStatus ?? (isBackendComplete == true || isProfileComplete);
 
   /// Effective profile photo URL following 3-tier priority:
   /// Tier 1: User-uploaded custom profile picture (`avatarUrl`)
@@ -73,6 +76,10 @@ class UserProfile {
   /// Role-based profile completion calculation.
   /// Backend remains the authoritative validator.
   bool get isProfileComplete {
+    if (isBackendComplete != null) {
+      return isBackendComplete!;
+    }
+    
     final nameOk = name.trim().isNotEmpty && name.trim().toLowerCase() != 'unknown';
     final emailOk = email.trim().isNotEmpty && !email.contains('anonymous');
     final phoneOk = phone.trim().isNotEmpty;
@@ -241,14 +248,8 @@ class UserController extends ChangeNotifier {
   }
 
   static String _resolveBaseUrl() {
-    if (kIsWeb) {
-      return AppConstants.backendBaseUrl;
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000';
-      }
-    } catch (_) {}
+    // Works on web, Android emulator (10.0.2.2), and physical devices
+    // (override with --dart-define=BACKEND_URL=...).
     return AppConstants.backendBaseUrl;
   }
 
@@ -395,8 +396,8 @@ class UserController extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['success'] == true && data['profile'] != null) {
-          final p = data['profile'];
+        final p = data['profile'] ?? data['user'];
+        if (data['success'] == true && p != null) {
           _user = UserProfile(
             id: p['id'] ?? _user.id,
             name: p['name'] ?? _user.name,
@@ -678,7 +679,7 @@ class UserController extends ChangeNotifier {
     required String currentPassword,
     required String newPassword,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
+    // Backend API logic goes here
     return true;
   }
 

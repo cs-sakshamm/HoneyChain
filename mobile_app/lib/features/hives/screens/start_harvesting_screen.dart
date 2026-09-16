@@ -7,6 +7,7 @@ import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
+import '../../collection/screens/nearest_centres_screen.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../models/hive_model.dart';
 
@@ -125,6 +126,34 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
               },
               child: Text(context.tr('cancel') == 'cancel' ? 'Cancel' : context.tr('cancel')),
             ),
+            OutlinedButton.icon(
+              onPressed: () {
+                if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+                final qty = double.tryParse(quantityCtrl.text.trim()) ?? 0.0;
+                if (qty <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid quantity in kg.')),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext);
+                final userCtrl = context.read<UserController>();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NearestCentresScreen(
+                      targetRole: 'COLLECTOR_PROCESSOR',
+                      originLocation: widget.hive?.apiaryLocation ?? widget.hive?.location ?? 'Apiary',
+                      originHiveId: widget.hive?.id,
+                      quantity: qty,
+                      harvesterName: userCtrl.user.name.isNotEmpty ? userCtrl.user.name : 'Harvester Operator',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.near_me_rounded, size: 16),
+              label: Text('Select Centre', style: GoogleFonts.manrope(fontWeight: FontWeight.w600)),
+            ),
             ElevatedButton(
               onPressed: () async {
                 if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
@@ -169,7 +198,7 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                   borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
                 ),
               ),
-              child: Text('Send to Collection', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+              child: Text('Direct Send', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
             ),
           ],
         );

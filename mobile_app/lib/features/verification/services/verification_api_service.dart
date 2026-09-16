@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,14 +11,8 @@ import '../models/packaging_manager_verification_model.dart';
 
 class VerificationApiService {
   static String get _defaultBaseUrl {
-    if (kIsWeb) {
-      return '${AppConstants.backendBaseUrl}/api';
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000/api';
-      }
-    } catch (_) {}
+    // Works on web, Android emulator (10.0.2.2), and physical devices
+    // (override with --dart-define=BACKEND_URL=...).
     return '${AppConstants.backendBaseUrl}/api';
   }
 
@@ -198,6 +191,29 @@ class VerificationApiService {
       return model;
     } else {
       throw Exception(data['error'] ?? data['message'] ?? 'Failed to verify Beekeeper Registration ID.');
+    }
+  }
+
+  /// Step 3.5: Submit FSSAI License
+  Future<HarvesterVerificationModel> submitHarvesterFssaiLicense({
+    required String harvesterId,
+    required String fssaiLicense,
+  }) async {
+    final cleanId = harvesterId.trim();
+    final url = Uri.parse('$baseUrl/verification/harvester/fssai');
+    final body = jsonEncode({
+      'harvesterId': cleanId,
+      'fssaiLicense': fssaiLicense.trim(),
+    });
+
+    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
+      final model = HarvesterVerificationModel.fromJson(data['verification']);
+      await _cacheLocalVerification(cleanId, model);
+      return model;
+    } else {
+      throw Exception(data['error'] ?? data['message'] ?? 'Failed to verify FSSAI License.');
     }
   }
 

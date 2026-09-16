@@ -4,7 +4,8 @@ async function main() {
   const HoneyChainProvenance = await hre.ethers.getContractFactory('HoneyChainProvenance');
   const contract = await HoneyChainProvenance.deploy();
   await contract.waitForDeployment();
-  console.log(HoneyChainProvenance deployed to );
+  const address = await contract.getAddress();
+  console.log(`HoneyChainProvenance deployed to: ${address}`);
 }
 
 main().catch((error) => {

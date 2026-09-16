@@ -16,6 +16,9 @@ class NearestCentresScreen extends StatefulWidget {
   final String? requestId;
   final double? quantity;
   final String? harvesterName;
+  final String? processingMethod;
+  final double? moistureLevel;
+  final String? notes;
 
   const NearestCentresScreen({
     super.key,
@@ -26,6 +29,9 @@ class NearestCentresScreen extends StatefulWidget {
     this.requestId,
     this.quantity,
     this.harvesterName,
+    this.processingMethod,
+    this.moistureLevel,
+    this.notes,
   });
 
   @override
@@ -151,14 +157,20 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
                   notes: notesCtrl.text.trim(),
                 );
               } else if (widget.targetRole == 'LAB') {
+                final effectiveNotes = [
+                  if (widget.notes != null && widget.notes!.isNotEmpty) widget.notes!,
+                  if (notesCtrl.text.trim().isNotEmpty) notesCtrl.text.trim(),
+                ].join(' | ');
+
                 success = await workflowCtrl.sendToLab(
                   requestId: widget.requestId ?? '',
                   batchId: widget.batchId ?? '',
                   qtyReceived: widget.quantity ?? 25.0,
-                  qtyAfter: widget.quantity ?? 25.0,
-                  method: 'Standard Cold Extraction',
+                  qtyAfter: (widget.quantity ?? 25.0) > 0 ? (widget.quantity ?? 25.0) * 0.95 : 20.0,
+                  method: widget.processingMethod ?? 'Standard Cold Extraction',
                   targetLabId: center['id'],
-                  notes: notesCtrl.text.trim(),
+                  moisture: widget.moistureLevel,
+                  notes: effectiveNotes,
                   processorId: userCtrl.user.name,
                 );
               } else if (widget.targetRole == 'PACKAGING') {

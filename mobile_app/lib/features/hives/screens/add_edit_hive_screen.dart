@@ -293,33 +293,69 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
     setState(() => _isSaving = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isEditing ? 'Hive updated successfully' : 'Hive added successfully! Find nearest collection centers:',
-          ),
-          backgroundColor: AppConstants.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-          ),
-        ),
-      );
       final savedHiveId = isEditing
           ? widget.hive!.id
           : (controller.hives.isNotEmpty ? controller.hives.first.id : null);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => NearestCentresScreen(
-            targetRole: 'COLLECTOR_PROCESSOR',
-            originLocation: hiveData.apiaryLocation,
-            originHiveId: savedHiveId,
-            quantity: hiveData.expectedProductionKg,
-            harvesterName: userController.user.name,
+          
+      if (isEditing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Hive updated successfully'),
+            backgroundColor: AppConstants.success,
+            behavior: SnackBarBehavior.floating,
           ),
-        ),
-      );
+        );
+        Navigator.pop(context);
+      } else {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              title: Text(
+                'Hive Added Successfully!',
+                style: GoogleFonts.manrope(fontWeight: FontWeight.w800),
+              ),
+              content: Text(
+                'Your hive has been registered. You can now send a request to a Collection & Processing Centre.',
+                style: GoogleFonts.inter(fontSize: 14),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.pop(context);
+                  },
+                  child: Text('Later', style: GoogleFonts.manrope(fontWeight: FontWeight.w600)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => NearestCentresScreen(
+                          targetRole: 'COLLECTOR_PROCESSOR',
+                          originLocation: hiveData.apiaryLocation,
+                          originHiveId: savedHiveId,
+                          quantity: hiveData.expectedProductionKg,
+                          harvesterName: userController.user.name,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: Text('Send Request', style: GoogleFonts.manrope(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onPrimary)),
+                ),
+              ],
+            );
+          },
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -937,3 +973,4 @@ class _PillBackButton extends StatelessWidget {
     );
   }
 }
+

@@ -35,72 +35,52 @@ class ProfileGuard {
   /// Checks if a Harvester has completed both profile and 3-step Harvester Verification.
   static bool checkHarvesterVerificationOrPrompt(BuildContext context) {
     final userCtrl = context.read<UserController>();
-    if (!userCtrl.user.isProfileComplete) {
-      showIncompleteProfileDialog(context);
-      return false;
-    }
+    if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
     final verCtrl = context.read<VerificationController>();
-    if (!verCtrl.verification.isFullyVerified) {
-      showHarvesterVerificationDialog(context);
-      return false;
-    }
+    if (verCtrl.verification.isFullyVerified) return true;
 
-    return true;
+    showIncompleteProfileDialog(context);
+    return false;
   }
 
   /// 2. Collection & Processing Verification Guard
   /// Checks if a Collector/Processor has completed 3/3 profile verification.
   static bool checkCollectorVerificationOrPrompt(BuildContext context) {
     final userCtrl = context.read<UserController>();
-    if (!userCtrl.user.isProfileComplete) {
-      showIncompleteProfileDialog(context);
-      return false;
-    }
+    if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
     final verCtrl = context.read<VerificationController>();
-    if (!verCtrl.collectorVerification.isFullyVerified) {
-      showCollectorVerificationDialog(context);
-      return false;
-    }
+    if (verCtrl.collectorVerification.isFullyVerified) return true;
 
-    return true;
+    showIncompleteProfileDialog(context);
+    return false;
   }
 
   /// 3. Lab Tester Verification Guard
   /// Checks if a Lab Tester has completed 3/3 profile verification.
   static bool checkLabVerificationOrPrompt(BuildContext context) {
     final userCtrl = context.read<UserController>();
-    if (!userCtrl.user.isProfileComplete) {
-      showIncompleteProfileDialog(context);
-      return false;
-    }
+    if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
     final verCtrl = context.read<VerificationController>();
-    if (!verCtrl.labVerification.isFullyVerified) {
-      showLabVerificationDialog(context);
-      return false;
-    }
+    if (verCtrl.labVerification.isFullyVerified) return true;
 
-    return true;
+    showIncompleteProfileDialog(context);
+    return false;
   }
 
   /// 4. Packaging Manager Verification Guard
   /// Checks if a Packaging Manager has completed 3/3 profile verification.
   static bool checkPackagingVerificationOrPrompt(BuildContext context) {
     final userCtrl = context.read<UserController>();
-    if (!userCtrl.user.isProfileComplete) {
-      showIncompleteProfileDialog(context);
-      return false;
-    }
+    if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
     final verCtrl = context.read<VerificationController>();
-    if (!verCtrl.packagingVerification.isFullyVerified) {
-      showPackagingVerificationDialog(context);
-      return false;
-    }
+    if (verCtrl.packagingVerification.isFullyVerified) return true;
 
-    return true;
+    showIncompleteProfileDialog(context);
+    return false;
   }
 
   /// Displays the modal dialog prompting the user to complete their profile.

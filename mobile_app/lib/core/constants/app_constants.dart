@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 /// Production Design System & App Constants for HoneyChain Mobile
@@ -8,8 +9,20 @@ class AppConstants {
   static const String appName = 'HoneyChain';
   static const String appTagline = 'Supply chain management simplified for business owners.';
 
-  // Backend / API base (single source of truth for mobile → backend calls)
-  static const String backendBaseUrl = 'http://127.0.0.1:3000';
+  /// Raw dart-define override (always wins when provided)
+  static const String _backendUrlOverride = String.fromEnvironment('BACKEND_URL');
+
+  /// Backend / API base (single source of truth for app → backend calls).
+  ///
+  /// - Explicit build override : --dart-define=BACKEND_URL=http://host:8000
+  /// - Web                     : localhost:8000 (backend must allow this origin; CORS is open)
+  /// - Android emulator        : 10.0.2.2:8000 (host loopback alias)
+  /// - Native desktop          : localhost:8000
+  static String get backendBaseUrl {
+    if (_backendUrlOverride.isNotEmpty) return _backendUrlOverride;
+    if (kIsWeb) return 'http://localhost:8000';
+    return 'http://10.0.2.2:8000'; // native mobile (emulator-compatible default)
+  }
   static const String legalDisclaimer =
       'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
 
@@ -117,58 +130,38 @@ class RoleImageItem {
 }
 
 class RoleImages {
-  // 1. HARVESTER: Beekeeping, Beehives, Honey Harvesting (Exactly 2 Relevant Images)
+  // 1. HARVESTER: Beekeeping, Beehives, Bees, Honey Harvesting (Exactly 1 Hero Image)
   static const List<RoleImageItem> harvesterImages = [
     RoleImageItem(
       url: 'https://images.unsplash.com/photo-1473081556163-2a17de81fc97?auto=format&fit=crop&w=1200&q=80',
       label: 'Beekeeping and hive inspection in active apiary',
       localAssetFallback: 'assets/images/beekeeping_hero.jpg',
     ),
-    RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1587049352851-8d4e89133924?auto=format&fit=crop&w=1200&q=80',
-      label: 'Raw honey harvesting directly from honeycomb frame',
-      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
-    ),
   ];
 
-  // 2. COLLECTION & PROCESSING: Honey Collection & Centrifugal Extraction (Exactly 2 Relevant Images)
+  // 2. COLLECTION & PROCESSING: Honey Extraction & Processing Facility (Exactly 1 Hero Image)
   static const List<RoleImageItem> collectionProcessingImages = [
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1587049352847-4a222e784d38?auto=format&fit=crop&w=1200&q=80',
-      label: 'Regional honey collection centre receiving raw batches',
-      localAssetFallback: 'assets/images/collection_processing_hero.jpg',
-    ),
-    RoleImageItem(
       url: 'https://images.unsplash.com/photo-1587049633312-d628ae50a8ae?auto=format&fit=crop&w=1200&q=80',
-      label: 'Centrifugal stainless steel honey extraction machinery',
+      label: 'Regional honey collection and centrifugal extraction facility',
       localAssetFallback: 'assets/images/collection_processing_hero.jpg',
     ),
   ];
 
-  // 3. LAB TESTER: Food Laboratory & Chemical Purity Testing (Exactly 2 Relevant Images)
+  // 3. LAB TESTER: Food Laboratory & Purity Testing (Exactly 1 Hero Image)
   static const List<RoleImageItem> labTesterImages = [
     RoleImageItem(
       url: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=1200&q=80',
-      label: 'Advanced food laboratory testing honey purity and safety',
-      localAssetFallback: 'assets/images/lab_testing_hero.jpg',
-    ),
-    RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80',
-      label: 'Scientist conducting chemical quality testing on honey samples',
+      label: 'Advanced food laboratory testing honey purity and quality',
       localAssetFallback: 'assets/images/lab_testing_hero.jpg',
     ),
   ];
 
-  // 4. PACKAGING: Honey Bottling Line & QR Traceability Labeling (Exactly 2 Relevant Images)
+  // 4. PACKAGING: Honey Bottling & Sealed Packaging Line (Exactly 1 Hero Image)
   static const List<RoleImageItem> packagingImages = [
     RoleImageItem(
       url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
-      label: 'Automated honey bottling and liquid filling line',
-      localAssetFallback: 'assets/images/packaging_hero.jpg',
-    ),
-    RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1589927986089-35812388d1f4?auto=format&fit=crop&w=1200&q=80',
-      label: 'Automated QR code batch traceability labeling',
+      label: 'Automated honey bottling line and sealed batch packaging',
       localAssetFallback: 'assets/images/packaging_hero.jpg',
     ),
   ];

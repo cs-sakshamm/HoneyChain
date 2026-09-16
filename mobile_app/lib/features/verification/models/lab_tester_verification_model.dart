@@ -1,4 +1,4 @@
-﻿/// Lab Tester Verification Data Model matching backend schema
+/// Lab Tester Verification Data Model matching backend schema
 /// Enforces the 3 verification parameters (3/3):
 /// 1. Identity Verification (Full Name & Mobile OTP)
 /// 2. Laboratory Details (Lab Name, Address, Registration Number & Accreditation)
@@ -71,7 +71,7 @@ class LabTesterVerificationModel {
   bool get isStep3KycComplete => kycStatus == 'Verified';
 
   bool get isFullyVerified =>
-      isStep1IdentityComplete && isStep2LabDetailsComplete && isStep3KycComplete;
+      isStep1IdentityComplete && isStep2LabDetailsComplete && isStep3KycComplete && verificationStatus == 'Verified';
 
   int get completedStepsCount {
     int count = 0;

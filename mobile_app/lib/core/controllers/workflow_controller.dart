@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -12,6 +11,7 @@ class WorkflowController extends ChangeNotifier {
   String? errorMessage;
   String? lastErrorCode;
   String? lastSuccessMessage;
+  Map<String, dynamic>? lastLabReportResult;
 
   bool get isProfileIncompleteError => lastErrorCode == 'PROFILE_INCOMPLETE';
 
@@ -25,14 +25,8 @@ class WorkflowController extends ChangeNotifier {
   }
 
   static String _resolveApiUrl() {
-    if (kIsWeb) {
-      return '${AppConstants.backendBaseUrl}/api';
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000/api';
-      }
-    } catch (_) {}
+    // Works on web, Android emulator (10.0.2.2), and physical devices
+    // (override with --dart-define=BACKEND_URL=...).
     return '${AppConstants.backendBaseUrl}/api';
   }
 
@@ -315,7 +309,7 @@ class WorkflowController extends ChangeNotifier {
 
       if (harvestRes.statusCode == 200 || harvestRes.statusCode == 201) {
         final data = json.decode(harvestRes.body);
-        final batchId = data['batch']?['id'];
+        final batchId = data['batchId'] ?? data['batch']?['id'] ?? data['batch']?['batch_id'] ?? data['id'];
 
         if (batchId != null) {
           // Step 2: Create Workflow Request targeting specific collection center
@@ -374,7 +368,7 @@ class WorkflowController extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      if (res.statusCode == 200) {
+      if (res.statusCode == 200 || res.statusCode == 201) {
         _updateLocalStatus(requestId, RequestStatus.accepted);
         await fetchAllData();
         return true;
@@ -384,11 +378,10 @@ class WorkflowController extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('acceptRequest error: $e');
-      if (!isProfileIncompleteError) {
-        _updateLocalStatus(requestId, RequestStatus.accepted);
-      }
+      errorMessage = 'Network error while accepting request';
+      notifyListeners();
+      return false;
     }
-    return false;
   }
 
   // ── 3. Reject Workflow Request ──
@@ -411,7 +404,7 @@ class WorkflowController extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      if (res.statusCode == 200) {
+      if (res.statusCode == 200 || res.statusCode == 201) {
         _updateLocalStatus(requestId, RequestStatus.denied);
         await fetchAllData();
         return true;
@@ -421,11 +414,10 @@ class WorkflowController extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('rejectRequest error: $e');
-      if (!isProfileIncompleteError) {
-        _updateLocalStatus(requestId, RequestStatus.denied);
-      }
+      errorMessage = 'Network error while rejecting request';
+      notifyListeners();
+      return false;
     }
-    return false;
   }
 
   // ── 4. Stage 1 -> Stage 2: Process & Send to Target Lab ──
@@ -512,6 +504,9 @@ class WorkflowController extends ChangeNotifier {
           .timeout(const Duration(seconds: 5));
 
       if (res.statusCode == 200) {
+        try {
+          lastLabReportResult = json.decode(res.body) as Map<String, dynamic>?;
+        } catch (_) {}
         await fetchAllData();
         return true;
       } else {
@@ -601,7 +596,6 @@ class WorkflowController extends ChangeNotifier {
 
   // ── 8. Update Request Status directly / Start Processing ──
   Future<bool> updateRequestStatus(String requestId, RequestStatus newStatus) async {
-    _updateLocalStatus(requestId, newStatus);
     try {
       final res = await _client
           .patch(
@@ -610,14 +604,15 @@ class WorkflowController extends ChangeNotifier {
             body: json.encode({'status': newStatus.name}),
           )
           .timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        _updateLocalStatus(requestId, newStatus);
         await fetchAllData();
         return true;
       }
     } catch (e) {
       debugPrint('updateRequestStatus error: $e');
     }
-    return true;
+    return false;
   }
 
   // ── 9. Fetch Full Batch Verification / Provenance ──
