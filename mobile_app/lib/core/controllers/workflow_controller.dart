@@ -12,6 +12,7 @@ class WorkflowController extends ChangeNotifier {
   String? errorMessage;
   String? lastErrorCode;
   String? lastSuccessMessage;
+  Map<String, dynamic>? lastLabReportResult;
 
   bool get isProfileIncompleteError => lastErrorCode == 'PROFILE_INCOMPLETE';
 
@@ -512,6 +513,7 @@ class WorkflowController extends ChangeNotifier {
           .timeout(const Duration(seconds: 5));
 
       if (res.statusCode == 200) {
+        lastLabReportResult = json.decode(res.body);
         await fetchAllData();
         return true;
       } else {

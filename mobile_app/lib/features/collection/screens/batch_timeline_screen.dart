@@ -615,6 +615,14 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
     );
   }
 
+  String _formatUnit(dynamic val, String unit) {
+    if (val == null) return 'No data available yet.';
+    final s = val.toString().trim();
+    if (s.isEmpty || s == '--') return 'No data available yet.';
+    if (s.endsWith(unit) || s.endsWith(unit.trim())) return s;
+    return '$s $unit';
+  }
+
   Widget _buildTelemetryAiCard(BuildContext context) {
     final telemetry = workflowData?['telemetry'] ?? workflowData?['iotTelemetry'];
     final ai = workflowData?['aiAnalysis'] ?? workflowData?['ai'];
@@ -635,9 +643,9 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
           ),
           const SizedBox(height: 12),
           if (telemetry != null) ...[
-            _buildSpecRow('Temperature', '${telemetry['temperature'] ?? telemetry['temperature_c'] ?? '--'} °C'),
-            _buildSpecRow('Humidity', '${telemetry['humidity'] ?? telemetry['humidity_pct'] ?? '--'} %'),
-            _buildSpecRow('Hive Weight', '${telemetry['weightKg'] ?? telemetry['weight_kg'] ?? '--'} kg'),
+            _buildSpecRow('Temperature', _formatUnit(telemetry['temperature'] ?? telemetry['temperature_c'], '°C')),
+            _buildSpecRow('Humidity', _formatUnit(telemetry['humidity'] ?? telemetry['humidity_pct'], '%')),
+            _buildSpecRow('Hive Weight', _formatUnit(telemetry['weightKg'] ?? telemetry['weight_kg'], 'kg')),
           ] else ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -649,8 +657,8 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
           ],
           const Divider(height: 16),
           if (ai != null) ...[
-            _buildSpecRow('AI Health Assessment', ai['overall_health'] ?? ai['healthStatus'] ?? 'Healthy'),
-            _buildSpecRow('Swarm Risk Prediction', ai['swarming_probability'] != null ? '${((ai['swarming_probability'] as num) * 100).toStringAsFixed(1)}%' : 'Low'),
+            _buildSpecRow('AI Health Assessment', ai['overall_health'] ?? ai['healthStatus'] ?? 'No AI/ML analysis available yet.'),
+            _buildSpecRow('Swarm Risk Prediction', ai['swarming_probability'] != null ? '${((ai['swarming_probability'] as num) * 100).toStringAsFixed(1)}%' : 'No AI/ML analysis available yet.'),
           ] else ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4.0),

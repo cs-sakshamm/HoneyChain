@@ -11,6 +11,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../verification/controllers/verification_controller.dart';
 import '../../verification/screens/lab_verification_screen.dart';
+import '../../collection/screens/nearest_centres_screen.dart';
 
 class LabReportScreen extends StatefulWidget {
   final WorkflowRequest request;
@@ -101,11 +102,20 @@ class _LabReportScreenState extends State<LabReportScreen> {
       return;
     }
 
+    final reportRes = workflowCtrl.lastLabReportResult;
+    final reportId = (reportRes?['reportId'] as String?) ?? 'LAB-RPT-2026-${widget.request.batchId.replaceAll('BATCH-', '').replaceAll('HC-', '')}';
+    final blockchain = reportRes?['blockchain'] as Map<String, dynamic>?;
+    final sigHash = (blockchain?['tx_hash'] as String?) ??
+        (blockchain?['data_hash'] as String?) ??
+        (widget.request.txHash != null && widget.request.txHash!.isNotEmpty
+            ? widget.request.txHash!
+            : '0x${(reportId + widget.request.batchId).hashCode.abs().toRadixString(16).padLeft(16, '0')}');
+
     setState(() {
       _isReportGenerated = true;
       _generatedReport = {
-        'reportId': 'LAB-REP-2026-' + widget.request.batchId.replaceAll('BATCH-', ''),
-        'qrTraceabilityId': 'QR-TRC-2026-' + widget.request.batchId.replaceAll('BATCH-', ''),
+        'reportId': reportId,
+        'qrTraceabilityId': 'QR-TRC-2026-${widget.request.batchId.replaceAll('BATCH-', '').replaceAll('HC-', '')}',
         'overallResult': isOverallPass ? 'PASS' : 'FAIL',
         'qualityScore': calculatedScore,
         'moisture': moisture,
@@ -120,7 +130,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
         'residuesStatus': isResiduesPass ? 'PASSED' : 'FAILED',
         'pollen': pollen,
         'notes': _notesController.text.trim(),
-        'testerSignatureHash': 'SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'testerSignatureHash': sigHash,
       };
     });
   }
@@ -383,21 +393,20 @@ class _LabReportScreenState extends State<LabReportScreen> {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: () async {
-                final workflowCtrl = context.read<WorkflowController>();
-                final sent = await workflowCtrl.sendToPackaging(
-                  requestId: widget.request.id,
-                  batchId: widget.request.batchId,
-                  notes: 'Lab verified Grade A purity. Dispatched for packaging.',
+              onPressed: () {
+                if (!ProfileGuard.checkLabVerificationOrPrompt(context)) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NearestCentresScreen(
+                      targetRole: 'PACKAGING',
+                      batchId: widget.request.batchId,
+                      requestId: widget.request.id,
+                      quantity: widget.request.estimatedQuantityKg,
+                      originLocation: widget.request.location,
+                    ),
+                  ),
                 );
-                if (mounted) {
-                  if (sent) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Batch successfully forwarded to Packaging!'), backgroundColor: AppConstants.success),
-                    );
-                  }
-                }
               },
               style: ElevatedButton.styleFrom(backgroundColor: context.colors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
               child: Text('Forward to Packaging Manager', style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.onPrimary)),
