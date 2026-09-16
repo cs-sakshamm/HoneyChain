@@ -155,3 +155,21 @@ untracked:  mobile_app/pubspec.lock
 ```
 All 3 pytest suites pass WITH these changes. The uncommitted `main.py` changes are security
 improvements (but incomplete — see HC-001 duplicate-route flaw inside them).
+
+---
+
+## 6. Addendum — HC-005 / HC-006 / HC-008 (2026-09-16, later session)
+
+All three executed with live evidence; full details in REMAINING_WORK.md.
+
+- **HC-005 🟢** — Google auth fail-closed: prod bare-email → 400 GOOGLE_ID_TOKEN_REQUIRED,
+  bad idToken → 401 INVALID_GOOGLE_TOKEN (no more silent fallback to client email).
+- **HC-006 🟢** — Live MQTT round-trip proven (real ai_ml subprocess, Isolation Forest
+  score 0.034189, AI row in DB 0.6s after live frame). ROOT CAUSE fixed in the
+  integration layer: consumer did ~1.4s cloud-DB writes inside the MQTT network
+  loop, queuing AI insights behind minutes of telemetry during bursts — now a
+  worker thread with dual priority FIFOs. `ai_ml/` untouched throughout.
+- **HC-008 🟢** — On-chain round-trip proven: Hardhat v3 node + freshly deployed
+  HoneyChainProvenance (0x5FbDB...80aa3); tx CONFIRMED (0xed4e2224..., block 10),
+  on-chain getEvents hash matches computed SHA-256, DB rows CONFIRMED=8 (was 0).
+  Env var name corrected (BLOCKCHAIN_PROVIDER_URL), web3 v8 signing compat fixed.

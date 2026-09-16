@@ -53,10 +53,10 @@ Note: all previously issued mobile sessions are invalid; users re-login once.
 ---
 | HC-003 | P1 | Commit the audited uncommitted work (auth guards, tests, token store) as a clean checkpoint | 🔵 NEEDS VERIFICATION | HC-001 | `git diff -- ai_ml/` empty; suite green at commit point |
 | HC-004 | P1 | Rotate Supabase password; document secret handling (plaintext in local `.env`) | 🔵 NEEDS VERIFICATION | None | User action: rotate in Supabase dashboard; `.env` updated |
-| HC-005 | P1 | `/api/auth/google`: reject bare-email auth when no `idToken` in production mode | 🟡 PARTIAL | None | 400 without idToken (prod), sandbox still allowed for dev |
-| HC-006 | P2 | Live MQTT round-trip test: publish raw telemetry → AI/ML → processed → backend → DB | 🔵 NEEDS VERIFICATION | None (broker already running) | `hive_telemetry` + `hive_ai_analysis` rows from a live publish |
+| HC-005 | P1 | `/api/auth/google`: reject bare-email auth when no `idToken` in production mode | 🟢 FIXED & VERIFIED | None | 400 without idToken (prod), sandbox still allowed for dev |
+| HC-006 | P2 | Live MQTT round-trip test: publish raw telemetry → AI/ML → processed → backend → DB | 🟢 FIXED & VERIFIED | None (broker already running) | `hive_telemetry` + `hive_ai_analysis` rows from a live publish |
 | HC-007 | P2 | ESP32 firmware: configurable broker host/creds instead of `broker.honeychain.io` placeholders | ⚪ NOT STARTED | None | Compiles; publishes to local broker |
-| HC-008 | P2 | Blockchain on-chain proof: start Hardhat node, deploy, verify tx hash round-trip end-to-end | 🔵 NEEDS VERIFICATION | None (node present) | `blockchain_records.status=CONFIRMED` + real `tx_hash` read back |
+| HC-008 | P2 | Blockchain on-chain proof: start Hardhat node, deploy, verify tx hash round-trip end-to-end | 🟢 FIXED & VERIFIED | None (node present) | `blockchain_records.status=CONFIRMED` + real `tx_hash` read back |
 | HC-009 | P2 | Flutter verification: `flutter analyze` + run app against backend | 🔵 NEEDS VERIFICATION | None | Zero analyzer errors; login works from app |
 | HC-010 | P4 | Production deploy config: `PUBLIC_APP_URL`, CORS origins, JWT secret, seed flag off | ⚪ NOT STARTED | HC-002 | QR encodes public URL; verify page reachable from phone |
 | HC-011 | P3 | Stale backend README (Node/prisma section) + duplicate section banner in main.py | ⚪ NOT STARTED | None | Docs match reality |
