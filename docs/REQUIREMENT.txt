@@ -1,0 +1,11 @@
+# ==============================================================================
+# HoneyChain Documentation Toolchain & Standards
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Documentation Toolchain Requirements
+# ------------------------------------------------------------------------------
+# Markdown Specification: GitHub Flavored Markdown (GFM)
+# Diagram Engine: Mermaid.js (v10+)
+# Static Site Generator (Optional): MkDocs >= 1.5.0 with mkdocs-material >= 9.5.0
+# Graph Rendering: PlantUML (v1.2023+) or Graphviz (optional)

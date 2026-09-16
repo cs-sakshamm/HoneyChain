@@ -1,0 +1,16 @@
+# ==============================================================================
+# HoneyChain Mosquitto Module - Service Requirements
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Broker Software
+# ------------------------------------------------------------------------------
+# Eclipse Mosquitto MQTT Broker: >= 2.0.0
+# Standard Port: 1883 (TCP / Non-TLS development)
+# Docker Image: eclipse-mosquitto:latest (specified in docker-compose.yml)
+
+# ------------------------------------------------------------------------------
+# 2. Command-Line Client Utilities (for testing and manual telemetry injection)
+# ------------------------------------------------------------------------------
+# Mosquitto Sub Client: mosquitto_sub
+# Mosquitto Pub Client: mosquitto_pub

@@ -1,0 +1,40 @@
+# ==============================================================================
+# HoneyChain IoT Subsystem - Hardware & Firmware Dependencies
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Target Microcontroller Hardware
+# ------------------------------------------------------------------------------
+# Microcontroller: Espressif ESP32-WROOM-32 (Dual Core 240MHz, 4MB Flash, Wi-Fi & BLE)
+# Power Supply: 3.7V 18650 Li-ion Battery with TP4056 charge controller or 5V DC micro-USB
+# Operating Temperature: -20°C to +70°C
+
+# ------------------------------------------------------------------------------
+# 2. Sensor Modules & Peripherals
+# ------------------------------------------------------------------------------
+# Temperature & Humidity Sensor: DHT22 / AM2302 (Digital 1-wire, -40°C to 80°C, 0-100% RH)
+# Hive Weight Scale: 4-wire Strain Gauge Load Cell (50kg or 100kg capacity)
+# Analog-to-Digital Converter: HX711 24-bit ADC module for weigh scales
+# Colony Acoustic Sensor: INMP441 I2S Digital Omnidirectional Microphone
+# Battery Voltage Monitor: 100kΩ / 100kΩ voltage divider circuit connected to ADC pin
+
+# ------------------------------------------------------------------------------
+# 3. Firmware Toolchain & Development Environment
+# ------------------------------------------------------------------------------
+# Development IDE: Visual Studio Code with PlatformIO Extension OR Arduino IDE 2.3+
+# Board Support Package: Espressif esp32 platform >= 2.0.14
+
+# ------------------------------------------------------------------------------
+# 4. Arduino / C++ Embedded Libraries
+# ------------------------------------------------------------------------------
+# MQTT Protocol Client:
+#   PubSubClient by Nick O'Leary (>= 2.8.0)
+# JSON Parsing & Serialization:
+#   ArduinoJson by Benoit Blanchon (>= 6.21.0 or 7.x)
+# Environmental Sensing:
+#   DHT sensor library by Adafruit (>= 1.4.4)
+#   Adafruit Unified Sensor (>= 1.1.9)
+# Weight Ingestion:
+#   HX711 by bogde (>= 0.7.5)
+# Networking:
+#   WiFi (built-in Espressif ESP32 Core)
