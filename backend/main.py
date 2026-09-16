@@ -1774,10 +1774,18 @@ def verify_batch(
             "totalConfirmedEvents": len(bc_records),
             "latestTxHash": bc_records[-1].tx_hash if bc_records and bc_records[-1].tx_hash else None,
             "events": [
-                {"eventType": b.event_type, "dataHash": b.data_hash, "txHash": b.tx_hash, "status": b.status}
+                {"eventType": b.event_type, "dataHash": b.data_hash, "txHash": b.tx_hash, "status": b.status, "timestamp": b.timestamp.isoformat() if b.timestamp else None}
                 for b in bc_records
             ],
         },
+        "provenanceEvents": [
+            {"eventType": b.event_type, "dataHash": b.data_hash, "txHash": b.tx_hash, "status": b.status, "timestamp": b.timestamp.isoformat() if b.timestamp else None, "network": b.network}
+            for b in bc_records
+        ],
+        "events": [
+            {"eventType": b.event_type, "dataHash": b.data_hash, "txHash": b.tx_hash, "status": b.status, "timestamp": b.timestamp.isoformat() if b.timestamp else None}
+            for b in bc_records
+        ],
     }
 
     accept_hdr = req.headers.get("accept", "").lower()

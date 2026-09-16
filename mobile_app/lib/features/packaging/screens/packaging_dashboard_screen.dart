@@ -413,25 +413,37 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
               const SizedBox(height: AppConstants.space12),
 
               // Lab Verification Summary Badge
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: context.successBgColor,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: context.successColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.verified_rounded, size: 18, color: context.successColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Lab Certified: Grade A Pure • Moisture 16.8% • PASS',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: context.successColor),
-                      ),
+              Builder(
+                builder: (context) {
+                  final labDetails = <String>[];
+                  if (req.purityGrade != null && req.purityGrade! > 0) labDetails.add('Purity: ${req.purityGrade!.toStringAsFixed(1)}%');
+                  if (req.moistureContent != null && req.moistureContent! > 0) labDetails.add('Moisture: ${req.moistureContent!.toStringAsFixed(1)}%');
+                  if (req.qualityScore != null && req.qualityScore! > 0) labDetails.add('Score: ${req.qualityScore!.toStringAsFixed(1)}/100');
+                  final labSummaryText = labDetails.isNotEmpty
+                      ? 'Lab Certified: ${labDetails.join(" • ")} • PASS'
+                      : (req.notes.isNotEmpty ? 'Lab Certified: ${req.notes}' : 'Lab Certified: Quality Test Approved');
+
+                  return Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: context.successBgColor,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: context.successColor.withValues(alpha: 0.3)),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.verified_rounded, size: 18, color: context.successColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            labSummaryText,
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: context.successColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
 

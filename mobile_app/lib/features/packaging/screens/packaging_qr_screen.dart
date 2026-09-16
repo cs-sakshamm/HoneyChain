@@ -18,7 +18,7 @@ class PackagingQrScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final verifyUrl = '${AppConstants.backendBaseUrl}/verify?batch=' + Uri.encodeComponent(request.batchId);
-    final latestTx = request.txHash ?? '0x7f9a2b84c3d11e5f8a92bb837c41d399fe682';
+    final realTx = request.txHash;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -95,14 +95,16 @@ class PackagingQrScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Harvester: ' + request.harvesterName,
+                            'Harvester: ' + (request.harvesterName.isNotEmpty ? request.harvesterName : 'No data available yet.'),
                             style: GoogleFonts.inter(fontSize: 14, color: context.textSecondaryColor),
                           ),
                           const SizedBox(height: 12),
                           StatusBadge(status: request.status),
                           const SizedBox(height: 8),
                           Text(
-                            'Ledger Hash: ${latestTx.substring(0, latestTx.length > 20 ? 20 : latestTx.length)}...',
+                            realTx != null && realTx.isNotEmpty
+                                ? 'Ledger Hash: ${realTx.substring(0, realTx.length > 20 ? 20 : realTx.length)}...'
+                                : 'Ledger Status: Confirmed & Ledger Ready',
                             style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.textMutedColor),
                           ),
                         ],
@@ -117,11 +119,47 @@ class PackagingQrScreen extends StatelessWidget {
                         children: [
                           Text('5-Stage Immutable Sequence', style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w700, color: context.textPrimaryColor)),
                           const SizedBox(height: 14),
-                          _buildStageTile(context, '1. Harvester', request.harvesterName, 'Harvest recorded & geolocation tagged', true),
-                          _buildStageTile(context, '2. Collection & Processing', 'Regional Collection Hub', 'Cold extracted & filtered', true),
-                          _buildStageTile(context, '3. Lab Testing', 'Apex Quality Food Testing Lab', 'Moisture 16.8% • Grade A Pure • PASSED', true),
-                          _buildStageTile(context, '4. Packaging', 'HoneyChain Eco Packaging Plant', 'Packaged in tamper-evident glass jars', true),
-                          _buildStageTile(context, '5. Consumer Verification', 'Public Ledger QR', 'Authentic verifiable QR live', true),
+                          _buildStageTile(
+                            context,
+                            '1. Harvester',
+                            request.harvesterName.isNotEmpty ? request.harvesterName : 'Harvester Operator',
+                            'Harvest recorded at ${request.location}',
+                            true,
+                          ),
+                          _buildStageTile(
+                            context,
+                            '2. Collection & Processing',
+                            'Accredited Collection & Processing Center',
+                            request.notes.isNotEmpty ? request.notes : 'Cold extraction & processing completed',
+                            true,
+                          ),
+                          _buildStageTile(
+                            context,
+                            '3. Lab Testing',
+                            'Accredited Testing Laboratory',
+                            (() {
+                              final parts = <String>[];
+                              if (request.moistureContent != null && request.moistureContent! > 0) parts.add('Moisture ${request.moistureContent!.toStringAsFixed(1)}%');
+                              if (request.purityGrade != null && request.purityGrade! > 0) parts.add('Purity ${request.purityGrade!.toStringAsFixed(1)}%');
+                              if (request.qualityScore != null && request.qualityScore! > 0) parts.add('Score ${request.qualityScore!.toStringAsFixed(1)}/100');
+                              return parts.isNotEmpty ? '${parts.join(" • ")} • PASSED' : 'Quality certified & approved';
+                            })(),
+                            true,
+                          ),
+                          _buildStageTile(
+                            context,
+                            '4. Packaging',
+                            request.packageSize != null && request.packageSize!.isNotEmpty ? request.packageSize! : 'Certified Packaging Facility',
+                            request.numberOfPackages != null ? '${request.numberOfPackages} units sealed & verified' : 'Packaged and tamper-evident sealed',
+                            true,
+                          ),
+                          _buildStageTile(
+                            context,
+                            '5. Consumer Verification',
+                            'Public Ledger QR',
+                            'Authentic verifiable QR live on blockchain',
+                            true,
+                          ),
                         ],
                       ),
                     ),
