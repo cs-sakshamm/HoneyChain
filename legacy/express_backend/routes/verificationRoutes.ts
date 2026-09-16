@@ -193,6 +193,27 @@ router.post('/harvester/registration', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/verification/harvester/fssai
+ * Step 3.5: Submit FSSAI License
+ */
+router.post('/harvester/fssai', async (req: Request, res: Response) => {
+  try {
+    const { harvesterId, fssaiLicense } = req.body;
+    if (!harvesterId || !fssaiLicense) {
+      return res.status(400).json({ success: false, error: 'harvesterId and fssaiLicense are required' });
+    }
+
+    const verification = await verificationService.submitHarvesterFssaiLicense(
+      harvesterId,
+      fssaiLicense
+    );
+    res.json({ success: true, message: 'FSSAI License verified.', verification });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error?.message || String(error) });
+  }
+});
+
+/**
  * POST /api/verification/harvester/location
  * Step 4: Submit Apiary Location
  */

@@ -3,15 +3,14 @@ node_modules/
 .pnp
 .pnp.js
 
-# Testing
+# Testing & Coverage
 coverage/
+.pytest_cache/
 
 # Environment Variables
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Databases
 *.db
@@ -19,6 +18,13 @@ coverage/
 *.sqlite
 *.sqlite3
 dev.db
+honeychain.db
+
+# Blockchain & Hardhat build outputs
+artifacts/
+cache/
+typechain/
+typechain-types/
 
 # Build outputs & caches
 dist/
@@ -35,8 +41,12 @@ out/
 .packages
 .pub-cache/
 .pub/
-build/
-*.lock
+
+# Android & iOS build artifacts
+.gradle/
+local.properties
+Generated.xcconfig
+flutter_export_environment.sh
 
 # IDEs & OS
 .vscode/

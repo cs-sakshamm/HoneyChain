@@ -1,0 +1,21 @@
+{
+  "model": "IsolationForest",
+  "version": "1.0",
+  "features": [
+    "temperature_c",
+    "humidity_pct",
+    "weight_kg",
+    "acoustics_hz",
+    "temperature_c_delta_1h",
+    "temperature_c_rolling_mean_6h",
+    "humidity_pct_delta_1h",
+    "humidity_pct_rolling_mean_6h",
+    "weight_kg_delta_1h",
+    "weight_kg_rolling_mean_6h",
+    "acoustics_hz_delta_1h",
+    "acoustics_hz_rolling_mean_6h",
+    "weight_delta_24h"
+  ],
+  "threshold": -4.2920853503269907e-17,
+  "n_samples": 485
+}

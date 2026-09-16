@@ -1,0 +1,19 @@
+# Compiled schema validation caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node modules & temporary validation outputs
+node_modules/
+*.log
+
+# Environment & temporary test files
+.env
+.env.*
+!.env.example
+
+# OS and Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

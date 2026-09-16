@@ -1,4 +1,4 @@
-﻿import * as crypto from 'crypto';
+import * as crypto from 'crypto';
 import {
   IAadhaarKycProvider,
   AadhaarOtpInitiateRequest,
@@ -60,7 +60,7 @@ export class SandboxAadhaarProvider implements IAadhaarKycProvider {
     const otpHash = this.hashOtp(rawOtp);
     const transactionId = `TXN-UIDAI-SBX-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
     const expiresInSeconds = 300; // 5 minutes
-    const cooldownSeconds = 60;
+    const cooldownSeconds = process.env.NODE_ENV === 'production' ? 60 : 5;
 
     const session: SandboxSession = {
       transactionId,

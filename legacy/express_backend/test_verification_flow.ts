@@ -132,6 +132,11 @@ async function runTests() {
     assert(locResult.apiaryLocation === 'Cascade Valley, OR', 'Public generalized region stored');
     assert(locResult.apiaryCoordinates === '44.0521, -121.3153', 'Private GPS coordinates stored off-chain');
 
+    // 6.5 Step 4.5: FSSAI License
+    console.log('\n--- 6.5 Step 4.5: FSSAI License ---');
+    const fssaiResult = await verificationService.submitHarvesterFssaiLicense(testHarvesterId, 'FSSAI-TEST-12345');
+    assert(fssaiResult.fssaiLicenseVerified === 'Verified', 'FSSAI License verified');
+
     // 7. Step 5: Final Blockchain Verification Record & Idempotency
     console.log('\n--- 7. Step 5: Final Blockchain Verification & Idempotency ---');
     const bcResult = await verificationService.submitBlockchainVerification(testHarvesterId);

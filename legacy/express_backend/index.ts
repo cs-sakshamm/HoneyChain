@@ -21,6 +21,28 @@ app.use(express.json());
 
 const prisma = new PrismaClient();
 
+// ── 7-Day Telemetry Cleanup Task ──
+// Deletes telemetry older than 7 days to prevent database bloat, keeps alerts.
+const cleanupOldTelemetry = async () => {
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const result = await prisma.hiveTelemetry.deleteMany({
+      where: {
+        recordedAt: { lt: sevenDaysAgo }
+      }
+    });
+    if (result.count > 0) {
+      console.log(`🧹 [Telemetry Cleanup] Deleted ${result.count} telemetry records older than 7 days.`);
+    }
+  } catch (error) {
+    console.error(`❌ [Telemetry Cleanup] Error:`, error);
+  }
+};
+// Run on startup, then every 24 hours
+cleanupOldTelemetry();
+setInterval(cleanupOldTelemetry, 24 * 60 * 60 * 1000);
+
+
 // Blockchain configuration
 const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'; // Account 0 on Hardhat Localhost
 const PROVIDER_URL = process.env.BLOCKCHAIN_PROVIDER_URL || 'http://127.0.0.1:8545';
