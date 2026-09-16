@@ -121,90 +121,92 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing HoneyChain Database and Models...")
     init_db()
 
-    # Seed default verified entities if empty
-    db = SessionLocal()
-    try:
-        if db.query(CollectionCentre).count() == 0:
-            centers = [
-                CollectionCentre(name="Central Sahyadri Honey Extraction & Processing Hub", location="Mahabaleshwar Apiary Zone, MH", latitude=17.9307, longitude=73.6477, contact_phone="+91 98230 11223", contact_email="contact@sahyadrihoney.org", license_number="FSSAI-MH-2026-0041"),
-                CollectionCentre(name="Cascade Range Regional Collection Centre", location="Bend Industrial Center, OR", latitude=44.0582, longitude=-121.3153, contact_phone="+1 541 555 0192", contact_email="intake@cascadeprocessing.com", license_number="USDA-OR-99120"),
-                CollectionCentre(name="Western Ghats Cooperative Extraction Facility", location="Shimoga Eco Zone, KA", latitude=13.9299, longitude=75.5681, contact_phone="+91 94481 33445", contact_email="ghats.coop@honeychain.io", license_number="FSSAI-KA-2026-0089"),
-            ]
-            db.add_all(centers)
-            db.commit()
-            logger.info("Seeded initial collection centres.")
+    # Seed default verified entities ONLY when explicitly enabled via env.
+    # Demo data must never silently appear in a real deployment.
+    if os.getenv("SEED_DEMO_DATA", "false").lower() in ("1", "true", "yes"):
+        db = SessionLocal()
+        try:
+            if db.query(CollectionCentre).count() == 0:
+                centers = [
+                    CollectionCentre(name="Central Sahyadri Honey Extraction & Processing Hub", location="Mahabaleshwar Apiary Zone, MH", latitude=17.9307, longitude=73.6477, contact_phone="+91 98230 11223", contact_email="contact@sahyadrihoney.org", license_number="FSSAI-MH-2026-0041"),
+                    CollectionCentre(name="Cascade Range Regional Collection Centre", location="Bend Industrial Center, OR", latitude=44.0582, longitude=-121.3153, contact_phone="+1 541 555 0192", contact_email="intake@cascadeprocessing.com", license_number="USDA-OR-99120"),
+                    CollectionCentre(name="Western Ghats Cooperative Extraction Facility", location="Shimoga Eco Zone, KA", latitude=13.9299, longitude=75.5681, contact_phone="+91 94481 33445", contact_email="ghats.coop@honeychain.io", license_number="FSSAI-KA-2026-0089"),
+                ]
+                db.add_all(centers)
+                db.commit()
+                logger.info("Seeded initial collection centres.")
 
-        # Seed Lab user & facility
-        lab_user = db.query(User).filter(User.role == "LAB").first()
-        if not lab_user:
-            lab_user = User(
-                name="National Apiculture & Food Safety Analytical Laboratory",
-                email="lab.director@honeychain.io",
-                role="LAB",
-                phone="+91 20 2569 1100",
-                organization_name="National Apiculture Analytical Centre",
-                facility_location="Pune Agri-Tech Park, MH",
-                license_number="NABL-ISO-17025-2026",
-                is_verified=True,
-            )
-            db.add(lab_user)
-            db.commit()
-            db.refresh(lab_user)
-
-        if db.query(Lab).count() == 0:
-            labs = [
-                Lab(
-                    user_id=lab_user.id,
-                    lab_name="National Apiculture & Food Safety Analytical Laboratory",
+            # Seed Lab user & facility
+            lab_user = db.query(User).filter(User.role == "LAB").first()
+            if not lab_user:
+                lab_user = User(
+                    name="National Apiculture & Food Safety Analytical Laboratory",
+                    email="lab.director@honeychain.io",
+                    role="LAB",
+                    phone="+91 20 2569 1100",
+                    organization_name="National Apiculture Analytical Centre",
                     facility_location="Pune Agri-Tech Park, MH",
-                    latitude=18.5204,
-                    longitude=73.8567,
-                    contact_phone="+91 20 2569 1100",
-                    contact_email="testing@apiculturelab.gov.in",
-                    registration_number="NABL-TC-8891",
-                    accreditation="NABL / FSSAI / ISO 17025 Certified",
-                ),
-            ]
-            db.add_all(labs)
-            db.commit()
-            logger.info("Seeded initial accredited testing labs.")
+                    license_number="NABL-ISO-17025-2026",
+                    is_verified=True,
+                )
+                db.add(lab_user)
+                db.commit()
+                db.refresh(lab_user)
 
-        # Seed Packaging facilities
-        if db.query(PackagingFacility).count() == 0:
-            facilities = [
-                PackagingFacility(
-                    name="Mahabaleshwar Pure Honey Bottling & Cleanroom Packaging Unit",
-                    location="Mahabaleshwar Industrial Area, MH",
-                    latitude=17.9250,
-                    longitude=73.6550,
-                    contact_phone="+91 98230 44556",
-                    contact_email="bottling@sahyadripure.org",
-                    license_number="FSSAI-PKG-1152026",
-                ),
-                PackagingFacility(
-                    name="Cascade Range Automated Bottling & Digital QR Packaging Facility",
-                    location="Bend Logistics Park, OR",
-                    latitude=44.0600,
-                    longitude=-121.3100,
-                    contact_phone="+1 541 555 0872",
-                    contact_email="packaging@cascadepack.com",
-                    license_number="OR-FDA-PKG-9821",
-                ),
-                PackagingFacility(
-                    name="Western Ghats Certified Honey Packaging Centre",
-                    location="Shimoga Packaging Depot, KA",
-                    latitude=13.9350,
-                    longitude=75.5720,
-                    contact_phone="+91 94481 77889",
-                    contact_email="packaging@westernghatshoney.com",
-                    license_number="FSSAI-PKG-1152089",
-                ),
-            ]
-            db.add_all(facilities)
-            db.commit()
-            logger.info("Seeded initial packaging facilities.")
-    finally:
-        db.close()
+            if db.query(Lab).count() == 0:
+                labs = [
+                    Lab(
+                        user_id=lab_user.id,
+                        lab_name="National Apiculture & Food Safety Analytical Laboratory",
+                        facility_location="Pune Agri-Tech Park, MH",
+                        latitude=18.5204,
+                        longitude=73.8567,
+                        contact_phone="+91 20 2569 1100",
+                        contact_email="testing@apiculturelab.gov.in",
+                        registration_number="NABL-TC-8891",
+                        accreditation="NABL / FSSAI / ISO 17025 Certified",
+                    ),
+                ]
+                db.add_all(labs)
+                db.commit()
+                logger.info("Seeded initial accredited testing labs.")
+
+            # Seed Packaging facilities
+            if db.query(PackagingFacility).count() == 0:
+                facilities = [
+                    PackagingFacility(
+                        name="Mahabaleshwar Pure Honey Bottling & Cleanroom Packaging Unit",
+                        location="Mahabaleshwar Industrial Area, MH",
+                        latitude=17.9250,
+                        longitude=73.6550,
+                        contact_phone="+91 98230 44556",
+                        contact_email="bottling@sahyadripure.org",
+                        license_number="FSSAI-PKG-1152026",
+                    ),
+                    PackagingFacility(
+                        name="Cascade Range Automated Bottling & Digital QR Packaging Facility",
+                        location="Bend Logistics Park, OR",
+                        latitude=44.0600,
+                        longitude=-121.3100,
+                        contact_phone="+1 541 555 0872",
+                        contact_email="packaging@cascadepack.com",
+                        license_number="OR-FDA-PKG-9821",
+                    ),
+                    PackagingFacility(
+                        name="Western Ghats Certified Honey Packaging Centre",
+                        location="Shimoga Packaging Depot, KA",
+                        latitude=13.9350,
+                        longitude=75.5720,
+                        contact_phone="+91 94481 77889",
+                        contact_email="packaging@westernghatshoney.com",
+                        license_number="FSSAI-PKG-1152089",
+                    ),
+                ]
+                db.add_all(facilities)
+                db.commit()
+                logger.info("Seeded initial packaging facilities.")
+        finally:
+            db.close()
 
     main_loop = asyncio.get_running_loop()
 
@@ -356,14 +358,6 @@ def get_current_user(
             raise HTTPException(status_code=401, detail={"success": False, "code": "USER_NOT_FOUND", "message": "User account not found."})
         return user
 
-    # Fallback to x-user-id header for development/testing if present
-    if req:
-        user_id = req.headers.get("x-user-id")
-        if user_id:
-            user = db.query(User).filter((User.id == user_id) | (User.email == user_id)).first()
-            if user:
-                return user
-
     raise HTTPException(
         status_code=401,
         detail={"success": False, "code": "UNAUTHORIZED", "message": "Authentication token is required."}
@@ -375,6 +369,17 @@ def get_optional_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
+    """Returns the user only when a VALID token is presented.
+    Invalid/expired tokens yield None (never a random DB user)."""
+    token = None
+    if credentials:
+        token = credentials.credentials
+    elif req:
+        auth_header = req.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+    if not token:
+        return None
     try:
         return get_current_user(req, credentials, db)
     except HTTPException:
@@ -630,6 +635,26 @@ def require_verified_packager(user: User = Depends(get_current_user)) -> User:
             }
         )
     return user
+
+
+def _notify(db: Session, user_id: Optional[str], ntype: str, title: str, message: str, meta: Optional[Dict[str, Any]] = None) -> None:
+    """Persist a real in-app notification for the target user (best-effort)."""
+    if not user_id:
+        return
+    try:
+        db.add(Notification(
+            user_id=user_id,
+            type="NORMAL",
+            category=(ntype or "SYSTEM")[:64],
+            title=(title or "HoneyChain update")[:128],
+            message=message,
+            severity="INFO",
+            resource_id=(meta or {}).get("requestId"),
+            details_json=json.dumps(meta or {}),
+        ))
+        db.flush()
+    except Exception as e:
+        logger.debug(f"Notification skipped: {e}")
 
 
 def get_user_dict(user: User) -> Dict[str, Any]:
@@ -948,33 +973,35 @@ def reset_password(payload: Optional[Dict[str, Any]] = None, db: Session = Depen
         return {"success": True, "message": "Password updated successfully. Please log in with your new password."}
 
     dev_token = None
-    if email:
+    reset_mode = os.getenv("PASSWORD_RESET_MODE", "email").lower()
+    if email and reset_mode == "sandbox":
         user = db.query(User).filter(User.email == email).first()
         if user:
             dev_token = create_access_token({"sub": user.id, "email": user.email, "purpose": "password_reset"}, expires_delta=timedelta(minutes=30))
 
-    return {
+    resp = {
         "success": True,
         "message": f"Password reset instructions sent to {email or 'your registered email'}.",
-        "devToken": dev_token,
     }
+    if dev_token:
+        resp["devToken"] = dev_token  # sandbox mode only
+    return resp
 
 
 @app.get("/api/profile")
 @app.get("/profile")
 def get_profile(
     userId: Optional[str] = None,
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    user = None
-    if userId:
+    # Authentication is mandatory. A userId may only be resolved by the
+    # account owner or an ADMIN — never fall back to an arbitrary user.
+    user = current_user
+    if userId and userId != current_user.id and userId != current_user.email:
+        if "ADMIN" not in (current_user.role or ""):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only view your own profile."})
         user = db.query(User).filter((User.id == userId) | (User.email == userId)).first()
-    if not user:
-        user = current_user
-
-    if not user:
-        user = db.query(User).first()
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
 
@@ -1113,14 +1140,20 @@ def get_hives(
     userId: Optional[str] = Query(None),
     harvesterId: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Hive list is authentication-scoped: harvesters see only their own hives;
+    admins may query any user's hives via ?userId=."""
     query = db.query(Hive)
     target_user_id = userId or harvesterId
-    if target_user_id:
+    is_admin = "ADMIN" in (current_user.role or "")
+    if target_user_id and (is_admin or target_user_id in (current_user.id, current_user.email)):
         user = db.query(User).filter((User.id == target_user_id) | (User.email == target_user_id)).first()
         if user:
             query = query.filter(Hive.user_id == user.id)
+    else:
+        query = query.filter(Hive.user_id == current_user.id)
 
     if search:
         s = f"%{search.strip().lower()}%"
@@ -1481,7 +1514,7 @@ def get_nearest_centers(
 
 @app.get("/api/requests")
 @app.get("/collection/requests")
-def get_workflow_requests(db: Session = Depends(get_db)):
+def get_workflow_requests(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     out = []
 
     # 1. Collection Requests (Harvester -> Collector)
@@ -1697,10 +1730,26 @@ def create_workflow_request(
 
 @app.put("/api/requests/{request_id}")
 @app.put("/collection/requests/{request_id}")
-def update_workflow_request(request_id: str, payload: WorkflowUpdateRequest, db: Session = Depends(get_db)):
+def update_workflow_request(
+    request_id: str,
+    payload: WorkflowUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Authenticated state transition with guards: no anonymous tampering,
+    no moves out of terminal states, no unknown statuses."""
+    TERMINAL = {"COMPLETED", "DENIED", "REJECTED", "CANCELLED"}
+    ALLOWED = {"PENDING", "ACCEPTED", "PROCESSING", "SENT_TO_LAB", "TESTING", "SENT_TO_PACKAGING", "PACKAGING_ACCEPTED", "COMPLETED", "DENIED", "REJECTED"}
+    new_status = (payload.status or "").upper().strip()
+    if new_status not in ALLOWED:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "VALIDATION_ERROR", "message": f"Unknown status '{new_status}'."})
+
     req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
     if req_obj:
-        req_obj.status = payload.status.upper()
+        old = (req_obj.status or "").upper()
+        if old in TERMINAL:
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Request already {old}; no further transitions allowed."})
+        req_obj.status = new_status
         if payload.notes:
             req_obj.notes = payload.notes
         if payload.quantityReceived:
@@ -1708,12 +1757,17 @@ def update_workflow_request(request_id: str, payload: WorkflowUpdateRequest, db:
         batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
         if batch:
             batch.status = req_obj.status
+            if new_status in ("PROCESSING", "IN_PROCESS", "IN_PROCESSING"):
+                batch.current_stage = "PROCESSING"
         db.commit()
         return {"success": True, "message": f"Request updated to {req_obj.status}"}
 
     lab_req = db.query(LabRequest).filter((LabRequest.id == request_id) | (LabRequest.request_id == request_id) | (LabRequest.batch_id == request_id)).first()
     if lab_req:
-        lab_req.status = payload.status.upper()
+        old = (lab_req.status or "").upper()
+        if old in TERMINAL:
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Lab request already {old}; no further transitions allowed."})
+        lab_req.status = new_status
         if payload.notes:
             lab_req.notes = payload.notes
         db.commit()
@@ -1736,6 +1790,17 @@ def accept_workflow_request(
     # 1. Check CollectionRequest
     req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
     if req_obj:
+        # State guards: only a pending request can be accepted, once, by the
+        # collection/processing role.
+        role = (current_user.role or "").upper()
+        if not any(k in role for k in ("COLLECT", "PROCESS")):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Collection & Processing accounts can accept collection requests."})
+        old_status = (req_obj.status or "").upper()
+        if old_status == "ACCEPTED":
+            raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_ACCEPT", "message": "Request has already been accepted."})
+        if old_status != "PENDING":
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Request is {old_status} and can no longer be accepted."})
+        req_obj.collection_centre_id = current_user.id
         if notes:
             req_obj.notes = f"{req_obj.notes or ''}\n{notes}".strip()
         req_obj.status = "ACCEPTED"
@@ -1760,6 +1825,7 @@ def accept_workflow_request(
             network=bc["network"],
             status=bc["status"],
         ))
+        _notify(db, req_obj.harvester_id, "REQUEST_ACCEPTED", "Collection request accepted", f"Your collection request {req_obj.request_id} was accepted by {current_user.organization_name or current_user.name}.", {"requestId": req_obj.request_id})
         db.commit()
         return {"success": True, "message": "Request accepted successfully", "requestId": req_obj.request_id, "status": "ACCEPTED", "blockchain": bc}
 
@@ -1825,74 +1891,60 @@ def accept_workflow_request(
 
 
 @app.patch("/api/requests/{request_id}/reject")
-def reject_workflow_request(request_id: str, payload: Optional[Dict[str, Any]] = None, db: Session = Depends(get_db)):
+def reject_workflow_request(
+    request_id: str,
+    payload: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     payload = payload or {}
-    reason = payload.get("reason") or "Rejected by reviewer"
-
     req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
     if req_obj:
-        req_obj.status = "REJECTED"
-        req_obj.notes = f"{req_obj.notes or ''}\nRejection Reason: {reason}".strip()
+        old_status = (req_obj.status or "").upper()
+        if old_status in ("COMPLETED", "DENIED", "REJECTED"):
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Request already {old_status}."})
+        reason = payload.get("reason") or payload.get("notes") or "Rejected by reviewer"
+        req_obj.status = "DENIED"
+        req_obj.notes = f"{req_obj.notes or ''}\nRejected: {reason}".strip()
         batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
         if batch:
-            batch.status = "REJECTED"
+            batch.status = "DENIED"
+        _notify(db, req_obj.harvester_id, "REQUEST_REJECTED", "Collection request rejected", f"Your collection request {req_obj.request_id} was rejected: {reason}", {"requestId": req_obj.request_id})
         db.commit()
-        return {"success": True, "message": "Request rejected", "requestId": req_obj.request_id, "status": "REJECTED"}
+        return {"success": True, "message": f"Request rejected"}
 
     lab_req = db.query(LabRequest).filter((LabRequest.id == request_id) | (LabRequest.request_id == request_id) | (LabRequest.batch_id == request_id)).first()
     if lab_req:
+        old_status = (lab_req.status or "").upper()
+        if old_status in ("COMPLETED", "REJECTED", "DENIED"):
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Lab request already {old_status}."})
         lab_req.status = "REJECTED"
-        lab_req.notes = f"{lab_req.notes or ''}\nRejection Reason: {reason}".strip()
-        batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == lab_req.batch_id).first()
-        if batch:
-            batch.status = "REJECTED"
         db.commit()
-        return {"success": True, "message": "Lab request rejected", "requestId": lab_req.request_id, "status": "REJECTED"}
+        return {"success": True, "message": "Lab request rejected"}
 
+    # Packaging-batch rejection (REQ-PKG-{batch_id} ids used by the Flutter packaging screen)
     clean_batch_id = request_id.replace("REQ-PKG-", "").strip()
     batch = db.query(CollectionBatch).filter((CollectionBatch.batch_id == clean_batch_id) | (CollectionBatch.id == clean_batch_id)).first()
     if batch:
+        old_status = (batch.status or "").upper()
+        if old_status in ("COMPLETED", "DENIED", "REJECTED"):
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Packaging batch already {old_status}."})
         batch.status = "REJECTED"
         db.commit()
         return {"success": True, "message": "Packaging batch rejected", "requestId": request_id, "status": "REJECTED"}
 
-    raise HTTPException(status_code=404, detail="Request not found")
+    raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Request not found"})
 
 
 @app.patch("/api/requests/{request_id}/status")
-def update_workflow_request_status(request_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
-    new_status = (payload.get("status") or "").upper().strip()
-    if not new_status:
-        return {"success": False, "message": "Missing status"}
-
-    req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
-    if req_obj:
-        req_obj.status = new_status
-        batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
-        if batch:
-            batch.status = new_status
-            if new_status in ("PROCESSING", "IN_PROCESS", "IN_PROCESSING"):
-                batch.current_stage = "PROCESSING"
-        db.commit()
-        return {"success": True, "message": f"Status updated to {req_obj.status}"}
-
-    lab_req = db.query(LabRequest).filter((LabRequest.id == request_id) | (LabRequest.request_id == request_id) | (LabRequest.batch_id == request_id)).first()
-    if lab_req:
-        lab_req.status = new_status
-        batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == lab_req.batch_id).first()
-        if batch:
-            batch.status = new_status
-        db.commit()
-        return {"success": True, "message": f"Status updated to {lab_req.status}"}
-
-    clean_batch_id = request_id.replace("REQ-PKG-", "").strip()
-    batch = db.query(CollectionBatch).filter((CollectionBatch.batch_id == clean_batch_id) | (CollectionBatch.id == clean_batch_id)).first()
-    if batch:
-        batch.status = new_status
-        db.commit()
-        return {"success": True, "message": f"Status updated to {batch.status}"}
-
-    raise HTTPException(status_code=404, detail="Request not found")
+def patch_request_status(
+    request_id: str,
+    payload: WorkflowUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Authenticated alias of PUT /api/requests/{id} for status updates."""
+    return update_workflow_request(request_id=request_id, payload=payload, current_user=current_user, db=db)
 
 
 @app.post("/api/requests/{request_id}/send-next")
@@ -2139,46 +2191,73 @@ def create_lab_report(
     current_user: User = Depends(require_verified_lab),
     db: Session = Depends(get_db)
 ):
-    batch_id = payload.get("batchId", f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}")
+    batch_id = payload.get("batchId")
+    if not batch_id:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "VALIDATION_ERROR", "message": "batchId is required for a lab report."})
     report_id = f"LAB-RPT-2026-{uuid.uuid4().hex[:6].upper()}"
+
+    # Real measured values are REQUIRED — no silent defaults that could
+    # fabricate a certification.
+    required_fields = {
+        "moistureContent": payload.get("moistureContent", payload.get("moistureValue")),
+        "hmfValue": payload.get("hmfValue"),
+        "diastaseValue": payload.get("diastaseValue"),
+    }
+    missing = [k for k, v in required_fields.items() if v is None]
+    if missing:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "VALIDATION_ERROR", "message": f"Missing measured values: {', '.join(missing)}. All physicochemical parameters are required."})
+
+    moisture = float(required_fields["moistureContent"])
+    hmf = float(required_fields["hmfValue"])
+    diastase = float(required_fields["diastaseValue"])
+
+    # Certification decision computed from real Codex/FSSAI thresholds.
+    thresholds_pass = (
+        moisture <= 20.0
+        and hmf <= 40.0
+        and diastase >= 8.0
+        and (payload.get("contaminantsFound") in (None, "", "None"))
+    )
+    overall_result = "PASS" if thresholds_pass else "FAIL"
+    cert_code = f"HC-CERT-2026-{uuid.uuid4().hex[:6].upper()}" if thresholds_pass else None
 
     lab_report = LabReport(
         report_id=report_id,
         batch_id=batch_id,
         lab_id=current_user.id,
-        quality_score=float(payload.get("qualityScore", 98.5)),
-        moisture_content=float(payload.get("moistureContent", payload.get("moistureValue", 16.8))),
-        purity_grade=payload.get("purityGrade", "Grade A (99.2%)"),
-        hmf_value=float(payload.get("hmfValue", 12.4)),
-        diastase_value=float(payload.get("diastaseValue", 14.2)),
-        contaminants_found=payload.get("contaminantsFound", "None"),
-        pollen_origin=payload.get("pollenValue", "Authentic Floral Matrix (Apis mellifera)"),
-        overall_result="PASS",
-        status="APPROVED",
-        remarks=payload.get("notes") or payload.get("remarks") or "Complies with Codex Alimentarius & FSSAI standards.",
+        quality_score=float(payload["qualityScore"]) if payload.get("qualityScore") is not None else None,
+        moisture_content=moisture,
+        purity_grade=payload.get("purityGrade") if thresholds_pass else None,
+        hmf_value=hmf,
+        diastase_value=diastase,
+        contaminants_found=payload.get("contaminantsFound") or "None",
+        pollen_origin=payload.get("pollenValue"),
+        overall_result=overall_result,
+        status=("APPROVED" if thresholds_pass else "REJECTED"),
+        remarks=(payload.get("notes") or payload.get("remarks") or ("Complies with Codex Alimentarius & FSSAI standards." if thresholds_pass else "One or more physicochemical parameters exceed permitted limits.")),
     )
     db.add(lab_report)
 
-    # Update lab request and batch stage
+    # Update lab request and batch stage based on the REAL outcome
     lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
     if lab_req:
-        lab_req.status = "COMPLETED"
+        lab_req.status = "COMPLETED" if thresholds_pass else "REJECTED"
 
     batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
     if batch:
         batch.current_stage = "LAB_TESTING"
-        batch.status = "APPROVED"
+        batch.status = "APPROVED" if thresholds_pass else "LAB_REJECTED"
 
     # Blockchain
     bc = blockchain_service.record_batch_event(
         batch_id=batch_id,
-        event_type="LAB_CERTIFICATION_APPROVED",
+        event_type="LAB_CERTIFICATION_APPROVED" if thresholds_pass else "LAB_CERTIFICATION_REJECTED",
         actor_id=current_user.id,
-        payload={"report_id": report_id, "quality_score": lab_report.quality_score, "moisture": lab_report.moisture_content},
+        payload={"report_id": report_id, "quality_score": lab_report.quality_score, "moisture": lab_report.moisture_content, "hmf": hmf, "diastase": diastase, "result": overall_result},
     )
     db.add(BlockchainRecord(
         batch_id=batch_id,
-        event_type="LAB_CERTIFICATION_APPROVED",
+        event_type="LAB_CERTIFICATION_APPROVED" if thresholds_pass else "LAB_CERTIFICATION_REJECTED",
         actor_id=current_user.id,
         data_hash=bc["data_hash"],
         tx_hash=bc.get("tx_hash"),
@@ -2186,7 +2265,15 @@ def create_lab_report(
         status=bc["status"],
     ))
     db.commit()
-    return {"success": True, "reportId": report_id, "status": "APPROVED", "blockchain": bc}
+    return {
+        "success": True,
+        "reportId": report_id,
+        "status": "APPROVED" if thresholds_pass else "REJECTED",
+        "overallResult": overall_result,
+        "certificationCode": cert_code,
+        "thresholds": {"moistureMax": 20.0, "hmfMax": 40.0, "diastaseMin": 8.0, "measured": {"moisture": moisture, "hmf": hmf, "diastase": diastase}},
+        "blockchain": bc,
+    }
 
 
 @app.post("/api/packaging")
@@ -2657,7 +2744,9 @@ def verify_batch(
             "packageSize": packaging.package_size if packaging else "500g Glass Jar",
         } if packaging else None,
         "blockchainVerification": {
-            "network": "Hardhat Localhost (Chain ID: 31337)",
+            "network": (bc_records[0].network if bc_records else blockchain_service.network),
+            "contractAddress": blockchain_service.contract_address or None,
+            "onChainConfigured": blockchain_service.is_connected(),
             "ledgerStatus": "CONFIRMED_ON_CHAIN" if any(b.status == "CONFIRMED" for b in bc_records) else ("TAMPER_EVIDENT_HASH_RECORDED" if bc_records else "NO_ON_CHAIN_RECORDS_YET"),
             "totalConfirmedEvents": len(bc_records),
             "latestTxHash": bc_records[-1].tx_hash if bc_records and bc_records[-1].tx_hash else None,
@@ -2700,13 +2789,21 @@ def send_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
     )
     db.add(otp)
     db.commit()
-    logger.info(f"[OTP Service] Generated real OTP for phone {phone}: {otp_code} (Session: {session_id})")
-    return {
+    # SECURITY: never log full OTP codes. In sandbox mode (no SMS provider
+    # configured) the code is returned to the client for testing; in live mode
+    # it is only dispatched via the SMS provider.
+    otp_provider = os.getenv("OTP_PROVIDER", "sandbox").lower()
+    logger.info(f"[OTP Service] OTP generated for phone {phone} (Session: {session_id}, provider: {otp_provider})")
+    resp = {
         "success": True,
         "message": "OTP generated and dispatched successfully.",
         "sessionId": session_id,
         "expiresInSeconds": 600,
+        "deliveryMode": otp_provider,
     }
+    if otp_provider == "sandbox":
+        resp["devOtp"] = otp_code  # sandbox/testing only
+    return resp
 
 
 @app.post("/api/verification/verify-otp")
@@ -2753,15 +2850,21 @@ def get_verification_status(role: str, user_id: str, db: Session = Depends(get_d
         profile.mobile_verified = "Verified"
         profile.kyc_status = "Verified"
         db.commit()
+    # Report REAL per-component status; never synthesize blanket "Verified".
 
-    verified_str = "Verified" if (user.is_verified or is_complete) else "Not Started"
+    verified_str = "Verified" if (user.is_verified or is_complete) else "In Progress"
+
+    def _real(component_status: Optional[str]) -> str:
+        s = (component_status or "Not Started").strip()
+        return s if s else "Not Started"
 
     return {
         "success": True,
         "verification": {
             "id": user.id,
             "harvesterId": user.id,
-            "collectorId": user.id,
+            "collectorId": _real(profile.mobile_verified and user.phone) or "Not Started",
+            "collectorIdStatus": _real(profile.mobile_verified),
             "labId": user.id,
             "packagerId": user.id,
             "fullName": user.name,
@@ -2770,15 +2873,16 @@ def get_verification_status(role: str, user_id: str, db: Session = Depends(get_d
             "facilityLocation": user.facility_location,
             "licenseNumber": user.license_number,
             "verificationStatus": verified_str,
-            "governmentIdVerified": verified_str,
-            "mobileVerified": verified_str,
-            "registrationVerified": verified_str,
-            "locationVerified": verified_str,
-            "fssaiLicenseVerified": verified_str,
-            "businessVerified": verified_str,
-            "kycStatus": verified_str,
-            "labDetailsVerified": verified_str,
-            "facilityDetailsVerified": verified_str,
+            "governmentIdVerified": _real(profile.kyc_status),
+            "mobileVerified": _real(profile.mobile_verified),
+            "registrationVerified": _real("Verified" if user.license_number else None),
+            "locationVerified": _real("Verified" if user.facility_location else None),
+            "fssaiLicenseVerified": _real("Verified" if user.license_number else "Not Started"),
+            "businessVerified": _real("Verified" if user.organization_name else "Not Started"),
+            "kycStatus": _real(profile.kyc_status),
+            "labDetailsVerified": _real("Verified" if user.organization_name else "Not Started"),
+            "facilityDetailsVerified": _real("Verified" if user.facility_location else "Not Started"),
+            "isProfileComplete": is_complete,
         }
     }
 
@@ -2805,29 +2909,64 @@ def handle_generic_verification(
     if not user:
         return {"success": False, "error": "User not found"}
 
-    # Mark user as verified
-    user.is_verified = True
-    # Also update profile verification status if exists
-    if user.profile:
-        user.profile.verification_status = "Verified"
+    # Real per-step state tracking on the Profile record. A step is only marked
+    # complete when its required data is actually present; full verification is
+    # granted only when profile completeness rules pass.
+    step_l = (step or "").lower()
+    if not user.profile:
+        user.profile = Profile(user_id=user.id)
+        db.add(user.profile)
+    p = user.profile
+    s = step_l
+    if "aadhaar" in s or "government" in s or "kyc" in s:
+        if (payload.get("documentNumber") or payload.get("governmentIdNumber") or payload.get("aadhaarNumber")):
+            p.government_id_type = (payload.get("documentType") or payload.get("governmentIdType") or "AADHAAR")[:64]
+            p.government_id_reference = (payload.get("documentNumber") or payload.get("governmentIdNumber") or payload.get("aadhaarNumber") or "")[:128]
+            p.kyc_status = "Verified"
+            p.kyc_verified_at = datetime.utcnow()
+    if "mobile" in s and "verify" in s:
+        p.mobile_verified = "Verified"
+        p.mobile_verified_at = datetime.utcnow()
+    if "business" in s or "details" in s or "facility" in s:
+        if payload.get("organizationName") or payload.get("labName"):
+            user.organization_name = payload.get("organizationName") or payload.get("labName")
+            user.facility_location = payload.get("facilityLocation") or payload.get("labAddress")
+    if "registration" in s and payload.get("registrationId"):
+        user.license_number = payload.get("registrationId")
+    if "fssai" in s and payload.get("fssaiLicense"):
+        user.license_number = payload.get("fssaiLicense")
+    if "location" in s and payload.get("apiaryLocation"):
+        user.facility_location = payload.get("apiaryLocation")
+
+    if is_user_profile_complete(user):
+        user.is_verified = True
+        p.verification_status = "Verified"
+        p.verified_at = datetime.utcnow()
+    else:
+        if p.verification_status == "Not Started":
+            p.verification_status = "In Progress"
     db.commit()
     db.refresh(user)
 
-    verified_str = "Verified"
+    verified_str = "Verified" if user.is_verified else "In Progress"
     return {
         "success": True,
         "verification": {
             "harvesterId": user_id,
+            "collectorId": user_id,
+            "labId": user_id,
+            "packagerId": user_id,
             "verificationStatus": verified_str,
-            "governmentIdVerified": verified_str,
-            "mobileVerified": verified_str,
-            "registrationVerified": verified_str,
-            "locationVerified": verified_str,
-            "fssaiLicenseVerified": verified_str,
-            "businessVerified": verified_str,
-            "kycStatus": verified_str,
-            "labDetailsVerified": verified_str,
-            "facilityDetailsVerified": verified_str,
+            "governmentIdVerified": p.kyc_status,
+            "mobileVerified": p.mobile_verified,
+            "registrationVerified": "Verified" if user.license_number else "Not Started",
+            "locationVerified": "Verified" if user.facility_location else "Not Started",
+            "fssaiLicenseVerified": "Verified" if user.license_number else "Not Started",
+            "businessVerified": "Verified" if user.organization_name else "Not Started",
+            "kycStatus": p.kyc_status,
+            "labDetailsVerified": "Verified" if user.organization_name else "Not Started",
+            "facilityDetailsVerified": "Verified" if user.facility_location else "Not Started",
+            "isProfileComplete": is_user_profile_complete(user),
         }
     }
 
@@ -2835,23 +2974,71 @@ def handle_generic_verification(
 @app.post("/api/verification/harvester")
 def verify_harvester(payload: Dict[str, Any], db: Session = Depends(get_db)):
     harvester_id = payload.get("harvesterId")
+    verif_id = f"HC-VERIF-HARVESTER-{uuid.uuid4().hex[:6].upper()}"
     if harvester_id:
         user = db.query(User).filter(User.id == harvester_id).first()
         if user:
-            user.is_verified = True
-            if user.profile:
+            # Persist the real verification record (Profile.review_notes JSON)
+            if not user.profile:
+                user.profile = Profile(user_id=user.id)
+                db.add(user.profile)
+            try:
+                notes = json.loads(user.profile.review_notes or "{}")
+            except Exception:
+                notes = {}
+            notes["verificationId"] = verif_id
+            notes["verificationRequestedAt"] = datetime.utcnow().isoformat()
+            user.profile.review_notes = json.dumps(notes)
+            if is_user_profile_complete(user):
+                user.is_verified = True
                 user.profile.verification_status = "Verified"
+                user.profile.verified_at = datetime.utcnow()
             db.commit()
-    verif_id = f"HC-VERIF-HARVESTER-{uuid.uuid4().hex[:6].upper()}"
-    return {"success": True, "verificationId": verif_id, "status": "VERIFIED"}
+    return {"success": True, "verificationId": verif_id, "status": "VERIFIED" if (harvester_id and _persisted_verified(db, harvester_id)) else "PENDING"}
+
+
+def _persisted_verified(db: Session, user_id: str) -> bool:
+    u = db.query(User).filter(User.id == user_id).first()
+    return bool(u and (u.is_verified or is_user_profile_complete(u)))
 
 
 @app.get("/api/verify/harvester/{verification_id}")
-def get_harvester_verification(verification_id: str):
-    return {
-        "success": True,
-        "found": True,
-        "verificationId": verification_id,
-        "verificationStatus": "VERIFIED",
-        "harvester": {"name": "Certified Beekeeper", "status": "VERIFIED"},
-    }
+def get_harvester_verification(verification_id: str, db: Session = Depends(get_db)):
+    """Public harvester verification lookup — real DB record or honest 404.
+    Verification IDs are persisted on the Profile row (review_notes JSON) when
+    harvester verification completes (see /api/verification/harvester)."""
+    import json as _json
+    try:
+        profiles = db.query(Profile).filter(Profile.review_notes.isnot(None)).all()
+    except Exception:
+        profiles = []
+    for p in profiles:
+        try:
+            notes = _json.loads(p.review_notes or "{}")
+        except Exception:
+            continue
+        if notes.get("verificationId") == verification_id:
+            u = db.query(User).filter(User.id == p.user_id).first()
+            return {
+                "success": True,
+                "found": True,
+                "verificationId": verification_id,
+                "verificationStatus": ("VERIFIED" if u and u.is_verified else "PENDING"),
+                "harvester": {
+                    "name": u.name if u else None,
+                    "status": ("VERIFIED" if u and u.is_verified else "PENDING"),
+                    "beekeeperId": u.beekeeper_id if u else None,
+                },
+            }
+
+    # Fallback: the ID may be a user id/email of a verified harvester
+    u = db.query(User).filter((User.id == verification_id) | (User.email == verification_id)).first()
+    if u and "HARVESTER" in (u.role or "").upper() and (u.is_verified or is_user_profile_complete(u)):
+        return {
+            "success": True,
+            "found": True,
+            "verificationId": verification_id,
+            "verificationStatus": "VERIFIED",
+            "harvester": {"name": u.name, "status": "VERIFIED", "beekeeperId": u.beekeeper_id},
+        }
+    return JSONResponse(status_code=404, content={"success": False, "found": False, "message": "Verification record not found"})

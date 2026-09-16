@@ -12,9 +12,12 @@ import 'features/hives/controllers/hive_controller.dart';
 import 'features/profile/controllers/user_controller.dart';
 import 'features/verification/controllers/verification_controller.dart';
 import 'firebase_options.dart';
+import 'core/services/auth_token_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await AuthTokenStore.loadFromPrefs();
 
   try {
     await Firebase.initializeApp(

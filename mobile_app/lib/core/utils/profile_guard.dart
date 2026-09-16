@@ -40,8 +40,6 @@ class ProfileGuard {
     final userCtrl = context.read<UserController>();
     if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
-    final verCtrl = context.read<VerificationController>();
-    if (verCtrl.verification.isFullyVerified) return true;
 
     showIncompleteProfileDialog(context);
     return false;
@@ -56,8 +54,6 @@ class ProfileGuard {
     final userCtrl = context.read<UserController>();
     if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
-    final verCtrl = context.read<VerificationController>();
-    if (verCtrl.collectorVerification.isFullyVerified) return true;
 
     showIncompleteProfileDialog(context);
     return false;
@@ -72,8 +68,6 @@ class ProfileGuard {
     final userCtrl = context.read<UserController>();
     if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
-    final verCtrl = context.read<VerificationController>();
-    if (verCtrl.labVerification.isFullyVerified) return true;
 
     showIncompleteProfileDialog(context);
     return false;
@@ -88,8 +82,6 @@ class ProfileGuard {
     final userCtrl = context.read<UserController>();
     if (userCtrl.user.isVerified || userCtrl.user.isProfileComplete) return true;
 
-    final verCtrl = context.read<VerificationController>();
-    if (verCtrl.packagingVerification.isFullyVerified) return true;
 
     showIncompleteProfileDialog(context);
     return false;

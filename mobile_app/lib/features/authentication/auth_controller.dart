@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/auth_token_store.dart';
 import 'auth_service.dart';
 
 enum AuthStateStatus {
@@ -79,10 +80,21 @@ class AuthController extends ChangeNotifier {
       : _authService = authService ?? AuthService(),
         _client = client ?? http.Client(),
         _baseUrl = baseUrl ?? _resolveBaseUrl() {
-    if (_authService.isFirebaseInitialized) {
+    _initSession();
+  }
+
+  Future<void> _initSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    
+    if (token != null && token.isNotEmpty) {
+      _status = AuthStateStatus.authenticated;
+      notifyListeners();
+    } else if (_authService.isFirebaseInitialized) {
       _currentUser = _authService.currentUser;
       if (_currentUser != null) {
         _status = AuthStateStatus.authenticated;
+        notifyListeners();
       }
     }
   }
@@ -464,6 +476,9 @@ class AuthController extends ChangeNotifier {
   /// Sign out
   Future<void> signOut() async {
     await _authService.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('user_profile_id');
     _currentUser = null;
     _selectedRole = null;
     _status = AuthStateStatus.idle;

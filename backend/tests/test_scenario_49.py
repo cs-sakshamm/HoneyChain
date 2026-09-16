@@ -216,6 +216,9 @@ def test_section_49_scenario():
         "labId": lab_user.id,
         "qualityScore": 99.4,
         "moistureContent": 16.2,
+        "hmfValue": 11.0,
+        "diastaseValue": 16.0,
+        "contaminantsFound": "None",
         "purityGrade": "Grade A+ (99.8% Pure)",
         "remarks": "Purity certified.",
     }, headers=lab_headers)

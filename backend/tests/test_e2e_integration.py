@@ -201,6 +201,9 @@ def test_e2e_integration():
         "labId": lab_user.id,
         "qualityScore": 99.1,
         "moistureContent": 16.5,
+        "hmfValue": 12.0,
+        "diastaseValue": 15.0,
+        "contaminantsFound": "None",
         "purityGrade": "Grade A (99.5% Pure)",
         "remarks": "100% compliant with FSSAI & Codex Alimentarius Honey Standards.",
     }, headers=lab_headers)
