@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import queue
 import threading
 from datetime import datetime
 from typing import Dict, Any, Callable, List, Optional
@@ -39,6 +40,15 @@ class MQTTConsumer:
         self.is_running = False
         self.listeners: List[Callable[[Dict[str, Any]], None]] = []
         self._thread: Optional[threading.Thread] = None
+        # HC-006: DB persistence is decoupled from the paho network loop AND
+        # split by priority. Synchronous cloud-DB writes inside on_message
+        # blocked the socket reader, so during a telemetry burst the AI
+        # 'processed' messages sat behind minutes of queued telemetry packets.
+        # Two FIFO queues guarantee processed (AI insight) messages are always
+        # handled before the raw telemetry backlog — per-topic order preserved.
+        self._processed_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue()
+        self._telemetry_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue()
+        self._worker: Optional[threading.Thread] = None
 
     def add_listener(self, callback: Callable[[Dict[str, Any]], None]):
         self.listeners.append(callback)
@@ -59,12 +69,51 @@ class MQTTConsumer:
     def on_message(self, client, userdata, msg):
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
-            if msg.topic == PROCESSED_TOPIC:
-                self.process_processed_payload(payload)
-            elif msg.topic == TELEMETRY_TOPIC:
-                self.process_raw_telemetry_payload(payload)
         except Exception as err:
-            logger.error(f"Error handling MQTT message on {msg.topic}: {err}")
+            logger.error(f"Error decoding MQTT message on {msg.topic}: {err}")
+            return
+        # Never block the network loop: hand off to the worker immediately.
+        if msg.topic == PROCESSED_TOPIC:
+            self._processed_queue.put(payload)
+        elif msg.topic == TELEMETRY_TOPIC:
+            self._telemetry_queue.put(payload)
+
+    def _handle(self, topic: str, payload: Dict[str, Any]):
+        if topic == PROCESSED_TOPIC:
+            self.process_processed_payload(payload)
+        elif topic == TELEMETRY_TOPIC:
+            self.process_raw_telemetry_payload(payload)
+
+    def _worker_loop(self):
+        while self.is_running or not self._processed_queue.empty() or not self._telemetry_queue.empty():
+            # Priority 1: AI-processed insights (small volume, high value,
+            # time-sensitive for alerts/dashboards). Drain without waiting.
+            handled = False
+            try:
+                payload = self._processed_queue.get_nowait()
+                handled = True
+                try:
+                    self._handle(PROCESSED_TOPIC, payload)
+                except Exception as err:
+                    logger.error(f"Error handling processed message: {err}")
+                finally:
+                    self._processed_queue.task_done()
+            except queue.Empty:
+                pass
+
+            # Priority 2: raw telemetry history (bulk). Block-wait here so the
+            # worker sleeps when idle.
+            if not handled:
+                try:
+                    payload = self._telemetry_queue.get(timeout=0.5)
+                    try:
+                        self._handle(TELEMETRY_TOPIC, payload)
+                    except Exception as err:
+                        logger.error(f"Error handling telemetry message: {err}")
+                    finally:
+                        self._telemetry_queue.task_done()
+                except queue.Empty:
+                    continue
 
     def process_processed_payload(self, payload: Dict[str, Any]):
         device_id = payload.get("device_id")
@@ -238,6 +287,10 @@ class MQTTConsumer:
         if self.is_running:
             return
 
+        self.is_running = True
+        self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="mqtt-db-worker")
+        self._worker.start()
+
         def _runner():
             try:
                 self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2 if hasattr(mqtt, "CallbackAPIVersion") else None)
@@ -258,6 +311,11 @@ class MQTTConsumer:
 
     def stop(self):
         self.is_running = False
+        if self._worker:
+            try:
+                self._worker.join(timeout=10)  # drain queued messages before exit
+            except Exception:
+                pass
         if self.client:
             try:
                 self.client.disconnect()

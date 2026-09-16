@@ -900,11 +900,29 @@ def switch_role(
 
 @app.post("/api/auth/google")
 def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
-    clean_email = (payload.email or "").strip().lower()
-    if not clean_email and not payload.idToken:
-        raise HTTPException(status_code=400, detail={"success": False, "error": "Google identity token or email required.", "code": "VALIDATION_ERROR"})
+    # SECURITY (HC-005): fail-closed Google authentication.
+    # - With an idToken: verification MUST succeed; the verified email from the
+    #   token is the only identity used. Verification failure => 401 (never a
+    #   silent fallback to the client-supplied email).
+    # - Without an idToken: rejected with 400 in production mode or whenever
+    #   GOOGLE_CLIENT_ID is configured (deployment intends real verification).
+    #   Bare-email sign-in remains available in local development for usability.
+    environment = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or "development").strip().lower()
+    is_production = environment in ("production", "prod")
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+    strict_mode = is_production or bool(google_client_id)
 
-    # In production, verify Google ID token with google-auth / firebase if token provided
+    clean_email = (payload.email or "").strip().lower()
+    if not payload.idToken:
+        if strict_mode:
+            raise HTTPException(
+                status_code=400,
+                detail={"success": False, "error": "A Google ID token is required for Google sign-in.", "code": "GOOGLE_ID_TOKEN_REQUIRED"},
+            )
+        if not clean_email:
+            raise HTTPException(status_code=400, detail={"success": False, "error": "Google identity token or email required.", "code": "VALIDATION_ERROR"})
+        logger.warning("Google sign-in WITHOUT idToken accepted (development mode only).")
+
     verified_email = clean_email
     verified_name = payload.name or "Google User"
     verified_photo = payload.photoUrl
@@ -913,13 +931,16 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
         try:
             from google.oauth2 import id_token
             from google.auth.transport import requests as grequests
-            client_id = os.getenv("GOOGLE_CLIENT_ID")
-            idinfo = id_token.verify_oauth2_token(payload.idToken, grequests.Request(), client_id)
+            idinfo = id_token.verify_oauth2_token(payload.idToken, grequests.Request(), google_client_id)
             verified_email = idinfo["email"].lower()
             verified_name = idinfo.get("name", verified_name)
             verified_photo = idinfo.get("picture", verified_photo)
         except Exception as e:
-            logger.warning(f"Google token direct verification: {e}")
+            logger.warning(f"Google ID token verification failed: {e}")
+            raise HTTPException(
+                status_code=401,
+                detail={"success": False, "error": "Google ID token could not be verified.", "code": "INVALID_GOOGLE_TOKEN"},
+            )
 
     target_role = (payload.role or "HARVESTER").upper()
 
