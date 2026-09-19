@@ -13,7 +13,7 @@
 | `backend/` | Python/FastAPI | 0 | — | N/A |
 | `mobile_app/` | Flutter/Dart | 0 | — | N/A |
 | `ai_ml/` | Python | 0 | — | **UNTOUCHED (read-only)** |
-| `legacy/` | TS + JS (quarantined) | 1 `.js` | 20+ `.ts` | **NOT migrated — unreferenced by any active layer** (`git grep legacy/` → no hits in active code, configs, or docs) |
+| `legacy/` | TS + JS (superseded Node backend) | 1 `.js` | 20+ `.ts` | **REMOVED from the repository** — verified unreferenced by any active layer; recoverable via tag `legacy-express-backend-archive` |
 
 **Active JS inventory detail (blockchain/):** `hardhat.config.js`, `compile_and_deploy.js`, `scripts/deploy.js`, `scripts/verify_backend_evm.js`, `test/provenance.test.js`. All consumed: config (Hardhat), scripts (`npm run`), test (`npm test`). Dynamic-import/lazy-load/route references: none found (`git grep` across configs, docs, scripts).
 
@@ -49,7 +49,7 @@ Configuration changes:                       + blockchain/tsconfig.json (strict,
 |---|---|---|
 | `scripts/generate_docs.py`, `scripts/generate_report.py` | **REMOVED** | zero references (`git grep` over `.py/.md/.json/.ps1/.sh/.json`); docs they generated are already committed |
 | `ml_models_backup/` (metrics.json, threshold.json) | **KEPT** | referenced by `ai_ml/` (`mqtt_processor.py`, training scripts, `ai_ml/README.md`) |
-| `legacy/` (express_backend*, express_backend_prisma) | **KEPT** | quarantine of a superseded implementation; never referenced by active layers — deleting it is a product decision, not a safe-cleanup one |
+| `legacy/` (express_backend*, express_backend_prisma — 94 tracked files, ~1.2 MB) | **REMOVED** (2026-09-20) | final verification before removal: no code/script/build/CI/docker references (`.dockerignore` exclusion deleted as inert); recovery point: tag `legacy-express-backend-archive` |
 | `mobile_app` controller methods (`fetchHiveStatus`, `fetchHiveTelemetryHistory`, `ingestSensorData`) | **KEPT** | public controller API surface; `fetchHiveStatus`/dashboard paths are exercised in tests; removal would risk behavior |
 | `scripts/start_dev.ps1` / `start_dev.sh`, `web/dist` | **KEPT** | local tooling; `web/dist` untracked |
 
@@ -114,7 +114,7 @@ Baseline comparison (pre-migration): blockchain test 1/1 PASS, web build PASS, a
 
 ## 7. Known Issues / Notes
 
-* `legacy/` remains in-tree, unreferenced. Safe to archive/delete in a dedicated decision.
+* ~~`legacy/` remains in-tree, unreferenced~~ → **resolved:** removed from the repository (94 files, ~1.2 MB) after full reference verification; recoverable at tag `legacy-express-backend-archive`.
 * `scripts/start_dev.ps1` is UTF-16 encoded; works with PowerShell but is inconsistent with the repo's UTF-8 convention (left untouched — functioning tooling).
 * The web verifier ships a `framer-motion` dependency already in use by its components (pre-existing; verified via `web/src/utils/animations.ts` usage) — unchanged.
 * `mobile_app` `AppConstants.publicVerificationBaseUrl` still defaults to a temporary trycloudflare host — flagged in `mobile_app/README.md` §9.

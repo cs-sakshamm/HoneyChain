@@ -12,7 +12,7 @@ The HoneyChain backend is the integration and business-logic core of the platfor
 * **Web3.py 8.x** (`services/blockchain_service.py`): EVM contract client for `HoneyChainProvenance.sol`.
 * **qrcode + Pillow** (`services/qr_service.py`): QR tag generation as base64 data URIs.
 * **python-jose / passlib**: JWT issuing/verification and password hashing.
-* **Node.js** (blockchain toolchain only): the Hardhat TypeScript toolchain lives in `blockchain/` — there is **no** Express/Prisma service inside `backend/` (an older implementation is quarantined under `legacy/` and is not part of the running system).
+* **Node.js** (blockchain toolchain only): the Hardhat TypeScript toolchain lives in `blockchain/` — there is **no** Express/Prisma service inside `backend/` (a superseded Node implementation was archived and removed from the repository; it remains recoverable at the `legacy-express-backend-archive` tag).
 
 ---
 

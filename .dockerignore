@@ -4,7 +4,6 @@
 **/*.pyc
 **/.pytest_cache
 **/.git
-legacy/
 mobile_app/
 docs/
 scripts/

@@ -78,7 +78,6 @@ __pycache__/
 # local test artifacts
 *.local
 generate_audit.py
-legacy/express_backend_node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
