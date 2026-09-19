@@ -152,6 +152,7 @@ class HiveTelemetry(Base):
         Index("ix_telemetry_hive_id", "hive_id"),
         Index("ix_telemetry_device_id", "device_id"),
         Index("ix_telemetry_recorded_at", "recorded_at"),
+        Index("ix_telemetry_device_id_timestamp", "device_id", "timestamp"),
     )
 
 

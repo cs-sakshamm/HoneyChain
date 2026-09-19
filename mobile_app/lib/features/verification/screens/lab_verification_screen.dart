@@ -10,10 +10,9 @@ import '../../../core/widgets/pill_page_header.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../controllers/verification_controller.dart';
 
-/// Lab Tester Profile Verification Screen (3/3)
-/// 1. Identity Verification (Full Name + Mobile OTP)
-/// 2. Laboratory Details (Lab Name, Lab Address, Reg No & Accreditation)
-/// 3. License, KYC & Qualification (Government ID + Lab Chemist Qualification & Scope)
+/// Lab Tester Profile Verification (2/2)
+/// 1. Laboratory Details (Lab Name, Lab Address, Reg No & Accreditation)
+/// 2. License, KYC & Qualification (Government ID + Lab Chemist Qualification & Scope)
 class LabVerificationScreen extends StatefulWidget {
   const LabVerificationScreen({super.key});
 
@@ -22,10 +21,7 @@ class LabVerificationScreen extends StatefulWidget {
 }
 
 class _LabVerificationScreenState extends State<LabVerificationScreen> {
-  // Step 1: Identity Controllers
-  late TextEditingController _nameController;
-  late TextEditingController _mobileController;
-  late TextEditingController _otpController;
+
 
   // Step 2: Laboratory Details Controllers
   late TextEditingController _labNameController;
@@ -45,9 +41,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
     final user = context.read<UserController>().user;
     final labVer = context.read<VerificationController>().labVerification;
 
-    _nameController = TextEditingController(text: labVer.fullName ?? user.name);
-    _mobileController = TextEditingController(text: labVer.mobileNumber ?? user.phone);
-    _otpController = TextEditingController();
+
 
     _labNameController = TextEditingController(text: labVer.labName ?? user.organizationName ?? '');
     _labAddressController = TextEditingController(text: labVer.labAddress ?? user.facilityLocation ?? '');
@@ -69,9 +63,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _mobileController.dispose();
-    _otpController.dispose();
+
     _labNameController.dispose();
     _labAddressController.dispose();
     _labRegController.dispose();
@@ -116,9 +108,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                 const SizedBox(height: AppConstants.space16),
               ],
 
-              // ── Step 1: Identity Verification ──
-              _buildStep1IdentityCard(context, verCtrl),
-              const SizedBox(height: AppConstants.space16),
+
 
               // ── Step 2: Laboratory Details ──
               _buildStep2LabDetailsCard(context, verCtrl),
@@ -172,7 +162,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'PROFILE VERIFICATION — ' + count.toString() + '/3',
+                      'PROFILE VERIFICATION — ' + count.toString() + '/2',
                       style: GoogleFonts.manrope(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -185,7 +175,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                     Text(
                       isVerified
                           ? 'Your lab tester profile is 100% verified & active.'
-                          : 'Complete all 3 parameters to accept sample testing requests.',
+                          : 'Complete all 2 parameters to accept sample testing requests.',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: context.textSecondaryColor,
@@ -205,7 +195,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                   ),
                 ),
                 child: Text(
-                  count.toString() + '/3',
+                  count.toString() + '/2',
                   style: GoogleFonts.manrope(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -219,7 +209,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: count / 3.0,
+              value: count / 2.0,
               minHeight: 8,
               backgroundColor: context.scaffoldBg,
               valueColor: AlwaysStoppedAnimation<Color>(
@@ -229,25 +219,19 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
           ),
           const SizedBox(height: 16),
           // Checklist
-          _buildChecklistItem(
-            context,
-            title: 'Identity Verification',
-            subtitle: 'Full name & verified mobile OTP',
-            isComplete: count >= 1 && context.watch<VerificationController>().labVerification.isStep1IdentityComplete,
-          ),
-          const SizedBox(height: 8),
+
           _buildChecklistItem(
             context,
             title: 'Laboratory Details',
             subtitle: 'Accredited lab name, address & license',
-            isComplete: count >= 2 && context.watch<VerificationController>().labVerification.isStep2LabDetailsComplete,
+            isComplete: count >= 1 && context.watch<VerificationController>().labVerification.isStep2LabDetailsComplete,
           ),
           const SizedBox(height: 8),
           _buildChecklistItem(
             context,
             title: 'License, KYC & Scope',
             subtitle: 'Government ID & certified chemist credentials',
-            isComplete: count == 3 && context.watch<VerificationController>().labVerification.isStep3KycComplete,
+            isComplete: count == 2 && context.watch<VerificationController>().labVerification.isStep3KycComplete,
           ),
         ],
       ),
@@ -327,191 +311,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
     );
   }
 
-  // ── Step 1: Identity Verification ──
-  Widget _buildStep1IdentityCard(BuildContext context, VerificationController verCtrl) {
-    final labVer = verCtrl.labVerification;
-    final isDone = labVer.isStep1IdentityComplete;
-    final user = context.read<UserController>().user;
-    final userId = user.id ?? user.email;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: isDone ? context.successBgColor : context.primarySoftColor,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '1',
-                        style: GoogleFonts.manrope(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: isDone ? context.successColor : context.textPrimaryColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Identity Verification',
-                        style: GoogleFonts.manrope(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: context.textPrimaryColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              _buildStatusPill(context, isDone ? 'Verified ✓' : 'Pending', isDone),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Provide your full legal name and verify your mobile number with OTP.',
-            style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
-          ),
-          const SizedBox(height: 16),
-
-          if (isDone) ...[
-            _buildVerifiedDataTile(context, 'Full Name', labVer.fullName ?? user.name),
-            const SizedBox(height: 8),
-            _buildVerifiedDataTile(context, 'Mobile Number', labVer.mobileNumber ?? user.phone),
-          ] else ...[
-            AppTextField(
-              controller: _nameController,
-              labelText: 'Full Name of Lab Tester',
-              hintText: 'Enter your full name',
-              prefixIcon: Icon(Icons.person_outline_rounded, size: 20, color: context.textSecondaryColor),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    controller: _mobileController,
-                    labelText: 'Mobile Number',
-                    hintText: 'e.g. 98765 43210',
-                    prefixIcon: Icon(Icons.phone_android_rounded, size: 20, color: context.textSecondaryColor),
-                    keyboardType: TextInputType.phone,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: verCtrl.isLoading
-                        ? null
-                        : () async {
-                            final mob = _mobileController.text.trim();
-                            if (mob.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please enter mobile number')),
-                              );
-                              return;
-                            }
-                            await verCtrl.sendLabMobileOtp(userId, mob);
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.colors.primary,
-                      foregroundColor: context.colors.onPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                    ),
-                    child: Text(
-                      verCtrl.mobileOtpSent ? 'Resend' : 'Send OTP',
-                      style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (verCtrl.mobileOtpSent) ...[
-              const SizedBox(height: 14),
-              if (verCtrl.devOtp != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: context.primarySoftColor,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: context.borderColor),
-                  ),
-                  child: Text(
-                    'OTP Code: ' + (verCtrl.devOtp ?? ''),
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                  ),
-                ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: AppTextField(
-                      controller: _otpController,
-                      labelText: 'Enter 6-Digit OTP',
-                      hintText: 'Enter 6-digit OTP',
-                      prefixIcon: Icon(Icons.lock_clock_outlined, size: 20, color: context.textSecondaryColor),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: verCtrl.isLoading
-                          ? null
-                          : () async {
-                              final otp = _otpController.text.trim();
-                              final name = _nameController.text.trim();
-                              final mob = _mobileController.text.trim();
-                              if (otp.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please enter OTP')),
-                                );
-                                return;
-                              }
-                              await verCtrl.verifyLabMobileOtp(
-                                labId: userId,
-                                mobile: mob,
-                                otp: otp,
-                                fullName: name,
-                              );
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: context.successColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                      ),
-                      child: Text(
-                        'Verify',
-                        style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ],
-      ),
-    );
-  }
 
   // ── Step 2: Laboratory Details ──
   Widget _buildStep2LabDetailsCard(BuildContext context, VerificationController verCtrl) {
@@ -539,7 +339,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        '2',
+                        '1',
                         style: GoogleFonts.manrope(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -680,7 +480,7 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        '3',
+                        '2',
                         style: GoogleFonts.manrope(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -841,17 +641,20 @@ class _LabVerificationScreenState extends State<LabVerificationScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.borderColor),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: context.textSecondaryColor),
+          Expanded(
+            child: Text(label, style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor)),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+            ),
           ),
         ],
       ),

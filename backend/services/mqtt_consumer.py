@@ -49,6 +49,7 @@ class MQTTConsumer:
         self._processed_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue()
         self._telemetry_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue()
         self._worker: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
 
     def add_listener(self, callback: Callable[[Dict[str, Any]], None]):
         self.listeners.append(callback)
@@ -137,48 +138,78 @@ class MQTTConsumer:
                 logger.warning(f"Telemetry received for unmapped device/hive: {device_id}. Skipping processing.")
                 return
 
-            recorded_dt = datetime.utcfromtimestamp(ts) if isinstance(ts, (int, float)) else datetime.utcnow()
+            try:
+                timestamp = int(ts)
+            except (TypeError, ValueError):
+                timestamp = int(datetime.utcnow().timestamp())
+            recorded_dt = datetime.utcfromtimestamp(timestamp)
 
-            # 2. Persist Telemetry
-            telemetry = HiveTelemetry(
-                hive_id=hive.id,
-                device_id=device_id,
-                timestamp=int(ts),
-                temperature_c=float(sensors.get("temperature_c", 0.0)),
-                humidity_pct=float(sensors.get("humidity_pct", 0.0)),
-                weight_kg=float(sensors.get("weight_kg", 0.0)),
-                acoustics_hz=float(sensors.get("acoustics_hz", 0.0)),
-                battery_v=float(diagnostics.get("battery_v", 4.12)) if diagnostics.get("battery_v") is not None else None,
-                wifi_rssi_dbm=float(diagnostics.get("wifi_rssi_dbm", -68)) if diagnostics.get("wifi_rssi_dbm") is not None else None,
-                recorded_at=recorded_dt,
+            # 2. The raw packet normally reaches this consumer before AI output.
+            # Reuse it so one physical reading is represented by one telemetry row.
+            telemetry = (
+                db.query(HiveTelemetry)
+                .filter(
+                    HiveTelemetry.hive_id == hive.id,
+                    HiveTelemetry.device_id == device_id,
+                    HiveTelemetry.timestamp == timestamp,
+                )
+                .first()
             )
-            db.add(telemetry)
-            db.commit()
-            db.refresh(telemetry)
+            if telemetry is None:
+                telemetry = HiveTelemetry(
+                    hive_id=hive.id,
+                    device_id=device_id,
+                    timestamp=timestamp,
+                    recorded_at=recorded_dt,
+                )
+                db.add(telemetry)
 
-            # 3. Persist AI Analysis
-            ai_analysis = HiveAIAnalysis(
-                hive_id=hive.id,
-                telemetry_id=telemetry.id,
-                device_id=device_id,
-                timestamp=int(ts),
-                risk_level=hive_status.get("risk_level", "LOW"),
-                status=hive_status.get("status", "HEALTHY"),
-                anomaly_detected=bool(hive_status.get("anomaly_detected", False)),
-                anomaly_score=float(hive_status.get("anomaly_score", 0.0)),
-                temperature_status=analysis.get("temperature", {}).get("status", "NORMAL"),
-                humidity_status=analysis.get("humidity", {}).get("status", "NORMAL"),
-                weight_status=analysis.get("weight", {}).get("status", "STABLE"),
-                weight_trend=analysis.get("weight", {}).get("trend", "STABLE"),
-                acoustic_status=analysis.get("acoustics", {}).get("status", "NORMAL"),
-                reasons_json=json.dumps(summary.get("reasons", [])),
-                alerts_json=json.dumps(alerts),
-                raw_output_json=json.dumps(payload),
+            telemetry.temperature_c = float(sensors.get("temperature_c", 0.0))
+            telemetry.humidity_pct = float(sensors.get("humidity_pct", 0.0))
+            telemetry.weight_kg = float(sensors.get("weight_kg", 0.0))
+            telemetry.acoustics_hz = float(sensors.get("acoustics_hz", 0.0))
+            telemetry.battery_v = float(diagnostics["battery_v"]) if diagnostics.get("battery_v") is not None else None
+            telemetry.wifi_rssi_dbm = float(diagnostics["wifi_rssi_dbm"]) if diagnostics.get("wifi_rssi_dbm") is not None else None
+            db.flush()
+
+            # 3. QoS 1 can redeliver a processed message.  Keep its analysis
+            # attached to the same physical telemetry row rather than creating
+            # duplicate dashboard history for one sensor timestamp.
+            ai_analysis = (
+                db.query(HiveAIAnalysis)
+                .filter(HiveAIAnalysis.telemetry_id == telemetry.id)
+                .first()
             )
-            db.add(ai_analysis)
+            is_new_analysis = ai_analysis is None
+            if is_new_analysis:
+                ai_analysis = HiveAIAnalysis(
+                    hive_id=hive.id,
+                    telemetry_id=telemetry.id,
+                    device_id=device_id,
+                    timestamp=timestamp,
+                )
+                db.add(ai_analysis)
 
-            # 4. Generate unignorable Alerts if anomaly detected or abnormal conditions
-            if hive_status.get("anomaly_detected") or hive_status.get("risk_level") in ("MEDIUM", "HIGH") or len(alerts) > 0:
+            ai_analysis.risk_level = hive_status.get("risk_level", "LOW")
+            ai_analysis.status = hive_status.get("status", "HEALTHY")
+            ai_analysis.anomaly_detected = bool(hive_status.get("anomaly_detected", False))
+            ai_analysis.anomaly_score = float(hive_status.get("anomaly_score", 0.0))
+            ai_analysis.temperature_status = analysis.get("temperature", {}).get("status", "NORMAL")
+            ai_analysis.humidity_status = analysis.get("humidity", {}).get("status", "NORMAL")
+            ai_analysis.weight_status = analysis.get("weight", {}).get("status", "STABLE")
+            ai_analysis.weight_trend = analysis.get("weight", {}).get("trend", "STABLE")
+            ai_analysis.acoustic_status = analysis.get("acoustics", {}).get("status", "NORMAL")
+            ai_analysis.reasons_json = json.dumps(summary.get("reasons", []))
+            ai_analysis.alerts_json = json.dumps(alerts)
+            ai_analysis.raw_output_json = json.dumps(payload)
+
+            # 4. Generate alerts once per physical reading. QoS 1 redelivery
+            # must not stack duplicate ACTIVE rows for the same timestamp.
+            if is_new_analysis and (
+                hive_status.get("anomaly_detected")
+                or hive_status.get("risk_level") in ("MEDIUM", "HIGH")
+                or len(alerts) > 0
+            ):
                 for alert_item in alerts:
                     msg_text = alert_item.get("message", "Unusual hive telemetry detected.")
                     param = alert_item.get("type", "ANOMALY").capitalize()
@@ -236,29 +267,48 @@ class MQTTConsumer:
                 logger.debug(f"Raw telemetry for unmapped device {device_id}; skipping direct persistence.")
                 return
 
-            ts = payload.get("timestamp", int(datetime.utcnow().timestamp()))
-            rec_time = datetime.utcfromtimestamp(ts) if isinstance(ts, (int, float)) else datetime.utcnow()
+            try:
+                timestamp = int(payload.get("timestamp", int(datetime.utcnow().timestamp())))
+            except (TypeError, ValueError):
+                timestamp = int(datetime.utcnow().timestamp())
+            rec_time = datetime.utcfromtimestamp(timestamp)
 
-            temp = payload.get("temperature") or payload.get("temperature_c") or 34.5
-            humidity = payload.get("humidity") or payload.get("humidity_pct") or 55.0
-            weight = payload.get("weight") or payload.get("weight_kg") or 22.0
-            acoustics = payload.get("acoustics") or payload.get("sound_frequency") or payload.get("acoustics_hz") or 240.0
-            battery = payload.get("battery") or payload.get("battery_v") or 4.1
-            rssi = payload.get("wifi_rssi") or payload.get("signal_strength") or payload.get("wifi_rssi_dbm") or -65.0
+            # Canonical ESP32 packets keep measurements under sensors and
+            # diagnostics. The flat aliases preserve existing deployed devices.
+            sensors = payload.get("sensors") if isinstance(payload.get("sensors"), dict) else {}
+            diagnostics = payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else {}
+            temp = sensors.get("temperature_c", payload.get("temperature_c", payload.get("temperature", 34.5)))
+            humidity = sensors.get("humidity_pct", payload.get("humidity_pct", payload.get("humidity", 55.0)))
+            weight = sensors.get("weight_kg", payload.get("weight_kg", payload.get("weightKg", payload.get("weight", 22.0))))
+            acoustics = sensors.get("acoustics_hz", payload.get("acoustics_hz", payload.get("sound_frequency", payload.get("acoustics", 240.0))))
+            battery = diagnostics.get("battery_v", payload.get("battery_v", payload.get("batteryLevel", payload.get("battery", 4.1))))
+            rssi = diagnostics.get("wifi_rssi_dbm", payload.get("wifi_rssi_dbm", payload.get("signalStrength", payload.get("signal_strength", payload.get("wifi_rssi", -65.0)))))
 
-            telemetry = HiveTelemetry(
-                hive_id=hive.id,
-                device_id=device_id,
-                timestamp=int(rec_time.timestamp()),
-                temperature_c=float(temp),
-                humidity_pct=float(humidity),
-                weight_kg=float(weight),
-                acoustics_hz=float(acoustics),
-                battery_v=float(battery),
-                wifi_rssi_dbm=float(rssi),
-                recorded_at=rec_time,
+            # A processed insight can arrive before this lower-priority raw
+            # queue item. Reuse that row to keep the reading idempotent.
+            telemetry = (
+                db.query(HiveTelemetry)
+                .filter(
+                    HiveTelemetry.hive_id == hive.id,
+                    HiveTelemetry.device_id == device_id,
+                    HiveTelemetry.timestamp == timestamp,
+                )
+                .first()
             )
-            db.add(telemetry)
+            if telemetry is None:
+                telemetry = HiveTelemetry(
+                    hive_id=hive.id,
+                    device_id=device_id,
+                    timestamp=timestamp,
+                    recorded_at=rec_time,
+                )
+                db.add(telemetry)
+            telemetry.temperature_c = float(temp)
+            telemetry.humidity_pct = float(humidity)
+            telemetry.weight_kg = float(weight)
+            telemetry.acoustics_hz = float(acoustics)
+            telemetry.battery_v = float(battery)
+            telemetry.wifi_rssi_dbm = float(rssi)
             db.commit()
             logger.info(f"Persisted raw telemetry for hive {hive.hive_code} (device: {device_id})")
 
@@ -288,29 +338,31 @@ class MQTTConsumer:
             return
 
         self.is_running = True
+        self._stop_event.clear()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="mqtt-db-worker")
         self._worker.start()
 
         def _runner():
-            try:
-                self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2 if hasattr(mqtt, "CallbackAPIVersion") else None)
-                self.client.on_connect = self.on_connect
-                self.client.on_message = self.on_message
-                if MQTT_USERNAME and MQTT_PASSWORD:
-                    self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-                logger.info(f"Connecting to MQTT Broker at {self.host}:{self.port}...")
-                self.client.connect(self.host, self.port, 60)
-                self.is_running = True
-                self.client.loop_forever()
-            except Exception as e:
-                logger.warning(f"MQTT Consumer could not connect to {self.host}:{self.port} ({e}). Will retry or operate in REST ingest mode.")
-                self.is_running = False
+            while not self._stop_event.is_set():
+                try:
+                    self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2 if hasattr(mqtt, "CallbackAPIVersion") else None)
+                    self.client.on_connect = self.on_connect
+                    self.client.on_message = self.on_message
+                    if MQTT_USERNAME and MQTT_PASSWORD:
+                        self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+                    logger.info(f"Connecting to MQTT Broker at {self.host}:{self.port}...")
+                    self.client.connect(self.host, self.port, 60)
+                    self.client.loop_forever(retry_first_connection=True)
+                except Exception as e:
+                    logger.warning(f"MQTT Consumer could not connect to {self.host}:{self.port} ({e}). Retrying in 5 seconds.")
+                    self._stop_event.wait(5)
 
         self._thread = threading.Thread(target=_runner, daemon=True)
         self._thread.start()
 
     def stop(self):
         self.is_running = False
+        self._stop_event.set()
         if self._worker:
             try:
                 self._worker.join(timeout=10)  # drain queued messages before exit

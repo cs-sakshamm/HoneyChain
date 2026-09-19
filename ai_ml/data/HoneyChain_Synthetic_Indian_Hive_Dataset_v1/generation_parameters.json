@@ -1,0 +1,27 @@
+{
+  "seed": 20260912,
+  "hives": [
+    "SIH_SYNTH_HIVE_01",
+    "SIH_SYNTH_HIVE_02",
+    "SIH_SYNTH_HIVE_03",
+    "SIH_SYNTH_HIVE_04",
+    "SIH_SYNTH_HIVE_05",
+    "SIH_SYNTH_HIVE_06",
+    "SIH_SYNTH_HIVE_07",
+    "SIH_SYNTH_HIVE_08",
+    "SIH_SYNTH_HIVE_09",
+    "SIH_SYNTH_HIVE_10"
+  ],
+  "days_per_hive": 120,
+  "sampling_minutes": 10,
+  "scenarios": [
+    "temperature_stress",
+    "humidity_stress",
+    "weight_decline",
+    "acoustic_shift",
+    "colony_weakening",
+    "forage_reduction",
+    "possible_swarm_disturbance",
+    "sensor_disturbance"
+  ]
+}

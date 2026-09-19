@@ -142,7 +142,7 @@ HoneyChain/
 
 - **mobile_app/**: Contains the Flutter app. Run with `flutter run`.
 - **backend/**: Contains the FastAPI app, services, and models. Run with `uvicorn main:app`.
-- **blockchain/**: Contains `HoneyChainProvenance.sol` and deployment scripts. Deploy with `npx hardhat run`.
+- **blockchain/**: Contains `HoneyChainProvenance.sol` and deployment scripts. Start with `npm run node`, then deploy with `npm run deploy`.
 - **iot/**: Contains `esp32_honeychain.ino` firmware. Flash using Arduino IDE.
 - **ai_ml/**: Contains the ML pipelines. Do not modify.
 
@@ -213,6 +213,7 @@ MQTT_INPUT_TOPIC=honeychain/hive/telemetry
 MQTT_OUTPUT_TOPIC=honeychain/hive/processed
 
 BLOCKCHAIN_PROVIDER_URL=http://127.0.0.1:8545
+BLOCKCHAIN_CHAIN_ID=31337
 BLOCKCHAIN_PRIVATE_KEY=your_private_key
 CONTRACT_ADDRESS=your_contract_address
 BLOCKCHAIN_NETWORK_NAME=amoy
@@ -277,13 +278,15 @@ Open a new terminal:
 ```bash
 cd blockchain
 npm install
-npx hardhat node
+npm run node
 ```
 In another terminal, deploy the contracts:
 ```bash
 cd blockchain
-npx hardhat run scripts/deploy.js --network localhost
-# Update CONTRACT_ADDRESS in backend/.env with the output address.
+# Set a funded local-development account in the current shell, then deploy.
+npm run deploy
+# Copy BLOCKCHAIN_PROVIDER_URL, BLOCKCHAIN_CHAIN_ID and CONTRACT_ADDRESS printed
+# by the deploy script into backend/.env, then restart the backend.
 ```
 
 **6. Start Mobile App**
@@ -357,7 +360,7 @@ Full Swagger documentation is available at `http://localhost:8000/docs` when the
 6. Login as Packager -> Receive batch -> Package -> View generated QR code.
 7. Scan QR to verify end-to-end traceability.
 
-*(For Automated tests, run `pytest` in `backend/` and `npx hardhat test` in `blockchain/`)*
+*(For automated cross-service tests, create `.test-venv`, install `requirements-test.txt`, then run `pytest backend/tests ai_ml/tests -q`. Run `npm test` in `blockchain/` for the smart contract and `npm run test:backend-evm` for the disposable local-EVM backend check.)*
 
 ---
 

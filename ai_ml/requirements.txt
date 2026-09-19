@@ -1,10 +1,12 @@
 paho-mqtt
 pandas
 numpy
-scikit-learn
+scikit-learn==1.9.0
 joblib
 pydantic
 python-dotenv
+sqlalchemy>=2.0.28
+psycopg2-binary>=2.9.9
 matplotlib
 seaborn
 torch

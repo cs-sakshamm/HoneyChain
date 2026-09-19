@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 /// Production Design System & App Constants for HoneyChain Mobile
@@ -20,9 +20,20 @@ class AppConstants {
   /// - Native desktop          : localhost:8000
   static String get backendBaseUrl {
     if (_backendUrlOverride.isNotEmpty) return _backendUrlOverride;
-    if (kIsWeb) return 'http://localhost:8000';
-    return 'http://10.0.2.2:8000'; // native mobile (emulator-compatible default)
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return 'http://localhost:8000';
+    }
+    return 'http://10.0.2.2:8000'; // Android emulator host-loopback alias
   }
+
+  /// Public verification base URL for customer QR codes.
+  static const String _publicVerifyUrlOverride = String.fromEnvironment('PUBLIC_VERIFY_URL');
+
+  static String get publicVerificationBaseUrl {
+    if (_publicVerifyUrlOverride.isNotEmpty) return _publicVerifyUrlOverride.replaceAll(RegExp(r'/+$'), '');
+    return 'https://generates-keep-michael-truck.trycloudflare.com';
+  }
+
   static const String legalDisclaimer =
       'By continuing, you agree to HoneyChain\'s Terms of Service and Privacy Policy.';
 

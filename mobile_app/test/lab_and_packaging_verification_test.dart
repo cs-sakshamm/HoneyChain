@@ -3,18 +3,17 @@ import 'package:mobile_app/features/verification/models/lab_tester_verification_
 import 'package:mobile_app/features/verification/models/packaging_manager_verification_model.dart';
 
 void main() {
-  group('Lab Tester Verification Model (3/3) Tests', () {
+  group('Lab Tester Verification Model (2/2) Tests', () {
     test('Initial lab model is unverified with 0 completed steps', () {
       final model = LabTesterVerificationModel.initial('lab-test-1');
       expect(model.labId, 'lab-test-1');
-      expect(model.isStep1IdentityComplete, isFalse);
       expect(model.isStep2LabDetailsComplete, isFalse);
       expect(model.isStep3KycComplete, isFalse);
       expect(model.isFullyVerified, isFalse);
       expect(model.completedStepsCount, 0);
     });
 
-    test('3/3 verification progression for Lab Tester', () {
+    test('2/2 verification progression for Lab Tester', () {
       const step1 = LabTesterVerificationModel(
         id: 'ver-1',
         labId: 'lab-1',
@@ -22,8 +21,7 @@ void main() {
         mobileNumber: '+919876543210',
         mobileVerified: 'Verified',
       );
-      expect(step1.isStep1IdentityComplete, isTrue);
-      expect(step1.completedStepsCount, 1);
+      expect(step1.completedStepsCount, 0);
       expect(step1.isFullyVerified, isFalse);
 
       const step2 = LabTesterVerificationModel(
@@ -37,7 +35,7 @@ void main() {
         labDetailsVerified: 'Verified',
       );
       expect(step2.isStep2LabDetailsComplete, isTrue);
-      expect(step2.completedStepsCount, 2);
+      expect(step2.completedStepsCount, 1);
       expect(step2.isFullyVerified, isFalse);
 
       const step3 = LabTesterVerificationModel(
@@ -53,7 +51,7 @@ void main() {
         verificationStatus: 'Verified',
       );
       expect(step3.isStep3KycComplete, isTrue);
-      expect(step3.completedStepsCount, 3);
+      expect(step3.completedStepsCount, 2);
       expect(step3.isFullyVerified, isTrue);
     });
 
@@ -85,22 +83,21 @@ void main() {
       expect(fromJson.labId, original.labId);
       expect(fromJson.labName, 'National Quality Labs');
       expect(fromJson.isFullyVerified, isTrue);
-      expect(fromJson.completedStepsCount, 3);
+      expect(fromJson.completedStepsCount, 2);
     });
   });
 
-  group('Packaging Manager Verification Model (3/3) Tests', () {
+  group('Packaging Manager Verification Model (2/2) Tests', () {
     test('Initial packaging model is unverified with 0 completed steps', () {
       final model = PackagingManagerVerificationModel.initial('pack-test-1');
       expect(model.packagerId, 'pack-test-1');
-      expect(model.isStep1IdentityComplete, isFalse);
       expect(model.isStep2FacilityComplete, isFalse);
       expect(model.isStep3KycComplete, isFalse);
       expect(model.isFullyVerified, isFalse);
       expect(model.completedStepsCount, 0);
     });
 
-    test('3/3 verification progression for Packaging Manager', () {
+    test('2/2 verification progression for Packaging Manager', () {
       const step1 = PackagingManagerVerificationModel(
         id: 'pkg-1',
         packagerId: 'pack-1',
@@ -108,8 +105,7 @@ void main() {
         mobileNumber: '+919123456780',
         mobileVerified: 'Verified',
       );
-      expect(step1.isStep1IdentityComplete, isTrue);
-      expect(step1.completedStepsCount, 1);
+      expect(step1.completedStepsCount, 0);
       expect(step1.isFullyVerified, isFalse);
 
       const step2 = PackagingManagerVerificationModel(
@@ -122,7 +118,7 @@ void main() {
         facilityDetailsVerified: 'Verified',
       );
       expect(step2.isStep2FacilityComplete, isTrue);
-      expect(step2.completedStepsCount, 2);
+      expect(step2.completedStepsCount, 1);
       expect(step2.isFullyVerified, isFalse);
 
       const step3 = PackagingManagerVerificationModel(
@@ -136,7 +132,7 @@ void main() {
         verificationStatus: 'Verified',
       );
       expect(step3.isStep3KycComplete, isTrue);
-      expect(step3.completedStepsCount, 3);
+      expect(step3.completedStepsCount, 2);
       expect(step3.isFullyVerified, isTrue);
     });
 
@@ -165,7 +161,7 @@ void main() {
       expect(fromJson.packagerId, original.packagerId);
       expect(fromJson.organizationName, 'PureHoney Packaging Ltd');
       expect(fromJson.isFullyVerified, isTrue);
-      expect(fromJson.completedStepsCount, 3);
+      expect(fromJson.completedStepsCount, 2);
     });
   });
 }

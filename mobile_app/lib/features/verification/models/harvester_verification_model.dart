@@ -80,18 +80,16 @@ class HarvesterVerificationModel {
     this.updatedAt,
   });
 
-  bool get isStep1IdentityComplete => mobileVerified == 'Verified';
   bool get isStep1Complete => governmentIdVerified == 'Verified';
-  bool get isStep2Complete => mobileVerified == 'Verified';
-  bool get isStep3Complete => registrationVerified == 'Verified';
-  bool get isStep3ManualReview =>
+  bool get isStep2Complete => registrationVerified == 'Verified';
+  bool get isStep2ManualReview =>
       registrationVerified == 'Manual Verification Required' ||
       registrationVerified == 'Pending Review';
-  bool get isStep4Complete => locationVerified == 'Verified';
+  bool get isStep3Complete => locationVerified == 'Verified';
 
   String get step3DisplayStatus {
     if (registrationVerified == 'Verified') return 'Registration Verified ✓';
-    if (isStep3ManualReview) return 'Manual verification required';
+    if (isStep2ManualReview) return 'Manual verification required';
     if (registrationVerified == 'Failed' || registrationVerified == 'Rejected') {
       return 'Registration ID could not be verified';
     }
@@ -100,13 +98,9 @@ class HarvesterVerificationModel {
   }
 
   bool get canSubmitBlockchain =>
-      isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete;
+      isStep1Complete && isStep2Complete && isStep3Complete;
 
-  bool get isFullyVerified =>
-      governmentIdVerified == 'Verified' &&
-      mobileVerified == 'Verified' &&
-      registrationVerified == 'Verified' &&
-      (verificationStatus == 'Verified' || (verificationId != null && verificationId!.isNotEmpty));
+  bool get isFullyVerified => isStep1Complete && isStep2Complete && isStep3Complete;
 
   int get completedStepsCount {
     int count = 0;

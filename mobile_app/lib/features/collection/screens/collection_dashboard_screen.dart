@@ -482,7 +482,6 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
             spacing: 12,
             runSpacing: 6,
             children: [
-              _buildMiniCheck(context, 'Identity', collectorVer.isStep1IdentityComplete),
               _buildMiniCheck(context, 'Business', collectorVer.isStep2BusinessComplete),
               _buildMiniCheck(context, 'License & KYC', collectorVer.isStep3KycComplete),
             ],

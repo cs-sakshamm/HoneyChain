@@ -44,6 +44,13 @@ class HiveHistory:
         self.data = deque(maxlen=max_length)
 
     def add(self, reading: dict) -> None:
+        # MQTT QoS 1 permits redelivery.  A reading is identified by its
+        # device-local timestamp, so a redelivery must replace rather than
+        # consume a history slot (which would fabricate temporal features).
+        for index, existing in enumerate(self.data):
+            if existing["timestamp"] == reading["timestamp"]:
+                self.data[index] = reading
+                return
         self.data.append(reading)
 
     def size(self) -> int:

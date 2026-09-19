@@ -1,0 +1,57 @@
+{
+  "model": "IsolationForest",
+  "version": "1.0",
+  "features": [
+    "temperature_c",
+    "humidity_pct",
+    "weight_kg",
+    "acoustics_hz",
+    "temperature_c_delta_1h",
+    "temperature_c_rolling_mean_6h",
+    "humidity_pct_delta_1h",
+    "humidity_pct_rolling_mean_6h",
+    "weight_kg_delta_1h",
+    "weight_kg_rolling_mean_6h",
+    "acoustics_hz_delta_1h",
+    "acoustics_hz_rolling_mean_6h",
+    "weight_delta_24h"
+  ],
+  "n_estimators": 300,
+  "random_state": 42,
+  "threshold": 0.0162398936295549,
+  "validation": {
+    "precision": 0.5104859335038363,
+    "recall": 0.46942615239887114,
+    "f1": 0.4890958098505268,
+    "roc_auc": 0.8260136065466596,
+    "average_precision": 0.4332954491249902,
+    "confusion_matrix": [
+      [
+        31189,
+        957
+      ],
+      [
+        1128,
+        998
+      ]
+    ]
+  },
+  "test": {
+    "precision": 0.6933962264150944,
+    "recall": 0.30849947534102834,
+    "f1": 0.42701525054466233,
+    "roc_auc": 0.8181268037482365,
+    "average_precision": 0.44379908762740083,
+    "confusion_matrix": [
+      [
+        16053,
+        130
+      ],
+      [
+        659,
+        294
+      ]
+    ]
+  },
+  "note": "Evaluation labels are synthetic scenario labels, not real disease ground truth."
+}

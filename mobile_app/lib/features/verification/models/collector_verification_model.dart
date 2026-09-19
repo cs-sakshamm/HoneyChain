@@ -62,16 +62,13 @@ class CollectorVerificationModel {
     this.updatedAt,
   });
 
-  bool get isStep1IdentityComplete => mobileVerified == 'Verified';
   bool get isStep2BusinessComplete => businessVerified == 'Verified';
   bool get isStep3KycComplete => kycStatus == 'Verified';
 
-  bool get isFullyVerified =>
-      isStep1IdentityComplete && isStep2BusinessComplete && isStep3KycComplete && verificationStatus == 'Verified';
+  bool get isFullyVerified => isStep2BusinessComplete && isStep3KycComplete;
 
   int get completedStepsCount {
     int count = 0;
-    if (isStep1IdentityComplete) count++;
     if (isStep2BusinessComplete) count++;
     if (isStep3KycComplete) count++;
     return count;

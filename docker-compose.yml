@@ -38,10 +38,9 @@ services:
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto-data:/mosquitto/data
-    # NOTE: mosquitto.conf sets allow_anonymous false with a password_file.
-    # For first-time local dev you can temporarily allow anonymous access, or
-    # generate credentials with:
-    #   docker exec honeychain-mosquitto mosquitto_passwd -c /mosquitto/config/passwd honeychain_backend
+    # The checked-in broker config is deliberately open for local development.
+    # Replace it with an authenticated configuration before deployment outside
+    # a private LAN/container network.
     healthcheck:
       test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -i healthcheck || exit 1"]
       interval: 10s
@@ -100,6 +99,7 @@ services:
       mosquitto:
         condition: service_started
     environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-honeychain}
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
       MQTT_USERNAME: ${MQTT_USERNAME:-}

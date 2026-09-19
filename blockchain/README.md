@@ -94,7 +94,7 @@ npm install
 In Terminal 1, run Hardhat's local JSON-RPC node:
 
 ```bash
-npx hardhat node
+npm run node
 ```
 
 This starts a local EVM network listening on `http://127.0.0.1:8545` with 20 funded test accounts.

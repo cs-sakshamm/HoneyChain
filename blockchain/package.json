@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "hardhat test",
-    "deploy": "hardhat run scripts/deploy.js"
+    "node": "hardhat node --hostname 127.0.0.1",
+    "test": "node --test test/*.test.js",
+    "test:backend-evm": "node scripts/verify_backend_evm.js",
+    "deploy": "node scripts/deploy.js"
   },
   "keywords": [],
   "author": "",

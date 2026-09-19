@@ -758,7 +758,6 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
             spacing: 12,
             runSpacing: 6,
             children: [
-              _buildMiniCheck(context, 'Identity', packagingVer.isStep1IdentityComplete),
               _buildMiniCheck(context, 'Facility', packagingVer.isStep2FacilityComplete),
               _buildMiniCheck(context, 'License & KYC', packagingVer.isStep3KycComplete),
             ],

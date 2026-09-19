@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
 from ai_ml.src.feature_builder import FeatureBuilder
+from ai_ml.src.history_loader import reload_history
 from ai_ml.src.anomaly_detector import AnomalyDetector
 from ai_ml.src.risk_engine import RiskEngine
 from ai_ml.src.output_formatter import build_app_json
@@ -40,6 +43,11 @@ MQTT_OUTPUT_TOPIC = os.getenv(
 
 MQTT_USERNAME = os.getenv("MQTT_USERNAME") or None
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD") or None
+MQTT_RECONNECT_DELAY_SECONDS = float(os.getenv("MQTT_RECONNECT_DELAY_SECONDS", "5"))
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+AI_HISTORY_RELOAD = os.getenv("AI_HISTORY_RELOAD", "true").lower() in {"true", "1", "yes"}
+
+logger = logging.getLogger("HoneyChainAIMQTT")
 
 
 # ============================================================
@@ -93,15 +101,20 @@ def on_connect(
         f"[MQTT] Connected with result code: "
         f"{reason_code}"
     )
-
-    client.subscribe(
-        MQTT_INPUT_TOPIC
-    )
+    client.subscribe(MQTT_INPUT_TOPIC)
 
     print(
         f"[MQTT] Subscribed to: "
         f"{MQTT_INPUT_TOPIC}"
     )
+
+
+def on_disconnect(client, userdata, disconnect_flags, reason_code, properties=None):
+    """Log disconnects; loop_forever reconnects after transient failures."""
+    if reason_code:
+        logger.warning("MQTT disconnected (reason=%s); reconnecting.", reason_code)
+    else:
+        logger.info("MQTT disconnected cleanly.")
 
 
 def on_message(
@@ -270,6 +283,24 @@ def on_message(
 # MAIN
 # ============================================================
 
+def build_client() -> mqtt.Client:
+    """Construct a configured client so reconnect behaviour is testable."""
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
+    client.on_message = on_message
+
+    if MQTT_USERNAME and MQTT_PASSWORD:
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    return client
+
+
+def run_client_once(client: mqtt.Client) -> None:
+    """Connect and service MQTT until paho returns from its network loop."""
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    client.loop_forever(retry_first_connection=True)
+
+
 def main():
 
     print("========================================")
@@ -292,25 +323,27 @@ def main():
         f"Model  : {MODEL_PATH}"
     )
 
-    client = mqtt.Client(
-        mqtt.CallbackAPIVersion.VERSION2
-    )
+    if AI_HISTORY_RELOAD:
+        loaded = reload_history(feature_builder, DATABASE_URL)
+        print(f"[AI] Reloaded {loaded} telemetry readings from database history.")
 
-    client.on_connect = on_connect
-    client.on_message = on_message
-
-    if MQTT_USERNAME and MQTT_PASSWORD:
-        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-
-    print("\n[MQTT] Connecting...")
-
-    client.connect(
-        MQTT_BROKER,
-        MQTT_PORT,
-        60,
-    )
-
-    client.loop_forever()
+    # loop_forever handles broker drops after a connection.  The outer loop
+    # also covers a broker that is unavailable when this long-running service
+    # starts, rather than exiting after one failed connect.
+    while True:
+        client = build_client()
+        try:
+            print("\n[MQTT] Connecting...")
+            run_client_once(client)
+        except (OSError, mqtt.MQTTException) as exc:
+            logger.warning(
+                "MQTT connection to %s:%s failed (%s); retrying in %ss.",
+                MQTT_BROKER,
+                MQTT_PORT,
+                exc,
+                MQTT_RECONNECT_DELAY_SECONDS,
+            )
+        time.sleep(MQTT_RECONNECT_DELAY_SECONDS)
 
 
 if __name__ == "__main__":

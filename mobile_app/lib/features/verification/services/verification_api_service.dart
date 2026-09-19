@@ -131,43 +131,7 @@ class VerificationApiService {
     }
   }
 
-  /// Step 2a: Send OTP to Mobile Number
-  Future<Map<String, dynamic>> sendMobileOtp(String mobile) async {
-    final url = Uri.parse('$baseUrl/verification/harvester/mobile/send-otp');
-    final body = jsonEncode({'mobile': mobile.trim()});
 
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 || response.statusCode == 429) {
-      return data;
-    }
-    return {'success': false, 'message': data['error'] ?? data['message'] ?? 'Failed to send OTP.'};
-  }
-
-  /// Step 2b: Verify Mobile OTP
-  Future<HarvesterVerificationModel> verifyMobileOtp({
-    required String harvesterId,
-    required String mobile,
-    required String otp,
-  }) async {
-    final cleanId = harvesterId.trim();
-    final url = Uri.parse('$baseUrl/verification/harvester/mobile/verify-otp');
-    final body = jsonEncode({
-      'harvesterId': cleanId,
-      'mobile': mobile.trim(),
-      'otp': otp.trim(),
-    });
-
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
-      final model = HarvesterVerificationModel.fromJson(data['verification']);
-      await _cacheLocalVerification(cleanId, model);
-      return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Invalid verification code.');
-    }
-  }
 
   /// Step 3: Submit Beekeeper Registration ID
   Future<HarvesterVerificationModel> submitRegistrationId({
@@ -310,52 +274,7 @@ class VerificationApiService {
     return _loadCachedCollectorVerification(cleanId);
   }
 
-  /// Collector Step 1a: Send Mobile OTP for Identity Verification
-  Future<Map<String, dynamic>> sendCollectorMobileOtp({
-    required String collectorId,
-    required String mobile,
-  }) async {
-    final cleanId = collectorId.trim();
-    final url = Uri.parse('$baseUrl/verification/collector/mobile/send-otp');
-    final body = jsonEncode({
-      'collectorId': cleanId,
-      'mobile': mobile.trim(),
-    });
 
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 || response.statusCode == 429) {
-      return data;
-    }
-    return {'success': false, 'message': data['error'] ?? data['message'] ?? 'Failed to send OTP.'};
-  }
-
-  /// Collector Step 1b: Verify Mobile OTP for Identity Verification
-  Future<CollectorVerificationModel> verifyCollectorMobileOtp({
-    required String collectorId,
-    required String mobile,
-    required String otp,
-    String? fullName,
-  }) async {
-    final cleanId = collectorId.trim();
-    final url = Uri.parse('$baseUrl/verification/collector/mobile/verify-otp');
-    final body = jsonEncode({
-      'collectorId': cleanId,
-      'mobile': mobile.trim(),
-      'otp': otp.trim(),
-      if (fullName != null && fullName.isNotEmpty) 'fullName': fullName.trim(),
-    });
-
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
-      final model = CollectorVerificationModel.fromJson(data['verification']);
-      await _cacheLocalCollectorVerification(cleanId, model);
-      return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Invalid OTP code.');
-    }
-  }
 
   /// Collector Step 2: Submit Business Verification (Center Name & Center Address)
   Future<CollectorVerificationModel> submitCollectorBusiness({
@@ -443,52 +362,7 @@ class VerificationApiService {
     return _loadCachedLabVerification(cleanId);
   }
 
-  /// Lab Step 1a: Send Mobile OTP
-  Future<Map<String, dynamic>> sendLabMobileOtp({
-    required String labId,
-    required String mobile,
-  }) async {
-    final cleanId = labId.trim();
-    final url = Uri.parse('$baseUrl/verification/lab/mobile/send-otp');
-    final body = jsonEncode({
-      'labId': cleanId,
-      'mobile': mobile.trim(),
-    });
 
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 || response.statusCode == 429) {
-      return data;
-    }
-    return {'success': false, 'message': data['error'] ?? data['message'] ?? 'Failed to send OTP.'};
-  }
-
-  /// Lab Step 1b: Verify Mobile OTP
-  Future<LabTesterVerificationModel> verifyLabMobileOtp({
-    required String labId,
-    required String mobile,
-    required String otp,
-    String? fullName,
-  }) async {
-    final cleanId = labId.trim();
-    final url = Uri.parse('$baseUrl/verification/lab/mobile/verify-otp');
-    final body = jsonEncode({
-      'labId': cleanId,
-      'mobile': mobile.trim(),
-      'otp': otp.trim(),
-      if (fullName != null && fullName.isNotEmpty) 'fullName': fullName.trim(),
-    });
-
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
-      final model = LabTesterVerificationModel.fromJson(data['verification']);
-      await _cacheLocalLabVerification(cleanId, model);
-      return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Invalid OTP code.');
-    }
-  }
 
   /// Lab Step 2: Submit Laboratory Details
   Future<LabTesterVerificationModel> submitLabDetails({
@@ -580,52 +454,7 @@ class VerificationApiService {
     return _loadCachedPackagingVerification(cleanId);
   }
 
-  /// Packaging Step 1a: Send Mobile OTP
-  Future<Map<String, dynamic>> sendPackagingMobileOtp({
-    required String packagerId,
-    required String mobile,
-  }) async {
-    final cleanId = packagerId.trim();
-    final url = Uri.parse('$baseUrl/verification/packaging/mobile/send-otp');
-    final body = jsonEncode({
-      'packagerId': cleanId,
-      'mobile': mobile.trim(),
-    });
 
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 || response.statusCode == 429) {
-      return data;
-    }
-    return {'success': false, 'message': data['error'] ?? data['message'] ?? 'Failed to send OTP.'};
-  }
-
-  /// Packaging Step 1b: Verify Mobile OTP
-  Future<PackagingManagerVerificationModel> verifyPackagingMobileOtp({
-    required String packagerId,
-    required String mobile,
-    required String otp,
-    String? fullName,
-  }) async {
-    final cleanId = packagerId.trim();
-    final url = Uri.parse('$baseUrl/verification/packaging/mobile/verify-otp');
-    final body = jsonEncode({
-      'packagerId': cleanId,
-      'mobile': mobile.trim(),
-      'otp': otp.trim(),
-      if (fullName != null && fullName.isNotEmpty) 'fullName': fullName.trim(),
-    });
-
-    final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
-      final model = PackagingManagerVerificationModel.fromJson(data['verification']);
-      await _cacheLocalPackagingVerification(cleanId, model);
-      return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Invalid OTP code.');
-    }
-  }
 
   /// Packaging Step 2: Submit Packaging Facility Details
   Future<PackagingManagerVerificationModel> submitPackagingDetails({

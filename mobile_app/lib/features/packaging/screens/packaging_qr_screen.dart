@@ -17,7 +17,7 @@ class PackagingQrScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final verifyUrl = '${AppConstants.backendBaseUrl}/verify?batch=' + Uri.encodeComponent(request.batchId);
+    final verifyUrl = '${AppConstants.publicVerificationBaseUrl}/verify/' + Uri.encodeComponent(request.batchId);
     final realTx = request.txHash;
 
     return Scaffold(

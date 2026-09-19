@@ -26,12 +26,7 @@ class VerificationController extends ChangeNotifier {
   String? _aadhaarTransactionId;
   String? _devAadhaarOtp;
 
-  // Mobile OTP State
-  bool _mobileOtpSent = false;
-  int _otpCooldown = 0;
-  Timer? _cooldownTimer;
-  String _pendingMobileNumber = '';
-  String? _devOtp;
+
 
   VerificationController({VerificationApiService? apiService})
       : _apiService = apiService ?? VerificationApiService();
@@ -39,7 +34,6 @@ class VerificationController extends ChangeNotifier {
   @override
   void dispose() {
     _aadhaarCooldownTimer?.cancel();
-    _cooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -56,12 +50,7 @@ class VerificationController extends ChangeNotifier {
   String? get aadhaarTransactionId => _aadhaarTransactionId;
   String? get devAadhaarOtp => _devAadhaarOtp;
 
-  // Mobile OTP Getters
-  bool get mobileOtpSent => _mobileOtpSent;
-  int get otpCooldown => _otpCooldown;
-  bool get canResendOtp => _otpCooldown == 0;
-  String get pendingMobileNumber => _pendingMobileNumber;
-  String? get devOtp => _devOtp;
+
 
   void clearMessages() {
     _errorMessage = null;
@@ -79,14 +68,7 @@ class VerificationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void resetMobileOtpState() {
-    _mobileOtpSent = false;
-    _pendingMobileNumber = '';
-    _devOtp = null;
-    _otpCooldown = 0;
-    _cooldownTimer?.cancel();
-    notifyListeners();
-  }
+
 
   /// Load verification status for harvester
   Future<void> loadVerification(String harvesterId) async {
@@ -225,77 +207,7 @@ class VerificationController extends ChangeNotifier {
     }
   }
 
-  /// Step 2a: Send Mobile OTP
-  Future<bool> sendMobileOtp(String mobile) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
 
-    try {
-      final res = await _apiService.sendMobileOtp(mobile);
-      if (res['success'] == true) {
-        _pendingMobileNumber = mobile;
-        _mobileOtpSent = true;
-        _otpCooldown = res['cooldownSeconds'] ?? 60;
-        _devOtp = res['devOtp'];
-        _successMessage = res['message'] ?? 'Verification code sent.';
-        _startCooldownTimer();
-        return true;
-      } else {
-        _errorMessage = res['message'] ?? 'Failed to send verification code.';
-        if (res['cooldownSeconds'] != null && res['cooldownSeconds'] > 0) {
-          _otpCooldown = res['cooldownSeconds'];
-          _startCooldownTimer();
-        }
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  void _startCooldownTimer() {
-    _cooldownTimer?.cancel();
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_otpCooldown > 0) {
-        _otpCooldown--;
-        notifyListeners();
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  /// Step 2b: Verify Mobile OTP
-  Future<bool> verifyMobileOtp(String otp) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
-
-    try {
-      _verification = await _apiService.verifyMobileOtp(
-        harvesterId: _verification.harvesterId,
-        mobile: _pendingMobileNumber,
-        otp: otp,
-      );
-      _successMessage = 'Mobile number verified successfully.';
-      _mobileOtpSent = false;
-      _devOtp = null;
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 
   /// Step 3: Submit Beekeeper Registration ID
   Future<bool> submitRegistrationId({
@@ -420,70 +332,7 @@ class VerificationController extends ChangeNotifier {
     }
   }
 
-  /// Collector Step 1a: Send Mobile OTP for Identity Verification
-  Future<bool> sendCollectorMobileOtp(String collectorId, String mobile) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
 
-    try {
-      final cleanMobile = mobile.trim();
-      final res = await _apiService.sendCollectorMobileOtp(
-        collectorId: collectorId,
-        mobile: cleanMobile,
-      );
-      if (res['success'] == true) {
-        _pendingMobileNumber = cleanMobile;
-        _mobileOtpSent = true;
-        _otpCooldown = res['cooldownSeconds'] ?? 60;
-        _devOtp = res['devOtp'];
-        _successMessage = res['message'] ?? 'OTP code sent to $cleanMobile';
-        _startCooldownTimer();
-        return true;
-      } else {
-        _errorMessage = res['message'] ?? 'Failed to send OTP.';
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Collector Step 1b: Verify Mobile OTP for Identity Verification
-  Future<bool> verifyCollectorMobileOtp({
-    required String collectorId,
-    required String mobile,
-    required String otp,
-    String? fullName,
-  }) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
-
-    try {
-      _collectorVerification = await _apiService.verifyCollectorMobileOtp(
-        collectorId: collectorId,
-        mobile: mobile,
-        otp: otp,
-        fullName: fullName,
-      );
-      _successMessage = 'Identity verified successfully.';
-      resetMobileOtpState();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 
   /// Collector Step 2: Submit Business Verification (Center Name & Center Address)
   Future<bool> submitCollectorBusiness({
@@ -567,70 +416,7 @@ class VerificationController extends ChangeNotifier {
     }
   }
 
-  /// Lab Step 1a: Send Mobile OTP
-  Future<bool> sendLabMobileOtp(String labId, String mobile) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
 
-    try {
-      final cleanMobile = mobile.trim();
-      final res = await _apiService.sendLabMobileOtp(
-        labId: labId,
-        mobile: cleanMobile,
-      );
-      if (res['success'] == true) {
-        _pendingMobileNumber = cleanMobile;
-        _mobileOtpSent = true;
-        _otpCooldown = res['cooldownSeconds'] ?? 60;
-        _devOtp = res['devOtp'];
-        _successMessage = res['message'] ?? 'OTP code sent to $cleanMobile';
-        _startCooldownTimer();
-        return true;
-      } else {
-        _errorMessage = res['message'] ?? 'Failed to send OTP.';
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Lab Step 1b: Verify Mobile OTP
-  Future<bool> verifyLabMobileOtp({
-    required String labId,
-    required String mobile,
-    required String otp,
-    String? fullName,
-  }) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
-
-    try {
-      _labVerification = await _apiService.verifyLabMobileOtp(
-        labId: labId,
-        mobile: mobile,
-        otp: otp,
-        fullName: fullName,
-      );
-      _successMessage = 'Identity verified successfully.';
-      resetMobileOtpState();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 
   /// Lab Step 2: Submit Laboratory Details
   Future<bool> submitLabDetails({
@@ -718,70 +504,7 @@ class VerificationController extends ChangeNotifier {
     }
   }
 
-  /// Packaging Step 1a: Send Mobile OTP
-  Future<bool> sendPackagingMobileOtp(String packagerId, String mobile) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
 
-    try {
-      final cleanMobile = mobile.trim();
-      final res = await _apiService.sendPackagingMobileOtp(
-        packagerId: packagerId,
-        mobile: cleanMobile,
-      );
-      if (res['success'] == true) {
-        _pendingMobileNumber = cleanMobile;
-        _mobileOtpSent = true;
-        _otpCooldown = res['cooldownSeconds'] ?? 60;
-        _devOtp = res['devOtp'];
-        _successMessage = res['message'] ?? 'OTP code sent to $cleanMobile';
-        _startCooldownTimer();
-        return true;
-      } else {
-        _errorMessage = res['message'] ?? 'Failed to send OTP.';
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Packaging Step 1b: Verify Mobile OTP
-  Future<bool> verifyPackagingMobileOtp({
-    required String packagerId,
-    required String mobile,
-    required String otp,
-    String? fullName,
-  }) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _successMessage = null;
-    notifyListeners();
-
-    try {
-      _packagingVerification = await _apiService.verifyPackagingMobileOtp(
-        packagerId: packagerId,
-        mobile: mobile,
-        otp: otp,
-        fullName: fullName,
-      );
-      _successMessage = 'Identity verified successfully.';
-      resetMobileOtpState();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 
   /// Packaging Step 2: Submit Packaging Facility Details
   Future<bool> submitPackagingDetails({

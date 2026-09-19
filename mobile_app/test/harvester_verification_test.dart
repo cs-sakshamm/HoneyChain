@@ -16,7 +16,6 @@ void main() {
       expect(model.isStep1Complete, isFalse);
       expect(model.isStep2Complete, isFalse);
       expect(model.isStep3Complete, isFalse);
-      expect(model.isStep4Complete, isFalse);
       expect(model.canSubmitBlockchain, isFalse);
       expect(model.isFullyVerified, isFalse);
       expect(model.completedStepsCount, 0);
@@ -40,8 +39,8 @@ void main() {
         id: 'ver-1',
         harvesterId: 'harvester-123',
         governmentIdVerified: 'Verified',
-        mobileNumber: '+15550199456',
-        mobileVerified: 'Verified',
+        registrationId: 'BKR-OR-2026-99',
+        registrationVerified: 'Verified',
       );
       expect(step2Model.isStep1Complete, isTrue);
       expect(step2Model.isStep2Complete, isTrue);
@@ -51,25 +50,14 @@ void main() {
         id: 'ver-1',
         harvesterId: 'harvester-123',
         governmentIdVerified: 'Verified',
-        mobileVerified: 'Verified',
-        registrationId: 'BKR-OR-2026-99',
-        registrationVerified: 'Verified',
-      );
-      expect(step3Model.completedStepsCount, 3);
-      expect(step3Model.canSubmitBlockchain, isFalse);
-
-      const step4Model = HarvesterVerificationModel(
-        id: 'ver-1',
-        harvesterId: 'harvester-123',
-        governmentIdVerified: 'Verified',
-        mobileVerified: 'Verified',
         registrationVerified: 'Verified',
         apiaryLocation: 'Willamette Valley, OR',
         locationVerified: 'Verified',
       );
-      expect(step4Model.completedStepsCount, 3);
-      expect(step4Model.canSubmitBlockchain, isTrue);
-      expect(step4Model.isFullyVerified, isFalse);
+      expect(step3Model.completedStepsCount, 3);
+      expect(step3Model.canSubmitBlockchain, isTrue);
+
+
 
       const fullyVerifiedModel = HarvesterVerificationModel(
         id: 'ver-1',
@@ -123,7 +111,6 @@ void main() {
       expect(parsed.isStep1Complete, isTrue);
       expect(parsed.isStep2Complete, isTrue);
       expect(parsed.isStep3Complete, isTrue);
-      expect(parsed.isStep4Complete, isTrue);
       expect(parsed.canSubmitBlockchain, isTrue);
       expect(parsed.isFullyVerified, isTrue);
       expect(parsed.completedStepsCount, 3);
@@ -198,8 +185,8 @@ void main() {
         governmentIdVerified: 'Verified',
         mobileVerified: 'Verified',
         registrationVerified: 'Verified',
-        locationVerified: 'Verified',
-        verificationStatus: 'Pending Review', // Not fully verified on chain yet
+        locationVerified: 'Not Started',
+        verificationStatus: 'Not Started',
       );
       expect(partialHarvester.isFullyVerified, isFalse);
     });

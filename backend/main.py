@@ -15,6 +15,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
+from pathlib import Path
+
 from fastapi import (
     FastAPI,
     Depends,
@@ -28,6 +30,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
@@ -244,6 +247,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Mount Built Web Verification Frontend ──
+web_dist_dir = Path(__file__).resolve().parent.parent / "web" / "dist"
+if not web_dist_dir.exists() or not (web_dist_dir / "index.html").exists():
+    web_dist_dir = Path(__file__).resolve().parent / "web_dist"
+if not web_dist_dir.exists():
+    web_dist_dir = Path(__file__).resolve().parent / "web" / "dist"
+
+if web_dist_dir.exists() and (web_dist_dir / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(web_dist_dir / "assets")), name="web_assets")
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/verify", response_class=HTMLResponse)
+@app.get("/verify/", response_class=HTMLResponse)
+def serve_root():
+    index_file = web_dist_dir / "index.html"
+    if index_file.exists():
+        return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>HoneyChain Cryptographic Verification Protocol</h1><p>Visit <a href='/verify/HC-BATCH-2026-CA7715'>/verify/HC-BATCH-2026-CA7715</a></p>")
 
 
 # ── WebSockets ──
@@ -510,9 +533,10 @@ def is_harvester_profile_complete(user: Optional[User]) -> bool:
     if not user:
         return False
     name_ok = bool(user.name and user.name.strip() and user.name.strip().lower() != "unknown")
-    phone_ok = bool(user.phone and user.phone.strip())
     email_ok = bool(user.email and user.email.strip() and not user.email.startswith("anonymous"))
-    return name_ok and phone_ok and email_ok
+    # Phone is optional for Harvesters — Google OAuth users may not have a phone.
+    # Identity is established through the 3-step harvester verification process instead.
+    return name_ok and email_ok
 
 
 def is_collector_profile_complete(user: Optional[User]) -> bool:
@@ -1430,9 +1454,6 @@ def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)):
     return {"success": True, "message": "Alert acknowledged."}
 
 
-# ============================================================
-# 4. WORKFLOW: REQUESTS, HARVESTS, PROCESSING, LAB, PACKAGING
-# ============================================================
 # ============================================================
 # 4. WORKFLOW: REQUESTS, HARVESTS, PROCESSING, LAB, PACKAGING
 # ============================================================
@@ -2636,9 +2657,9 @@ def generate_verification_html(data: Dict[str, Any]) -> str:
 
 
 @app.get("/api/verify")
-@app.get("/verify")
 @app.get("/api/verify/{batch_id}")
 @app.get("/verify/{batch_id}")
+@app.get("/api/traceability/{batch_id}")
 def verify_batch(
     req: Request,
     batch_id: Optional[str] = None,
@@ -2692,6 +2713,8 @@ def verify_batch(
         pkg_name = (pkg_facility.name if pkg_facility else None) or (pkg_user.organization_name or pkg_user.name if pkg_user else "No data available yet.")
 
     bc_records = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == target_batch_id).order_by(BlockchainRecord.timestamp).all()
+
+    on_chain = blockchain_service.get_batch_events(target_batch_id)
 
     verification_data = {
         "success": True,
@@ -2768,6 +2791,9 @@ def verify_batch(
             "network": (bc_records[0].network if bc_records else blockchain_service.network),
             "contractAddress": blockchain_service.contract_address or None,
             "onChainConfigured": blockchain_service.is_connected(),
+            "onChainReadSuccess": on_chain["success"],
+            "onChainEventCount": len(on_chain["events"]),
+            "onChainReadError": on_chain["error"],
             "ledgerStatus": "CONFIRMED_ON_CHAIN" if any(b.status == "CONFIRMED" for b in bc_records) else ("TAMPER_EVIDENT_HASH_RECORDED" if bc_records else "NO_ON_CHAIN_RECORDS_YET"),
             "totalConfirmedEvents": len(bc_records),
             "latestTxHash": bc_records[-1].tx_hash if bc_records and bc_records[-1].tx_hash else None,
@@ -2787,7 +2813,11 @@ def verify_batch(
     }
 
     accept_hdr = req.headers.get("accept", "").lower()
-    if "text/html" in accept_hdr:
+    is_api_call = req.url.path.startswith("/api/")
+    if "text/html" in accept_hdr and not is_api_call:
+        index_file = web_dist_dir / "index.html"
+        if index_file.exists():
+            return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
         return HTMLResponse(content=generate_verification_html(verification_data))
 
     return verification_data
@@ -2797,7 +2827,7 @@ def verify_batch(
 # 6. VERIFICATION FLOW APIS (FOR FLUTTER PROFILE GATES)
 # ============================================================
 @app.post("/api/verification/send-otp")
-def send_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
+def send_otp(payload: dict, db = Depends(get_db)):
     phone = (payload.get("phone") or "").strip()
     session_id = str(uuid.uuid4())
     import secrets
@@ -2810,9 +2840,6 @@ def send_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
     )
     db.add(otp)
     db.commit()
-    # SECURITY: never log full OTP codes. In sandbox mode (no SMS provider
-    # configured) the code is returned to the client for testing; in live mode
-    # it is only dispatched via the SMS provider.
     otp_provider = os.getenv("OTP_PROVIDER", "sandbox").lower()
     logger.info(f"[OTP Service] OTP generated for phone {phone} (Session: {session_id}, provider: {otp_provider})")
     resp = {

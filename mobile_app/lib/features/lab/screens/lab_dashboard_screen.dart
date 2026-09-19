@@ -579,7 +579,6 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
             spacing: 12,
             runSpacing: 6,
             children: [
-              _buildMiniCheck(context, 'Identity', labVer.isStep1IdentityComplete),
               _buildMiniCheck(context, 'Lab Details', labVer.isStep2LabDetailsComplete),
               _buildMiniCheck(context, 'KYC & Scope', labVer.isStep3KycComplete),
             ],

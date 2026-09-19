@@ -60,6 +60,7 @@ Thumbs.db
 .venv/
 venv/
 env/
+.test-venv/
 
 # Python cache
 __pycache__/
@@ -84,4 +85,6 @@ __pycache__/
 
 # Logs and Secrets
 *.log
+*.log.*
 secrets/
+iot/firmware/secrets.h

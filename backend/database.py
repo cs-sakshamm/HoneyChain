@@ -35,7 +35,12 @@ engine = None
 is_postgres = False
 
 try:
-    if clean_db_url.startswith("postgres") or clean_db_url.startswith("postgresql"):
+    if allow_sqlite:
+        sqlite_path = Path(__file__).resolve().parent / "honeychain.db"
+        sqlite_url = f"sqlite:///{sqlite_path.as_posix()}"
+        engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
+        logger.info(f"Connected to local SQLite database: {sqlite_url}")
+    elif clean_db_url.startswith("postgres") or clean_db_url.startswith("postgresql"):
         test_engine = create_engine(
             clean_db_url,
             pool_size=DB_POOL_SIZE,
@@ -50,16 +55,18 @@ try:
         engine = test_engine
         is_postgres = True
         logger.info(f"Connected to PostgreSQL database: {clean_db_url.split('@')[-1]}")
-    elif allow_sqlite:
-        sqlite_path = Path(__file__).resolve().parent / "honeychain.db"
-        sqlite_url = f"sqlite:///{sqlite_path.as_posix()}"
-        engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
-        logger.info(f"Connected to local SQLite database: {sqlite_url}")
     else:
         raise ValueError(f"Unsupported database scheme: {clean_db_url}")
 except Exception as e:
-    logger.critical(f"FATAL: Production database connection failed: {e}")
-    raise RuntimeError(f"Failed to connect to authoritative PostgreSQL database: {e}") from e
+    sqlite_path = Path(__file__).resolve().parent / "honeychain.db"
+    if sqlite_path.exists() and os.getenv("ENVIRONMENT", "development") != "production":
+        logger.warning(f"PostgreSQL connection failed ({e}). Falling back to local SQLite: {sqlite_path}")
+        sqlite_url = f"sqlite:///{sqlite_path.as_posix()}"
+        engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
+        is_postgres = False
+    else:
+        logger.critical(f"FATAL: Production database connection failed: {e}")
+        raise RuntimeError(f"Failed to connect to authoritative PostgreSQL database: {e}") from e
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

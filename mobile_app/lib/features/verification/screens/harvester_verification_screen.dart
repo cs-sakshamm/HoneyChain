@@ -17,10 +17,8 @@ class HarvesterVerificationScreen extends StatefulWidget {
 }
 
 class _HarvesterVerificationScreenState extends State<HarvesterVerificationScreen> {
-  // Step 1 Form (Harvester Full Name & Mobile OTP)
+  // Step 1 Form (Harvester Full Name)
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
 
   // Legacy Step 1 Form (Aadhaar Card ONLY)
   final TextEditingController _aadhaarNumberController = TextEditingController();
@@ -91,17 +89,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
       if (user.name.isNotEmpty) {
         _fullNameController.text = user.name;
       }
-      if (user.phone.isNotEmpty) {
-        String digits = user.phone.replaceAll(RegExp(r'\D'), '');
-        if (digits.startsWith('91') && digits.length > 10) {
-          digits = digits.substring(2);
-        }
-        if (digits.length == 10) {
-          _phoneController.text = '${digits.substring(0, 5)} ${digits.substring(5)}';
-        } else {
-          _phoneController.text = digits;
-        }
-      }
+
       if (user.organizationName != null && user.organizationName!.isNotEmpty) {
         _apiaryNameController.text = user.organizationName!;
       }
@@ -132,8 +120,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
     _fullNameController.dispose();
     _aadhaarNumberController.dispose();
     _aadhaarOtpController.dispose();
-    _phoneController.dispose();
-    _otpController.dispose();
+
     _registrationIdController.dispose();
     _districtController.dispose();
     _villageCityController.dispose();
@@ -275,31 +262,24 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                         children: [
                           _buildChecklistItem(
                             context,
-                            title: 'Full Name',
-                            isDone: context.watch<UserController>().user.name.trim().isNotEmpty,
-                            missingHint: 'Enter your Harvester Full Name below',
+                            title: 'Identity Details',
+                            isDone: ver.isStep1Complete,
+                            missingHint: 'Complete Government ID Verification',
                           ),
                           const SizedBox(height: 8),
                           _buildChecklistItem(
                             context,
-                            title: 'Mobile OTP',
+                            title: 'Beekeeper Registration',
                             isDone: ver.isStep2Complete,
-                            missingHint: 'Verify mobile OTP in Step 1',
+                            missingHint: 'Complete Registration ID Verification',
                           ),
                           const SizedBox(height: 8),
                           _buildChecklistItem(
                             context,
-                            title: 'Required Profile Details',
-                            isDone: ver.isStep3Complete && ver.isStep4Complete,
-                            missingHint: 'Complete Beekeeper Registration & Apiary Location',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildChecklistItem(
-                            context,
-                            title: 'Verified',
-                            isDone: ver.isFullyVerified,
+                            title: 'Apiary Location',
+                            isDone: ver.isStep3Complete,
                             isFinal: true,
-                            missingHint: 'Complete above items to unlock full role access',
+                            missingHint: 'Complete Location & Coordinates',
                           ),
                         ],
                       ),
@@ -572,21 +552,19 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
               // ── STEP 1: Identity & Mobile Verification (Full Name + Mobile OTP) ──
               _buildStepCard(
                 stepNumber: 1,
-                title: 'Harvester Identity & Mobile Verification',
-                subtitle: 'Full Legal Name & DLT-Compliant Mobile OTP',
+                title: 'Harvester Identity',
+                subtitle: 'Full Legal Name',
                 icon: Icons.person_pin_rounded,
-                isCompleted: ver.isStep2Complete && context.watch<UserController>().user.name.trim().isNotEmpty,
-                statusText: (ver.isStep2Complete && context.watch<UserController>().user.name.trim().isNotEmpty)
+                isCompleted: context.watch<UserController>().user.name.trim().isNotEmpty,
+                statusText: (context.watch<UserController>().user.name.trim().isNotEmpty)
                     ? 'Identity Verified ✓'
-                    : ver.mobileVerified == 'Verified'
-                        ? 'Name Required'
-                        : ver.mobileVerified,
+                    : 'Name Required',
                 content: (ver.isStep2Complete && context.watch<UserController>().user.name.trim().isNotEmpty)
                     ? _buildVerifiedStepInfo(
                         label: 'Verified Harvester Identity',
-                        value: '${context.watch<UserController>().user.name} (${ver.mobileNumber ?? context.watch<UserController>().user.phone})',
-                        subtext: 'Harvester full name & mobile identity confirmed with 2FA OTP Gateway',
-                        verifiedBadgeText: 'Full Name & Mobile — Verified ✓',
+                        value: '${context.watch<UserController>().user.name}',
+                        subtext: 'Harvester full name identity confirmed',
+                        verifiedBadgeText: 'Full Name — Verified ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -613,258 +591,28 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                             ),
                           ),
                           const SizedBox(height: 14),
-
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Mobile Number',
-                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: context.primarySoftColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '+91 India Mobile',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: context.primaryDarkColor,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          _ActionButton(
+                            label: 'Save Identity',
+                            icon: Icons.verified_user_outlined,
+                            isLoading: verCtrl.isLoading,
+                            onTap: () async {
+                              final name = _fullNameController.text.trim();
+                              if (name.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please enter Full Name of Harvester.')),
+                                );
+                                return;
+                              }
+                              // We simulate verification to proceed to next step
+                              final userCtrl = context.read<UserController>();
+                              await userCtrl.updateProfile(
+                                name: name,
+                                email: userCtrl.user.email,
+                                phone: userCtrl.user.phone,
+                              );
+                              userCtrl.reloadProfile();
+                            },
                           ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                            maxLength: 11,
-                            enabled: !verCtrl.mobileOtpSent && !verCtrl.isLoading,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              _IndianPhoneNumberFormatter(),
-                            ],
-                            decoration: InputDecoration(
-                              counterText: '',
-                              prefixIcon: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox(width: 14),
-                                  Icon(Icons.phone_outlined, size: 20, color: context.textSecondaryColor),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '+91',
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: context.textPrimaryColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    height: 18,
-                                    width: 1,
-                                    color: context.borderColor,
-                                  ),
-                                  const SizedBox(width: 10),
-                                ],
-                              ),
-                              hintText: '98765 43210',
-                              hintStyle: GoogleFonts.inter(color: context.textMutedColor),
-                              filled: true,
-                              fillColor: context.scaffoldBg,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            ),
-                          ),
-                          if (!verCtrl.mobileOtpSent) ...[
-                            const SizedBox(height: 12),
-                            _ActionButton(
-                              label: 'Send OTP',
-                              icon: Icons.send_rounded,
-                              isLoading: verCtrl.isLoading,
-                              onTap: () {
-                                final name = _fullNameController.text.trim();
-                                if (name.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter Full Name of Harvester.')),
-                                  );
-                                  return;
-                                }
-                                final phone = _phoneController.text.trim();
-                                final digits = phone.replaceAll(RegExp(r'\D'), '');
-                                if (digits.length < 10) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter a valid 10-digit mobile number.')),
-                                  );
-                                  return;
-                                }
-                                verCtrl.sendMobileOtp(phone);
-                              },
-                            ),
-                          ] else ...[
-                            const SizedBox(height: 12),
-                            // OTP Sent Banner
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: context.primarySoftColor.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.sms_outlined, size: 20, color: context.primaryDarkColor),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          'OTP sent to ${verCtrl.pendingMobileNumber}',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: context.textPrimaryColor,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (verCtrl.devOtp != null && verCtrl.devOtp!.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: context.surfaceColor,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: context.borderColor),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'Dev Sandbox OTP: ',
-                                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: context.textSecondaryColor),
-                                          ),
-                                          SelectableText(
-                                            verCtrl.devOtp!,
-                                            style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w800, color: context.primaryDarkColor),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Enter OTP',
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
-                                ),
-                                GestureDetector(
-                                  onTap: verCtrl.isLoading ? null : () => verCtrl.resetMobileOtpState(),
-                                  child: Text(
-                                    'Change Number',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: context.primaryDarkColor,
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _otpController,
-                                    keyboardType: TextInputType.number,
-                                    maxLength: 6,
-                                    autofocus: true,
-                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                    decoration: InputDecoration(
-                                      counterText: '',
-                                      hintText: '_ _ _ _ _ _',
-                                      prefixIcon: Icon(Icons.pin_outlined, size: 20, color: context.textSecondaryColor),
-                                      hintStyle: GoogleFonts.inter(color: context.textMutedColor, letterSpacing: 3.0),
-                                      filled: true,
-                                      fillColor: context.scaffoldBg,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton(
-                                  onPressed: verCtrl.canResendOtp && !verCtrl.isLoading
-                                      ? () {
-                                          final phone = _phoneController.text.trim();
-                                          verCtrl.sendMobileOtp(phone);
-                                        }
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: context.primarySoftColor,
-                                    foregroundColor: context.primaryDarkColor,
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  ),
-                                  child: Text(
-                                    verCtrl.otpCooldown > 0 ? '${verCtrl.otpCooldown}s' : 'Resend OTP',
-                                    style: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 12),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                              _ActionButton(
-                                label: 'Verify OTP & Save Identity',
-                                icon: Icons.verified_user_outlined,
-                                isLoading: verCtrl.isLoading,
-                                onTap: () async {
-                                  final name = _fullNameController.text.trim();
-                                  if (name.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Please enter Full Name of Harvester.')),
-                                    );
-                                    return;
-                                  }
-                                  final code = _otpController.text.trim();
-                                  if (code.length != 6) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Please enter 6-digit OTP.')),
-                                    );
-                                    return;
-                                  }
-                                  final ok = await verCtrl.verifyMobileOtp(code);
-                                  if (ok && context.mounted) {
-                                    final userCtrl = context.read<UserController>();
-                                    await userCtrl.updateProfile(
-                                      name: name,
-                                      email: userCtrl.user.email,
-                                      phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : userCtrl.user.phone,
-                                    );
-                                    userCtrl.reloadProfile();
-                                  }
-                                },
-                              ),
-                          ],
                         ],
                       ),
               ),
@@ -949,7 +697,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           const SizedBox(height: 14),
 
                           // Manual Verification Alert if previously submitted with manual authority
-                          if (ver.isStep3ManualReview) ...[
+                          if (ver.isStep2ManualReview) ...[
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -1074,9 +822,9 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                 title: 'Location',
                 subtitle: 'State, District & Village / City Registry',
                 icon: Icons.pin_drop_outlined,
-                isCompleted: ver.isStep4Complete,
+                isCompleted: ver.isStep3Complete,
                 statusText: ver.locationVerified == 'Verified' ? 'Location — Completed ✓' : ver.locationVerified,
-                content: ver.isStep4Complete
+                content: ver.isStep3Complete
                     ? _buildVerifiedStepInfo(
                         label: 'Location',
                         value: ver.apiaryLocation ?? 'Registered Apiary',
@@ -1428,16 +1176,20 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: context.textSecondaryColor,
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: context.textSecondaryColor,
+                  ),
                 ),
               ),
-              if (verifiedBadgeText != null)
+              if (verifiedBadgeText != null) ...[
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
@@ -1454,6 +1206,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                     ),
                   ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 2),

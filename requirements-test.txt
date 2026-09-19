@@ -1,0 +1,4 @@
+# HoneyChain cross-service test environment only.
+# Runtime services keep their own dependency manifests under backend/ and ai_ml/.
+-r backend/requirements.txt
+-r ai_ml/requirements.txt

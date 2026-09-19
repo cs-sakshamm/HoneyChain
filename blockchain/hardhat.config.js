@@ -3,7 +3,8 @@ export default {
   networks: {
     localhost: {
       type: "http",
-      url: "http://127.0.0.1:8545"
+      url: "http://127.0.0.1:8545",
+      chainId: 31337
     },
     amoy: {
       type: "http",

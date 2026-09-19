@@ -54,7 +54,7 @@ class UserProfile {
     this.isVerifiedStatus,
   });
 
-  bool get isVerified => isVerifiedStatus ?? (isBackendComplete == true || isProfileComplete);
+  bool get isVerified => isVerifiedStatus == true || isBackendComplete == true || _localProfileComplete;
 
   /// Effective profile photo URL following 3-tier priority:
   /// Tier 1: User-uploaded custom profile picture (`avatarUrl`)
@@ -74,21 +74,30 @@ class UserProfile {
   }
 
   /// Role-based profile completion calculation.
-  /// Backend remains the authoritative validator.
+  /// Backend's isBackendComplete / isVerifiedStatus are authoritative.
+  /// If either backend field confirms completion or verified status, return true.
   bool get isProfileComplete {
-    if (isBackendComplete != null) {
-      return isBackendComplete!;
-    }
-    
+    // Backend authoritative: verified users are always considered complete.
+    if (isVerifiedStatus == true) return true;
+    if (isBackendComplete == true) return true;
+    // If backend explicitly says incomplete, respect it.
+    if (isBackendComplete == false) return _localProfileComplete;
+    // No backend data yet — fall back to local field check.
+    return _localProfileComplete;
+  }
+
+  /// Local heuristic profile completion, used as fallback when backend is unreachable.
+  bool get _localProfileComplete {
     final nameOk = name.trim().isNotEmpty && name.trim().toLowerCase() != 'unknown';
     final emailOk = email.trim().isNotEmpty && !email.contains('anonymous');
     final phoneOk = phone.trim().isNotEmpty;
 
     final normRole = role.toUpperCase().trim();
 
-    // 1. Harvester Profile
+    // 1. Harvester Profile — name + email sufficient (phone added if available).
     if (normRole.isEmpty || normRole == 'HARVESTER') {
-      return nameOk && emailOk && phoneOk;
+      // For Google-auth harvesters without a phone, name+email is enough locally.
+      return nameOk && emailOk;
     }
 
     // 2. Collection & Processing Profile
@@ -416,6 +425,7 @@ class UserController extends ChangeNotifier {
             bsid: p['bsid'] ?? _user.bsid,
             bspPass: p['bspPass'] ?? _user.bspPass,
             isBackendComplete: p['isProfileComplete'] as bool?,
+            isVerifiedStatus: p['isVerified'] as bool?,
           );
           notifyListeners();
 
@@ -643,6 +653,7 @@ class UserController extends ChangeNotifier {
             bsid: p['bsid'] ?? _user.bsid,
             bspPass: p['bspPass'] ?? _user.bspPass,
             isBackendComplete: p['isProfileComplete'] as bool?,
+            isVerifiedStatus: p['isVerified'] as bool?,
           );
           notifyListeners();
           if (_user.beekeeperId != null) await prefs.setString(_beekeeperIdKey, _user.beekeeperId!);

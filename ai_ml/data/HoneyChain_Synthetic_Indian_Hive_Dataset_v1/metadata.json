@@ -1,0 +1,34 @@
+{
+  "dataset": "HoneyChain Synthetic Indian Hive Telemetry v1.0",
+  "synthetic": true,
+  "not_authentic_measured_data": true,
+  "rows": 172800,
+  "hives": 10,
+  "days_per_hive": 120,
+  "interval": "10 minutes",
+  "signals": [
+    "temperature_c",
+    "humidity_pct",
+    "weight_kg",
+    "acoustics_hz"
+  ],
+  "excluded": [
+    "co2_ppm",
+    "o2_ppm",
+    "ph"
+  ],
+  "research_basis": [
+    "Krishnasamy et al. 2023, Sociobiology, Apis cerana indica colonies in Bengaluru: in-hive temperature/RH linked to forager activity; strong-colony peak 27.84 C/61.47% RH; weak-colony peak 26.52 C/61.42% RH; brood/honey/pollen areas measured.",
+    "Geetha, Theerthagiri & Devi 2025, Indian Journal of Entomology: Andhra Pradesh apiary; temperature, humidity, hive weight, vibration and sound were among monitored parameters; raw public observations were not found in the accessible source."
+  ],
+  "synthetic_assumptions": [
+    "10 heterogeneous virtual colonies.",
+    "10-minute regular sampling.",
+    "Daily and slow temporal patterns.",
+    "Correlated temperature/RH.",
+    "Slow weight trajectories and short-term foraging variation.",
+    "Colony-specific acoustic baselines.",
+    "Controlled single-parameter and multivariate anomaly scenarios."
+  ],
+  "warning": "Do not report this dataset as real Indian measurements or use synthetic classification accuracy as real-world disease-detection accuracy."
+}

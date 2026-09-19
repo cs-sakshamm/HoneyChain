@@ -1,0 +1,53 @@
+{
+  "model": "LSTM Autoencoder",
+  "features": [
+    "temperature_c",
+    "humidity_pct",
+    "weight_kg",
+    "acoustics_hz"
+  ],
+  "sequence_length": 36,
+  "sequence_hours": 6,
+  "stride": 6,
+  "epochs": 15,
+  "batch_size": 256,
+  "hidden_size": 64,
+  "latent_size": 32,
+  "learning_rate": 0.001,
+  "threshold": 0.1161518543958664,
+  "validation": {
+    "precision": 0.46,
+    "recall": 0.3248587570621469,
+    "f1": 0.38079470198675497,
+    "roc_auc": 0.7923011605164738,
+    "average_precision": 0.3036791591329867,
+    "confusion_matrix": [
+      [
+        5261,
+        135
+      ],
+      [
+        239,
+        115
+      ]
+    ]
+  },
+  "test": {
+    "precision": 0.45454545454545453,
+    "recall": 0.25316455696202533,
+    "f1": 0.3252032520325203,
+    "roc_auc": 0.7618301085989293,
+    "average_precision": 0.2925002685283466,
+    "confusion_matrix": [
+      [
+        2669,
+        48
+      ],
+      [
+        118,
+        40
+      ]
+    ]
+  },
+  "note": "Synthetic labels are evaluation labels only. They are not real disease ground truth."
+}

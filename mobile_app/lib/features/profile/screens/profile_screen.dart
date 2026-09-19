@@ -94,7 +94,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final userCtrl = context.watch<UserController>();
     final verCtrl = context.watch<VerificationController>();
     final user = userCtrl.user;
-    final complete = user.isProfileComplete;
+    // A user is eligible for role operations if their basic profile is complete
+    // OR their role verification is fully complete. These are the two paths to
+    // eligibility — checking either prevents the "Verified ✓ but Profile incomplete" paradox.
+    final r = user.role.toUpperCase();
+    final verificationComplete = r.contains('COLLECT') || r.contains('PROCESS')
+        ? verCtrl.collectorVerification.isFullyVerified
+        : r.contains('LAB')
+            ? verCtrl.labVerification.isFullyVerified
+            : r.contains('PKG') || r.contains('PACKAG')
+                ? verCtrl.packagingVerification.isFullyVerified
+                : verCtrl.verification.isFullyVerified;
+    final complete = user.isProfileComplete || user.isVerified || verificationComplete;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -278,8 +289,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
 
                     const SizedBox(height: AppConstants.space20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: AppConstants.space16,
+                      runSpacing: AppConstants.space16,
                       children: [
                         _PillAction(
                           label: context.tr('edit_profile'),
@@ -406,7 +419,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.verified_user_outlined,
                         trailingBadge: context.watch<VerificationController>().collectorVerification.isFullyVerified
                             ? 'Verified ✓'
-                            : '${context.watch<VerificationController>().collectorVerification.completedStepsCount}/3 Steps',
+                            : '${context.watch<VerificationController>().collectorVerification.completedStepsCount}/2 Steps',
                         badgeColor: context.watch<VerificationController>().collectorVerification.isFullyVerified
                             ? context.successColor
                             : context.textPrimaryColor,
@@ -427,7 +440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.science_outlined,
                         trailingBadge: context.watch<VerificationController>().labVerification.isFullyVerified
                             ? 'Verified ✓'
-                            : '${context.watch<VerificationController>().labVerification.completedStepsCount}/3 Steps',
+                            : '${context.watch<VerificationController>().labVerification.completedStepsCount}/2 Steps',
                         badgeColor: context.watch<VerificationController>().labVerification.isFullyVerified
                             ? context.successColor
                             : context.textPrimaryColor,
@@ -448,7 +461,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.inventory_2_outlined,
                         trailingBadge: context.watch<VerificationController>().packagingVerification.isFullyVerified
                             ? 'Verified ✓'
-                            : '${context.watch<VerificationController>().packagingVerification.completedStepsCount}/3 Steps',
+                            : '${context.watch<VerificationController>().packagingVerification.completedStepsCount}/2 Steps',
                         badgeColor: context.watch<VerificationController>().packagingVerification.isFullyVerified
                             ? context.successColor
                             : context.textPrimaryColor,
@@ -860,7 +873,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       items = [
         {'title': 'Facility Name & Location', 'done': collVer.isStep2BusinessComplete},
         {'title': 'License / Registration', 'done': collVer.isStep3KycComplete},
-        {'title': 'Mobile OTP Verification', 'done': collVer.isStep1IdentityComplete},
         {'title': 'Verified', 'done': isFullyVerified, 'final': true},
       ];
       onVerifyTap = () => Navigator.push(
@@ -874,7 +886,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       items = [
         {'title': 'Laboratory Name & Address', 'done': labVer.isStep2LabDetailsComplete},
         {'title': 'Accreditation & Scope', 'done': labVer.isStep3KycComplete},
-        {'title': 'Mobile OTP Verification', 'done': labVer.isStep1IdentityComplete},
         {'title': 'Verified', 'done': isFullyVerified, 'final': true},
       ];
       onVerifyTap = () => Navigator.push(
@@ -888,7 +899,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       items = [
         {'title': 'Packaging Unit & Address', 'done': pkgVer.isStep2FacilityComplete},
         {'title': 'FSSAI License & Scope', 'done': pkgVer.isStep3KycComplete},
-        {'title': 'Mobile OTP Verification', 'done': pkgVer.isStep1IdentityComplete},
         {'title': 'Verified', 'done': isFullyVerified, 'final': true},
       ];
       onVerifyTap = () => Navigator.push(
@@ -901,8 +911,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isFullyVerified = harvVer.isFullyVerified;
       items = [
         {'title': 'Full Name', 'done': user.name.trim().isNotEmpty},
-        {'title': 'Mobile OTP', 'done': harvVer.isStep2Complete},
-        {'title': 'Required Profile Details', 'done': harvVer.isStep3Complete && harvVer.isStep4Complete},
+        {'title': 'Required Profile Details', 'done': harvVer.isStep2Complete && harvVer.isStep3Complete},
         {'title': 'Verified', 'done': isFullyVerified, 'final': true},
       ];
       onVerifyTap = () => Navigator.push(

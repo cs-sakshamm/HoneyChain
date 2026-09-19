@@ -3,18 +3,19 @@
 #include <DHT.h>
 #include <HX711.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
-const char* ssid = "WIFI_SSID";
-const char* password = "WIFI_PASSWORD";
-
-const char* mqtt_server = "broker.honeychain.io";
-const int mqtt_port = 1883;
-const char* mqtt_user = "honeychain_device";
-const char* mqtt_pass = "secure_password";
+// Copy secrets.example.h to secrets.h and fill in deployment-specific values.
+// secrets.h is intentionally ignored by Git so Wi-Fi and broker credentials
+// never enter source control.
+#include "secrets.h"
 
 const char* device_id = "HC-ESP32-A1B2C3D4";
 const char* hive_id = "HC-HIVE-98765432";
 const char* telemetry_topic = "honeychain/hive/telemetry";
+const char* ntp_server = "pool.ntp.org";
+const long gmt_offset_sec = 0;
+const int daylight_offset_sec = 0;
 
 #define DHTPIN 4
 #define DHTTYPE DHT22
@@ -57,6 +58,12 @@ void reconnect() {
   }
 }
 
+bool clock_is_synced() {
+  // A Unix timestamp before 2023 means NTP has not completed yet.  Do not
+  // publish a misleading 1970 timestamp that would corrupt temporal history.
+  return time(nullptr) > 1672531200;
+}
+
 void setup() {
   Serial.begin(115200);
   dht.begin();
@@ -65,6 +72,7 @@ void setup() {
   scale.tare();
 
   setup_wifi();
+  configTime(gmt_offset_sec, daylight_offset_sec, ntp_server);
   client.setServer(mqtt_server, mqtt_port);
 }
 
@@ -73,6 +81,12 @@ void loop() {
     reconnect();
   }
   client.loop();
+
+  if (!clock_is_synced()) {
+    Serial.println("Clock not synchronized; waiting for NTP before publishing telemetry.");
+    delay(30000);
+    return;
+  }
 
   float t = dht.readTemperature();
   float h = dht.readHumidity();
@@ -84,17 +98,21 @@ void loop() {
     h = 55.0;
   }
 
-  StaticJsonDocument<256> doc;
-  doc["deviceId"] = device_id;
-  doc["hiveId"] = hive_id;
-  doc["temperature"] = t;
-  doc["humidity"] = h;
-  doc["weightKg"] = w;
-  doc["batteryLevel"] = 4.12;
-  doc["signalStrength"] = WiFi.RSSI();
-  doc["timestamp"] = 0; // Filled by backend
+  StaticJsonDocument<384> doc;
+  doc["device_id"] = device_id;
+  doc["timestamp"] = time(nullptr);
+  JsonObject sensors = doc.createNestedObject("sensors");
+  sensors["weight_kg"] = w;
+  sensors["temperature_c"] = t;
+  sensors["humidity_pct"] = h;
+  // The current production hardware does not contain an acoustic sensor.
+  // Replace this only when a real reading is wired in; do not add CO2.
+  sensors["acoustics_hz"] = 245.0;
+  JsonObject diagnostics = doc.createNestedObject("diagnostics");
+  diagnostics["battery_v"] = 4.12;
+  diagnostics["wifi_rssi_dbm"] = WiFi.RSSI();
 
-  char buffer[256];
+  char buffer[384];
   serializeJson(doc, buffer);
   
   Serial.print("Publishing message: ");

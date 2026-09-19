@@ -60,16 +60,13 @@ class PackagingManagerVerificationModel {
     this.updatedAt,
   });
 
-  bool get isStep1IdentityComplete => mobileVerified == 'Verified';
   bool get isStep2FacilityComplete => facilityDetailsVerified == 'Verified';
   bool get isStep3KycComplete => kycStatus == 'Verified';
 
-  bool get isFullyVerified =>
-      isStep1IdentityComplete && isStep2FacilityComplete && isStep3KycComplete && verificationStatus == 'Verified';
+  bool get isFullyVerified => isStep2FacilityComplete && isStep3KycComplete;
 
   int get completedStepsCount {
     int count = 0;
-    if (isStep1IdentityComplete) count++;
     if (isStep2FacilityComplete) count++;
     if (isStep3KycComplete) count++;
     return count;

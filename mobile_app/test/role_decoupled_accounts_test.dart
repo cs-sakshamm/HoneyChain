@@ -19,15 +19,35 @@ void main() {
       expect(userRoleFromString('PACKAGER'), UserRole.packaging);
     });
 
-    test('Harvester profile completion requires name, email, and phone', () {
-      const incompleteHarv = UserProfile(
+    test('Harvester profile completion requires name and email (phone optional)', () {
+      // A Harvester without a name is incomplete.
+      const noName = UserProfile(
+        name: '',
+        email: 'maria@honeychain.io',
+        phone: '',
+        role: 'HARVESTER',
+      );
+      expect(noName.isProfileComplete, false);
+
+      // A Harvester without an email is incomplete.
+      const noEmail = UserProfile(
+        name: 'Maria Harvester',
+        email: '',
+        phone: '',
+        role: 'HARVESTER',
+      );
+      expect(noEmail.isProfileComplete, false);
+
+      // A Google OAuth Harvester with no phone but valid name+email IS complete.
+      const googleHarv = UserProfile(
         name: 'Maria Harvester',
         email: 'maria@honeychain.io',
         phone: '',
         role: 'HARVESTER',
       );
-      expect(incompleteHarv.isProfileComplete, false);
+      expect(googleHarv.isProfileComplete, true);
 
+      // A Harvester with name, email, and phone is also complete.
       const completeHarv = UserProfile(
         name: 'Maria Harvester',
         email: 'maria@honeychain.io',

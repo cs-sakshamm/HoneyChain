@@ -1,163 +1,65 @@
+"""Fast, configurable ESP32 telemetry simulator for local and LAN demos."""
+from __future__ import annotations
+
+import argparse
 import json
 import time
-from datetime import datetime
 
-import pandas as pd
 import paho.mqtt.client as mqtt
 
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-BROKER_HOST = "localhost"
-BROKER_PORT = 1883
-
-MQTT_TOPIC = "honeychain/hive/telemetry"
-
-DATASET_PATH = (
-    "ai_ml/data/"
-    "HoneyChain_Synthetic_Indian_Hive_Dataset_v1/"
-    "honeychain_synthetic_hive_telemetry.csv"
-)
-
-# Number of readings to simulate
-NUMBER_OF_READINGS = 300
-
-# Delay between simulated ESP32 readings
-# 1 second = one simulated 10-minute sensor reading
-DELAY_SECONDS = 1
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=1883)
+    parser.add_argument("--topic", default="honeychain/hive/telemetry")
+    parser.add_argument("--device-id", default="SIH_HIVE_MVP_01")
+    parser.add_argument("--count", type=int, default=145)
+    parser.add_argument("--interval", type=float, default=0.05)
+    parser.add_argument("--scenario", choices=("normal", "attention", "alert", "ml"), default="normal")
+    return parser.parse_args()
 
 
-# ============================================================
-# TIMESTAMP CONVERSION
-# ============================================================
-
-def convert_timestamp(value):
-    """
-    Convert dataset timestamp into Unix timestamp.
-    Supports ISO timestamps and Unix timestamps.
-    """
-
-    if isinstance(value, (int, float)):
-        return int(value)
-
-    text = str(value).strip()
-
-    try:
-        return int(float(text))
-    except ValueError:
-        dt = datetime.fromisoformat(text)
-
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=None)
-
-        return int(dt.timestamp())
-
-
-# ============================================================
-# LOAD DATASET
-# ============================================================
-
-print("=" * 60)
-print("HoneyChain MQTT Simulator")
-print("=" * 60)
-
-print("\n[DATA] Loading dataset...")
-
-df = pd.read_csv(DATASET_PATH)
-
-print(f"[DATA] Total dataset rows: {len(df):,}")
-
-# Select one hive
-device_id = df["device_id"].iloc[0]
-
-print(f"[DATA] Selected hive: {device_id}")
-
-# Select only this hive and first 300 readings
-hive_df = (
-    df[df["device_id"] == device_id]
-    .sort_values("timestamp")
-    .head(NUMBER_OF_READINGS)
-    .copy()
-)
-
-print(f"[DATA] Readings selected for simulation: {len(hive_df)}")
-
-
-# ============================================================
-# MQTT SETUP
-# ============================================================
-
-client = mqtt.Client()
-
-print("\n[MQTT] Connecting to broker...")
-
-client.connect(BROKER_HOST, BROKER_PORT, 60)
-
-print("[MQTT] Connected successfully")
-print(f"[MQTT] Publishing to: {MQTT_TOPIC}")
-
-print("\n" + "=" * 60)
-print("Starting ESP32 simulation")
-print("=" * 60)
-
-
-# ============================================================
-# PUBLISH READINGS
-# ============================================================
-
-for index, row in hive_df.iterrows():
-
-    payload = {
-        "device_id": str(row["device_id"]),
-
-        "timestamp": convert_timestamp(row["timestamp"]),
-
-        "sensors": {
-            "weight_kg": float(row["weight_kg"]),
-            "temperature_c": float(row["temperature_c"]),
-            "humidity_pct": float(row["humidity_pct"]),
-            "acoustics_hz": float(row["acoustics_hz"])
-        },
-
-        "diagnostics": {
-            "battery_v": 4.12,
-            "wifi_rssi_dbm": -68
+def readings(args: argparse.Namespace):
+    start = int(time.time()) - max(args.count - 1, 0) * 600
+    for index in range(args.count):
+        temperature, humidity, weight, acoustics = 34.2, 61.5, 3.25 + index * 0.001, 245.0
+        if args.scenario == "attention" and index == args.count - 1:
+            temperature = 37.0
+        elif args.scenario == "alert" and index == args.count - 1:
+            temperature, humidity, weight = 38.0, 75.0, 2.80
+        elif args.scenario == "ml" and index == args.count - 1:
+            temperature, humidity, weight, acoustics = 12.0, 18.0, 0.40, 40.0
+        yield {
+            "device_id": args.device_id,
+            "timestamp": start + index * 600,
+            "sensors": {
+                "weight_kg": round(weight, 3),
+                "temperature_c": temperature,
+                "humidity_pct": humidity,
+                "acoustics_hz": acoustics,
+            },
+            "diagnostics": {"battery_v": 4.12, "wifi_rssi_dbm": -68},
         }
-    }
-
-    message = json.dumps(payload)
-
-    client.publish(
-        MQTT_TOPIC,
-        message,
-        qos=1
-    )
-
-    reading_number = list(hive_df.index).index(index) + 1
-
-    print(
-        f"[ESP32] Reading "
-        f"{reading_number:03d}/{len(hive_df)} | "
-        f"Temp: {payload['sensors']['temperature_c']:.2f}°C | "
-        f"Humidity: {payload['sensors']['humidity_pct']:.2f}% | "
-        f"Weight: {payload['sensors']['weight_kg']:.2f} kg | "
-        f"Acoustic: {payload['sensors']['acoustics_hz']:.2f} Hz"
-    )
-
-    # Simulate time between sensor readings
-    time.sleep(DELAY_SECONDS)
 
 
-# ============================================================
-# FINISHED
-# ============================================================
+def main() -> None:
+    args = parse_args()
+    if args.count < 1:
+        raise SystemExit("--count must be positive")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.connect(args.host, args.port, 60)
+    client.loop_start()
+    try:
+        for number, payload in enumerate(readings(args), start=1):
+            client.publish(args.topic, json.dumps(payload), qos=1).wait_for_publish()
+            print(f"[{number}/{args.count}] {payload['device_id']} t={payload['timestamp']} {args.scenario}")
+            if args.interval:
+                time.sleep(args.interval)
+    finally:
+        client.loop_stop()
+        client.disconnect()
 
-client.disconnect()
 
-print("\n" + "=" * 60)
-print("Simulation completed")
-print(f"Total readings sent: {len(hive_df)}")
-print(f"MQTT topic: {MQTT_TOPIC}")
-print("=" * 60)
+if __name__ == "__main__":
+    main()

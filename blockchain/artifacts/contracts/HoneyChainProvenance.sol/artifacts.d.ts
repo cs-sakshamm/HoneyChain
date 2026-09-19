@@ -15,7 +15,7 @@ export interface HoneyChainProvenance$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/HoneyChainProvenance.sol";
-  readonly buildInfoId: "solc-0_8_20-6a63f3dcde2ae123a7564976d2160964231898b0";
+  readonly buildInfoId: "solc-0_8_20-ca8025896bc49e879810bb862092924165e4b7f6";
 };
 
 import "hardhat/types/artifacts";

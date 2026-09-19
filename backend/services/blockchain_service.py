@@ -21,6 +21,7 @@ logger = logging.getLogger("BlockchainService")
 RPC_URL = os.getenv("BLOCKCHAIN_PROVIDER_URL", os.getenv("POLYGON_AMOY_RPC_URL", "http://127.0.0.1:8545"))
 PRIVATE_KEY = os.getenv("BLOCKCHAIN_PRIVATE_KEY", "")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS", "")
+CHAIN_ID = os.getenv("BLOCKCHAIN_CHAIN_ID", "")
 NETWORK_NAME = os.getenv("BLOCKCHAIN_NETWORK_NAME", "Polygon Amoy (Chain ID: 80002)" if "amoy" in RPC_URL else "Hardhat Localhost (Chain ID: 31337)")
 
 CONTRACT_ABI = [
@@ -69,17 +70,27 @@ class BlockchainService:
         self.w3 = None
         self.contract = None
         self.account = None
+        self.chain_id = None
 
         if Web3 and PRIVATE_KEY and CONTRACT_ADDRESS:
             try:
                 self.w3 = Web3(Web3.HTTPProvider(self.rpc_url, request_kwargs={"timeout": 2.0}))
-                if self.w3.is_connected():
-                    self.account = self.w3.eth.account.from_key(PRIVATE_KEY)
-                    checksum_address = Web3.to_checksum_address(self.contract_address)
-                    self.contract = self.w3.eth.contract(address=checksum_address, abi=CONTRACT_ABI)
-                    logger.info(f"Connected to blockchain node at {self.rpc_url}")
+                if not self.w3.is_connected():
+                    raise ConnectionError(f"Cannot reach blockchain RPC at {self.rpc_url}")
+                self.chain_id = self.w3.eth.chain_id
+                if CHAIN_ID and self.chain_id != int(CHAIN_ID):
+                    raise ValueError(f"Configured chain ID {CHAIN_ID} does not match RPC chain ID {self.chain_id}")
+                self.account = self.w3.eth.account.from_key(PRIVATE_KEY)
+                checksum_address = Web3.to_checksum_address(self.contract_address)
+                if self.w3.eth.get_code(checksum_address) in (b"", b"0x"):
+                    raise ValueError(f"No contract bytecode found at {checksum_address} on chain {self.chain_id}")
+                self.contract = self.w3.eth.contract(address=checksum_address, abi=CONTRACT_ABI)
+                logger.info(f"Connected to blockchain node at {self.rpc_url} (chain ID {self.chain_id})")
             except Exception as e:
-                logger.warning(f"Blockchain initialization notice: {e}")
+                self.w3 = None
+                self.contract = None
+                self.account = None
+                logger.warning(f"Blockchain initialization failed: {e}")
         else:
             logger.info("Blockchain running in offline-safe tamper-evident hashing mode.")
 
@@ -130,7 +141,10 @@ class BlockchainService:
             })
 
             signed_tx = self.w3.eth.account.sign_transaction(tx, private_key=PRIVATE_KEY)
-            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+            raw_transaction = getattr(signed_tx, "raw_transaction", getattr(signed_tx, "rawTransaction", None))
+            if raw_transaction is None:
+                raise RuntimeError("Web3 returned a signed transaction without raw transaction bytes")
+            tx_hash = self.w3.eth.send_raw_transaction(raw_transaction)
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=10)
 
             tx_hex = self.w3.to_hex(tx_hash)
@@ -155,6 +169,27 @@ class BlockchainService:
                 "network": self.network,
                 "error": str(err),
             }
+
+    def get_batch_events(self, batch_id: str) -> Dict[str, Any]:
+        """Read the contract's provenance history; database records remain the API cache."""
+        if not self.is_connected():
+            return {"success": False, "events": [], "error": "Blockchain node or deployed contract is not configured."}
+        try:
+            events = self.contract.functions.getEvents(batch_id).call()
+            return {
+                "success": True,
+                "events": [
+                    {
+                        "batchId": event[0], "eventType": event[1], "actorId": event[2],
+                        "dataHash": event[3], "previousEventHash": event[4], "timestamp": int(event[5]),
+                    }
+                    for event in events
+                ],
+                "error": None,
+            }
+        except Exception as err:
+            logger.error(f"[Blockchain Error] Failed to read events for {batch_id}: {err}")
+            return {"success": False, "events": [], "error": str(err)}
 
 
 blockchain_service = BlockchainService()
