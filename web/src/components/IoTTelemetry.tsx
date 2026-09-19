@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Cpu, Thermometer, Droplets, Scale, Activity, Battery, ChevronDown, ChevronUp } from 'lucide-react';
 import { IoTTelemetryInfo } from '../api/honeychainApi';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { getHoverProps, getButtonProps } from '../utils/animations';
 
 interface Props {
   telemetry: IoTTelemetryInfo | null;
@@ -8,10 +10,13 @@ interface Props {
 
 export const IoTTelemetry: React.FC<Props> = ({ telemetry }) => {
   const [showTechnical, setShowTechnical] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
+  const hoverProps = getHoverProps(shouldReduceMotion ?? false);
+  const buttonProps = getButtonProps(shouldReduceMotion ?? false);
 
   if (!telemetry) {
     return (
-      <div className="honey-card">
+      <motion.div className="honey-card" {...hoverProps}>
         <div className="card-header-row">
           <div className="card-title-group">
             <div className="card-title-icon">
@@ -26,12 +31,12 @@ export const IoTTelemetry: React.FC<Props> = ({ telemetry }) => {
         <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '13px' }}>
           No telemetry records found for this batch's hive.
         </p>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="honey-card">
+    <motion.div className="honey-card" {...hoverProps}>
       <div className="card-header-row">
         <div className="card-title-group">
           <div className="card-title-icon">
@@ -88,31 +93,43 @@ export const IoTTelemetry: React.FC<Props> = ({ telemetry }) => {
         </div>
       </div>
 
-      <button
+      <motion.button
+        {...buttonProps}
         onClick={() => setShowTechnical(!showTechnical)}
         className="btn-secondary"
         style={{ width: '100%', marginTop: '4px' }}
       >
         {showTechnical ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         {showTechnical ? 'Hide Technical Data' : 'View Technical Data (JSON)'}
-      </button>
+      </motion.button>
 
-      {showTechnical && (
-        <pre
-          style={{
-            marginTop: '10px',
-            background: 'rgba(0, 0, 0, 0.4)',
-            padding: '12px',
-            borderRadius: '8px',
-            fontSize: '11px',
-            fontFamily: 'var(--font-mono)',
-            color: '#CBD5E1',
-            overflowX: 'auto',
-          }}
-        >
-          {JSON.stringify(telemetry, null, 2)}
-        </pre>
-      )}
-    </div>
+      <AnimatePresence>
+        {showTechnical && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <pre
+              style={{
+                marginTop: '10px',
+                background: 'rgba(0, 0, 0, 0.4)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+                color: '#CBD5E1',
+                overflowX: 'auto',
+                margin: '10px 0 0 0',
+              }}
+            >
+              {JSON.stringify(telemetry, null, 2)}
+            </pre>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };

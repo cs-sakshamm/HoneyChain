@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 /// Clean Flag-free Indian Language Picker (English + 22 Scheduled Indian Languages)
 class LanguageSettingScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  const _PillBackButton(),
+                  const PillBackButton(),
                   const SizedBox(width: 14),
                   Text(
                     langCtrl.tr('select_language') == 'select_language' ? 'Select Language' : langCtrl.tr('select_language'),
@@ -140,25 +141,3 @@ class _LanguageSettingScreenState extends State<LanguageSettingScreen> {
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

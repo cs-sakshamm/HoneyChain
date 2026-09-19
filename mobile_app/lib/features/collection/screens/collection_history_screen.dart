@@ -10,6 +10,7 @@ import '../../../core/widgets/status_badge.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/localization/localization_service.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 class CollectionHistoryScreen extends StatelessWidget {
   const CollectionHistoryScreen({super.key});
@@ -30,7 +31,7 @@ class CollectionHistoryScreen extends StatelessWidget {
               child: Row(
                 children: [
                   if (Navigator.canPop(context)) ...[
-                    const _PillBackButton(),
+                    const PillBackButton(),
                     const SizedBox(width: 14),
                   ],
                   Text(
@@ -159,25 +160,3 @@ class CollectionHistoryScreen extends StatelessWidget {
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

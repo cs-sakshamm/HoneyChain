@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/pill_back_button.dart';
 import '../../verification/controllers/verification_controller.dart';
 import '../../verification/screens/lab_verification_screen.dart';
 import '../../collection/screens/nearest_centres_screen.dart';
@@ -147,22 +148,7 @@ class _LabReportScreenState extends State<LabReportScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  Material(
-                    color: context.surfaceColor,
-                    borderRadius: BorderRadius.circular(30),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(30),
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: context.borderColor),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-                      ),
-                    ),
-                  ),
+                  const PillBackButton(),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(

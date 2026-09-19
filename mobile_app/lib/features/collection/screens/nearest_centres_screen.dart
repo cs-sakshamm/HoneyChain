@@ -7,6 +7,7 @@ import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../profile/controllers/user_controller.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 class NearestCentresScreen extends StatefulWidget {
   final String targetRole; // 'COLLECTOR_PROCESSOR', 'LAB', or 'PACKAGING'
@@ -171,7 +172,7 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
                   targetLabId: center['id'],
                   moisture: widget.moistureLevel,
                   notes: effectiveNotes,
-                  processorId: userCtrl.user.name,
+                  processorId: userCtrl.user.id,
                 );
               } else if (widget.targetRole == 'PACKAGING') {
                 success = await workflowCtrl.sendToPackaging(
@@ -179,7 +180,7 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
                   batchId: widget.batchId ?? '',
                   targetPackagerId: center['id'],
                   notes: notesCtrl.text.trim(),
-                  labId: userCtrl.user.name,
+                  labId: userCtrl.user.id,
                 );
               }
 
@@ -224,7 +225,7 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  const _PillBackButton(),
+                  const PillBackButton(),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -345,7 +346,7 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            center['address'] ?? 'Oregon Region',
+                            center['location'] ?? 'Location unavailable',
                             style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -461,25 +462,3 @@ class _NearestCentresScreenState extends State<NearestCentresScreen> {
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { QrCode, Copy, Check, Download } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { getHoverProps, getButtonProps, staggerContainer } from '../utils/animations';
 
 interface Props {
   batchId: string;
@@ -10,6 +12,9 @@ export const QRDisplay: React.FC<Props> = ({ batchId }) => {
   const [imageError, setImageError] = useState(false);
   const verifyUrl = `${window.location.origin}/verify/${encodeURIComponent(batchId)}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(verifyUrl)}&margin=10`;
+  const shouldReduceMotion = useReducedMotion();
+  const hoverProps = getHoverProps(shouldReduceMotion ?? false);
+  const buttonProps = getButtonProps(shouldReduceMotion ?? false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(verifyUrl);
@@ -28,7 +33,7 @@ export const QRDisplay: React.FC<Props> = ({ batchId }) => {
   };
 
   return (
-    <div className="honey-card" style={{ textAlign: 'center' }}>
+    <motion.div className="honey-card" style={{ textAlign: 'center' }} {...hoverProps}>
       <div className="card-header-row" style={{ justifyContent: 'center', marginBottom: '8px' }}>
         <div className="card-title-group">
           <div className="card-title-icon">
@@ -41,7 +46,11 @@ export const QRDisplay: React.FC<Props> = ({ batchId }) => {
         This high-contrast QR code is printed directly on the product tamper-evident seal.
       </p>
 
-      <div
+      <motion.div
+        initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.4 }}
         style={{
           display: 'inline-block',
           background: '#FFFFFF',
@@ -85,7 +94,7 @@ export const QRDisplay: React.FC<Props> = ({ batchId }) => {
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
       <div
         style={{
@@ -104,14 +113,24 @@ export const QRDisplay: React.FC<Props> = ({ batchId }) => {
       </div>
 
       <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-        <button onClick={handleCopy} className="btn-secondary">
-          {copied ? <Check size={15} color="var(--success-green)" /> : <Copy size={15} />}
+        <motion.button {...buttonProps} onClick={handleCopy} className="btn-secondary">
+          <AnimatePresence mode="wait" initial={false}>
+            {copied ? (
+              <motion.div key="check" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}>
+                <Check size={15} color="var(--success-green)" />
+              </motion.div>
+            ) : (
+              <motion.div key="copy" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}>
+                <Copy size={15} />
+              </motion.div>
+            )}
+          </AnimatePresence>
           {copied ? 'Copied to Clipboard' : 'Copy Verification Link'}
-        </button>
-        <button onClick={handleDownload} className="btn-secondary">
+        </motion.button>
+        <motion.button {...buttonProps} onClick={handleDownload} className="btn-secondary">
           <Download size={15} /> Download QR Code
-        </button>
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
 };

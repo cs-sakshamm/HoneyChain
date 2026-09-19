@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../constants/app_constants.dart';
 import '../models/workflow_request.dart';
+import '../services/auth_token_store.dart';
 
 class WorkflowController extends ChangeNotifier {
   List<WorkflowRequest> _requests = [];
@@ -33,6 +34,7 @@ class WorkflowController extends ChangeNotifier {
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...AuthTokenStore.authHeader(),
       };
 
   void clearError() {
@@ -44,8 +46,11 @@ class WorkflowController extends ChangeNotifier {
   void _handleErrorResponse(http.Response res, String defaultMessage) {
     try {
       final body = json.decode(res.body);
-      lastErrorCode = body['code'];
-      errorMessage = body['message'] ?? body['error'] ?? defaultMessage;
+      final errorBody = body['detail'] is Map<String, dynamic>
+          ? body['detail'] as Map<String, dynamic>
+          : body as Map<String, dynamic>;
+      lastErrorCode = errorBody['code'] as String?;
+      errorMessage = errorBody['message'] ?? errorBody['error'] ?? defaultMessage;
     } catch (_) {
       lastErrorCode = null;
       errorMessage = defaultMessage;

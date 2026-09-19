@@ -1,6 +1,8 @@
-import React from 'react';
-import { Blocks, CheckCircle, ShieldCheck, Link2 } from 'lucide-react';
+﻿import React from 'react';
+import { Blocks, CheckCircle, Clock, Link2 } from 'lucide-react';
 import { BlockchainVerificationInfo, BlockchainEvent } from '../api/honeychainApi';
+import { motion, useReducedMotion } from 'framer-motion';
+import { staggerContainer, getHoverProps } from '../utils/animations';
 
 interface Props {
   blockchain: BlockchainVerificationInfo;
@@ -8,63 +10,83 @@ interface Props {
   provenanceEvents: BlockchainEvent[];
 }
 
-export const BlockchainProof: React.FC<Props> = ({ blockchain, batchId, provenanceEvents }) => {
+export const BlockchainProof: React.FC<Props> = ({ blockchain, provenanceEvents }) => {
+  const shouldReduceMotion = useReducedMotion();
+  const hoverProps = getHoverProps(shouldReduceMotion ?? false);
   const events = blockchain.events && blockchain.events.length > 0 ? blockchain.events : provenanceEvents;
+  const hasEvents = events.length > 0;
+
+  const eventItemVariants = {
+    hidden: { opacity: 0, y: 5 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.2 } }
+  };
+
+  const reducedEventItemVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.2 } }
+  };
 
   return (
-    <div className="honey-card">
+    <motion.div className="honey-card" {...hoverProps}>
       <div className="card-header-row">
         <div className="card-title-group">
-          <div className="card-title-icon blue">
+          <div className={`card-title-icon ${hasEvents ? 'blue' : ''}`}>
             <Blocks size={20} />
           </div>
           <div>
-            <h2 className="card-title">Blockchain Proof & Immutable Ledger</h2>
+            <h2 className="card-title">Blockchain Proof & Tamper-Evident Ledger</h2>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Cryptographically verified on-chain provenance records
+              Authorized supply-chain events and document hashes anchored as state commitments
             </div>
           </div>
         </div>
-        <span className="status-pill success" style={{ fontSize: '11px' }}>
-          <CheckCircle size={12} /> Confirmed On-Chain
+        <span className={`status-pill ${hasEvents ? 'success' : 'gold'}`} style={{ fontSize: '11px' }}>
+          {hasEvents ? <CheckCircle size={12} /> : <Clock size={12} />} {hasEvents ? 'Events Recorded' : 'No Records Yet'}
         </span>
       </div>
 
       <div style={{ background: 'rgba(56, 189, 248, 0.06)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '10px', padding: '10px 14px', marginBottom: '14px', fontSize: '12px', color: '#94A3B8' }}>
-        <strong style={{ color: '#38BDF8' }}>Architecture Architecture: </strong>
-        Tamper-evident supply chain milestones are anchored on the blockchain ledger using SHA-256 state commitments. Continuous high-frequency IoT telemetry is securely streamed and analyzed by HoneyChain backend.
+        <strong style={{ color: '#38BDF8' }}>Traceability note: </strong>
+        HoneyChain verifies authorization, ordering, and tamper-evident integrity of recorded events and documents. It does not independently prove every physical-world value is truthful.
       </div>
 
       <div className="kv-grid" style={{ marginBottom: '14px' }}>
         <div className="kv-item">
-          <div className="kv-label">Ledger Protocol Network</div>
-          <div className="kv-value highlight">{blockchain.network || 'Polygon Amoy / Hardhat (Chain ID: 80002)'}</div>
+          <div className="kv-label">Ledger Network</div>
+          <div className="kv-value highlight">{blockchain.network || 'Not configured'}</div>
         </div>
         <div className="kv-item">
-          <div className="kv-label">Smart Contract Name</div>
+          <div className="kv-label">Smart Contract</div>
           <div className="kv-value">HoneyChainProvenance</div>
         </div>
         <div className="kv-item">
           <div className="kv-label">Contract Address</div>
           <div className="kv-value mono" style={{ fontSize: '11px' }}>
-            {blockchain.contractAddress || '0x5FbDB2315678afecb367f032d93F642f64180aa3'}
+            {blockchain.contractAddress || 'Not configured'}
           </div>
         </div>
         <div className="kv-item">
-          <div className="kv-label">Verified Provenance Events</div>
-          <div className="kv-value">{events.length || blockchain.totalConfirmedEvents || 4} On-Chain Records</div>
+          <div className="kv-label">Provenance Events</div>
+          <div className="kv-value">{events.length || blockchain.totalConfirmedEvents || 0} Records</div>
         </div>
       </div>
 
-      {events.length > 0 && (
+      {hasEvents ? (
         <div style={{ marginTop: '14px' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Link2 size={13} color="var(--primary-gold)" /> On-Chain Provenance Event Log
+            <Link2 size={13} color="var(--primary-gold)" /> Provenance Event Log
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <motion.div
+            style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-20px" }}
+          >
             {events.map((evt, idx) => (
-              <div
+              <motion.div
                 key={idx}
+                variants={shouldReduceMotion ? reducedEventItemVariants : eventItemVariants}
                 style={{
                   background: 'rgba(15, 23, 42, 0.6)',
                   border: '1px solid var(--border-subtle)',
@@ -75,8 +97,8 @@ export const BlockchainProof: React.FC<Props> = ({ blockchain, batchId, provenan
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <span style={{ fontWeight: 600, color: 'var(--primary-gold)' }}>{evt.eventType}</span>
-                  <span className="status-pill success" style={{ fontSize: '10px', padding: '1px 6px' }}>
-                    {evt.status || 'CONFIRMED'}
+                  <span className={`status-pill ${evt.status === 'FAILED' ? 'danger' : 'success'}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
+                    {evt.status || 'RECORDED'}
                   </span>
                 </div>
                 <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', wordBreak: 'break-all' }}>
@@ -89,11 +111,15 @@ export const BlockchainProof: React.FC<Props> = ({ blockchain, batchId, provenan
                     {evt.txHash}
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
+      ) : (
+        <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '13px' }}>
+          No blockchain provenance events have been recorded for this batch.
+        </p>
       )}
-    </div>
+    </motion.div>
   );
 };

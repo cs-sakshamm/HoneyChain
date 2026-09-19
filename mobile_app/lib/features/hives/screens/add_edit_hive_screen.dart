@@ -11,6 +11,7 @@ import '../../collection/screens/nearest_centres_screen.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 /// Form screen for creating or editing a Hive
 class AddEditHiveScreen extends StatefulWidget {
@@ -384,7 +385,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  const _PillBackButton(),
+                  const PillBackButton(),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
@@ -548,7 +549,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildTextField(
-                        label: '${context.tr('queen_age')} (months) *',
+                        label: '${context.tr('queen_age')} *',
                         hint: 'e.g. 12',
                         controller: _queenAgeMonthsController,
                         keyboardType: TextInputType.number,
@@ -584,7 +585,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: '${context.tr('expected_honey')} (kg) *',
+                        label: '${context.tr('expected_honey')} *',
                         hint: 'e.g. 35.0',
                         controller: _expectedProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -603,7 +604,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                     const SizedBox(width: AppConstants.space12),
                     Expanded(
                       child: _buildTextField(
-                        label: '${context.tr('previous_year')} (kg) *',
+                        label: '${context.tr('previous_year')} *',
                         hint: 'e.g. 25.0',
                         controller: _previousYearProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -626,7 +627,7 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildTextField(
-                        label: '${context.tr('current_year')} (kg) *',
+                        label: '${context.tr('current_year')} *',
                         hint: 'e.g. 28.0',
                         controller: _currentYearProductionController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -950,29 +951,6 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
     );
   }
 }

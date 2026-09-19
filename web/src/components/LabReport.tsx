@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { FlaskConical, CheckCircle, FileText, Download, X } from 'lucide-react';
 import { LabVerificationInfo } from '../api/honeychainApi';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { getHoverProps, getButtonProps } from '../utils/animations';
 
 interface Props {
   lab: LabVerificationInfo | null;
@@ -9,10 +11,13 @@ interface Props {
 
 export const LabReport: React.FC<Props> = ({ lab, batchId }) => {
   const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
+  const hoverProps = getHoverProps(shouldReduceMotion ?? false);
+  const buttonProps = getButtonProps(shouldReduceMotion ?? false);
 
   if (!lab) {
     return (
-      <div className="honey-card">
+      <motion.div className="honey-card" {...hoverProps}>
         <div className="card-header-row">
           <div className="card-title-group">
             <div className="card-title-icon">
@@ -27,14 +32,14 @@ export const LabReport: React.FC<Props> = ({ lab, batchId }) => {
         <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '13px' }}>
           Laboratory report not available for this batch.
         </p>
-      </div>
+      </motion.div>
     );
   }
 
   const isApproved = lab.status.toUpperCase().includes('PASS') || lab.status.toUpperCase().includes('APPROV');
 
   return (
-    <div className="honey-card">
+    <motion.div className="honey-card" {...hoverProps}>
       <div className="card-header-row">
         <div className="card-title-group">
           <div className={`card-title-icon ${isApproved ? 'success' : ''}`}>
@@ -101,104 +106,117 @@ export const LabReport: React.FC<Props> = ({ lab, batchId }) => {
       )}
 
       <div style={{ marginTop: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button
+        <motion.button
+          {...buttonProps}
           onClick={() => setShowCertificateModal(true)}
           className="btn-primary"
           style={{ flex: 1, minWidth: '160px', padding: '8px 14px', fontSize: '13px' }}
         >
           <Download size={15} /> Download Lab Report
-        </button>
-        <button
+        </motion.button>
+        <motion.button
+          {...buttonProps}
           onClick={() => setShowCertificateModal(true)}
           className="btn-secondary"
           style={{ flex: 1, minWidth: '160px', padding: '8px 14px', fontSize: '13px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
           <FileText size={15} /> View Analytical Certificate
-        </button>
+        </motion.button>
       </div>
 
-      {showCertificateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '16px',
-          }}
-        >
-          <div
+      <AnimatePresence>
+        {showCertificateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             style={{
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              maxWidth: '560px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              position: 'relative',
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '16px',
             }}
           >
-            <button
-              onClick={() => setShowCertificateModal(false)}
+            <motion.div
+              initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.96 }}
+              transition={{ duration: 0.2 }}
               style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                color: 'var(--text-secondary)',
-                padding: '4px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '16px',
+                maxWidth: '560px',
+                width: '100%',
+                padding: '24px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                position: 'relative',
               }}
             >
-              <X size={20} />
-            </button>
+              <button
+                onClick={() => setShowCertificateModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  color: 'var(--text-secondary)',
+                  padding: '4px',
+                }}
+              >
+                <X size={20} />
+              </button>
 
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-              <div style={{ color: 'var(--primary-gold)', fontWeight: 800, fontSize: '18px' }}>
-                CERTIFICATE OF ANALYSIS
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <div style={{ color: 'var(--primary-gold)', fontWeight: 800, fontSize: '18px' }}>
+                  CERTIFICATE OF ANALYSIS
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  HoneyChain Trust & Traceability Protocol
+                </div>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                HoneyChain Trust & Traceability Protocol
-              </div>
-            </div>
 
-            <div className="kv-grid" style={{ marginBottom: '16px' }}>
-              <div className="kv-item">
-                <div className="kv-label">Report ID</div>
-                <div className="kv-value mono">{lab.reportId}</div>
+              <div className="kv-grid" style={{ marginBottom: '16px' }}>
+                <div className="kv-item">
+                  <div className="kv-label">Report ID</div>
+                  <div className="kv-value mono">{lab.reportId}</div>
+                </div>
+                <div className="kv-item">
+                  <div className="kv-label">Batch Code</div>
+                  <div className="kv-value mono">{batchId}</div>
+                </div>
+                <div className="kv-item">
+                  <div className="kv-label">Laboratory</div>
+                  <div className="kv-value">{lab.labName}</div>
+                </div>
+                <div className="kv-item">
+                  <div className="kv-label">Overall Result</div>
+                  <div className="kv-value" style={{ color: 'var(--success-green)' }}>{lab.status}</div>
+                </div>
               </div>
-              <div className="kv-item">
-                <div className="kv-label">Batch Code</div>
-                <div className="kv-value mono">{batchId}</div>
-              </div>
-              <div className="kv-item">
-                <div className="kv-label">Laboratory</div>
-                <div className="kv-value">{lab.labName}</div>
-              </div>
-              <div className="kv-item">
-                <div className="kv-label">Overall Result</div>
-                <div className="kv-value" style={{ color: 'var(--success-green)' }}>{lab.status}</div>
-              </div>
-            </div>
 
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.6 }}>
-              This document certifies that the aforementioned lot sample underwent comprehensive physicochemical testing. All measured parameters, including moisture content, diastase enzyme levels, HMF index, and pollen origin, conform strictly with Codex Alimentarius and FSSAI honey quality standards.
-            </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.6 }}>
+                This document certifies that the aforementioned lot sample underwent comprehensive physicochemical testing. All measured parameters, including moisture content, diastase enzyme levels, HMF index, and pollen origin, conform strictly with Codex Alimentarius and FSSAI honey quality standards.
+              </div>
 
-            <button
-              onClick={() => window.print()}
-              className="btn-primary"
-              style={{ width: '100%' }}
-            >
-              <Download size={16} /> Print / Save Certificate
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+              <motion.button
+                {...buttonProps}
+                onClick={() => window.print()}
+                className="btn-primary"
+                style={{ width: '100%' }}
+              >
+                <Download size={16} /> Print / Save Certificate
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };

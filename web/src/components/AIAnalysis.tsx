@@ -1,15 +1,20 @@
 import React from 'react';
 import { Sparkles, CheckCircle, AlertTriangle } from 'lucide-react';
 import { AIAnalysisInfo } from '../api/honeychainApi';
+import { motion, useReducedMotion } from 'framer-motion';
+import { getHoverProps } from '../utils/animations';
 
 interface Props {
   ai: AIAnalysisInfo | null;
 }
 
 export const AIAnalysis: React.FC<Props> = ({ ai }) => {
+  const shouldReduceMotion = useReducedMotion();
+  const hoverProps = getHoverProps(shouldReduceMotion ?? false);
+
   if (!ai) {
     return (
-      <div className="honey-card">
+      <motion.div className="honey-card" {...hoverProps}>
         <div className="card-header-row">
           <div className="card-title-group">
             <div className="card-title-icon">
@@ -24,14 +29,14 @@ export const AIAnalysis: React.FC<Props> = ({ ai }) => {
         <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '13px' }}>
           No AI/ML inference records available for this batch.
         </p>
-      </div>
+      </motion.div>
     );
   }
 
   const isHealthy = ai.healthStatus.toUpperCase().includes('HEALTH') || ai.riskLevel.toUpperCase().includes('LOW');
 
   return (
-    <div className="honey-card">
+    <motion.div className="honey-card" {...hoverProps}>
       <div className="card-header-row">
         <div className="card-title-group">
           <div className={`card-title-icon ${isHealthy ? 'success' : ''}`}>
@@ -82,6 +87,6 @@ export const AIAnalysis: React.FC<Props> = ({ ai }) => {
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
         Note: AI inference is an environmental monitoring and anomaly detection assessment, not an official laboratory purity certificate.
       </div>
-    </div>
+    </motion.div>
   );
 };

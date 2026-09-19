@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../models/harvester_verification_model.dart';
 import '../services/verification_api_service.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 class PublicVerificationLookupScreen extends StatefulWidget {
   final String? initialVerificationId;
@@ -97,7 +98,7 @@ class _PublicVerificationLookupScreenState extends State<PublicVerificationLooku
               // Header
               Row(
                 children: [
-                  _PillBackButton(onTap: () => Navigator.pop(context)),
+                  PillBackButton(onTap: () => Navigator.pop(context)),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -339,28 +340,3 @@ class _PublicVerificationLookupScreenState extends State<PublicVerificationLooku
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _PillBackButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

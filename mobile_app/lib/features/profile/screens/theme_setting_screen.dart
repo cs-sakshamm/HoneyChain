@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 /// Screen to select Theme Mode (Light, Dark, System Default)
 class ThemeSettingScreen extends StatelessWidget {
@@ -26,7 +27,7 @@ class ThemeSettingScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  const _PillBackButton(),
+                  const PillBackButton(),
                   const SizedBox(width: 14),
                   Text(
                     context.tr('theme_settings') == 'theme_settings' ? 'Appearance' : context.tr('theme_settings'),
@@ -117,26 +118,3 @@ class ThemeSettingScreen extends StatelessWidget {
 }
 
 /// Reusable pill-style back button used across all secondary screens
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

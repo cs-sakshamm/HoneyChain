@@ -7,6 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../controllers/verification_controller.dart';
+import '../../../core/widgets/pill_back_button.dart';
 // import 'verification_certificate_screen.dart';
 
 class HarvesterVerificationScreen extends StatefulWidget {
@@ -144,7 +145,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: Center(
-            child: _PillBackButton(onTap: () => Navigator.pop(context)),
+            child: PillBackButton(onTap: () => Navigator.pop(context)),
           ),
         ),
         title: Column(
@@ -1460,31 +1461,4 @@ class _AlertBanner extends StatelessWidget {
     );
   }
 }
-
-class _PillBackButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _PillBackButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}
-
 

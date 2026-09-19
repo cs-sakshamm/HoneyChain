@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 class PackagingQrScreen extends StatelessWidget {
   final WorkflowRequest request;
@@ -30,7 +31,7 @@ class PackagingQrScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  const _PillBackButton(),
+                  const PillBackButton(),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
@@ -290,25 +291,3 @@ class PackagingQrScreen extends StatelessWidget {
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

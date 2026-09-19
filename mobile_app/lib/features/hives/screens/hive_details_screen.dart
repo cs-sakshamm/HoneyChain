@@ -13,6 +13,7 @@ import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
 import 'start_harvesting_screen.dart';
 import '../../../core/controllers/telemetry_alert_controller.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 /// Clean, Minimal Field Overview & Harvest Details Screen
 class HiveDetailsScreen extends StatelessWidget {
@@ -85,7 +86,7 @@ class HiveDetailsScreen extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: _PillBackButton(),
+                  child: PillBackButton(),
                 ),
               ),
               Expanded(child: Center(child: Text(context.tr('no_matching_hives')))),
@@ -105,22 +106,7 @@ class HiveDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  Material(
-                    color: context.surfaceColor,
-                    borderRadius: BorderRadius.circular(30),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(30),
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: context.borderColor),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-                      ),
-                    ),
-                  ),
+                  const PillBackButton(),
                   const Spacer(),
                   Material(
                     color: context.surfaceColor,
@@ -577,29 +563,6 @@ class HiveDetailsScreen extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${dt.day}/${dt.month}/${dt.year}';
-  }
-}
-
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
   }
 }
 

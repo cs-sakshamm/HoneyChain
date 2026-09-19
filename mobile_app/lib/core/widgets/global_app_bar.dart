@@ -42,8 +42,8 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canPop = ModalRoute.of(context)?.canPop ?? false;
-    final isSubPage = (showBackButton || canPop) && titleText != null;
+final canPop = ModalRoute.of(context)?.canPop ?? false;
+    final shouldShowBack = showBackButton || canPop;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Real dynamic unread message / notification state
@@ -82,51 +82,40 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Left Section: Logo + Name OR Back Button + Title
+// Left Section: Logo + Name OR Back Button + Title
               Expanded(
-                child: isSubPage
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const PillBackButton(),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              titleText!,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.manrope(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: context.textPrimaryColor,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (shouldShowBack) ...[
+                      const PillBackButton(),
+                      const SizedBox(width: 12),
+                    ],
+                    if (titleText != null)
+                      Expanded(
+                        child: Text(
+                          titleText!,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.manrope(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: context.textPrimaryColor,
+                            letterSpacing: -0.3,
                           ),
-                        ],
+                        ),
                       )
-                    : Row(
+                    else if (!shouldShowBack)
+                      Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const AppLogo(
                             size: 26,
                             showWordmark: true,
                           ),
-                          if (titleText != null) ...[
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                '• $titleText',
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: context.textSecondaryColor,
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
+                  ],
+                ),
               ),
 
               // Right Section: Inbox / Message Button (ONLY, "+" icon removed)

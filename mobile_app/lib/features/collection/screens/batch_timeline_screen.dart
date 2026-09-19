@@ -9,6 +9,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 class BatchTimelineScreen extends StatefulWidget {
   final String batchId;
@@ -72,7 +73,7 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  const _PillBackButton(),
+                  const PillBackButton(),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -728,29 +729,6 @@ class _BatchTimelineScreenState extends State<BatchTimelineScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
         ),
       ),
     );

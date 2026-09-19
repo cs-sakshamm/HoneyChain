@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../utils/profile_guard.dart';
 import 'app_card.dart';
 import 'status_badge.dart';
+import 'global_app_bar.dart';
 import '../../features/collection/screens/batch_timeline_screen.dart';
 import '../../features/lab/screens/lab_report_screen.dart';
 import '../../features/packaging/screens/packaging_qr_screen.dart';
@@ -100,18 +101,9 @@ class _MyRequestsViewState extends State<MyRequestsView> {
     return Scaffold(
       backgroundColor: context.scaffoldBg,
       appBar: widget.showAppBar
-          ? AppBar(
-              backgroundColor: context.surfaceColor,
-              elevation: 0,
-              title: Text(
-                'My Requests',
-                style: GoogleFonts.manrope(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                  color: context.textPrimaryColor,
-                ),
-              ),
-              centerTitle: false,
+          ? const GlobalAppBar(
+              titleText: 'My Requests',
+              showBackButton: true,
             )
           : null,
       body: SafeArea(

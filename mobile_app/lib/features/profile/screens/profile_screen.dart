@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/user_avatar.dart';
+import '../../../core/widgets/global_app_bar.dart';
 import '../../authentication/auth_controller.dart';
 import '../../authentication/widgets/google_logo_icon.dart';
 import '../../collection/screens/collection_dashboard_screen.dart';
@@ -1230,10 +1231,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 MaterialPageRoute(
                   builder: (context) => Scaffold(
                     backgroundColor: context.scaffoldBg,
-                    appBar: AppBar(
-                      title: Text('My Workflow Requests', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
-                      backgroundColor: context.surfaceColor,
-                      elevation: 0,
+                    appBar: const GlobalAppBar(
+                      titleText: 'My Workflow Requests',
+                      showBackButton: true,
                     ),
                     body: const MyRequestsView(userRole: 'HARVESTER'),
                   ),

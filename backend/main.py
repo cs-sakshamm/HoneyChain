@@ -266,7 +266,7 @@ def serve_root():
     index_file = web_dist_dir / "index.html"
     if index_file.exists():
         return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>HoneyChain Cryptographic Verification Protocol</h1><p>Visit <a href='/verify/HC-BATCH-2026-CA7715'>/verify/HC-BATCH-2026-CA7715</a></p>")
+    return HTMLResponse("<h1>HoneyChain Cryptographic Verification Protocol</h1><p>Enter a valid batch ID in the verifier route.</p>")
 
 
 # ── WebSockets ──
@@ -732,6 +732,47 @@ def _notify(db: Session, user_id: Optional[str], ntype: str, title: str, message
         db.flush()
     except Exception as e:
         logger.debug(f"Notification skipped: {e}")
+
+
+ACTIVE_REQUEST_STATUSES = {"PENDING", "ACCEPTED", "PROCESSING", "TESTING", "SENT_TO_LAB", "SENT_TO_PACKAGING", "PACKAGING_ACCEPTED"}
+TERMINAL_REQUEST_STATUSES = {"COMPLETED", "DENIED", "REJECTED", "CANCELLED"}
+
+
+def _latest_event_hash(db: Session, batch_id: Optional[str]) -> str:
+    if not batch_id:
+        return ""
+    latest = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+    return latest.data_hash if latest else ""
+
+
+def _record_provenance(
+    db: Session,
+    batch_id: str,
+    event_type: str,
+    actor_id: str,
+    payload: Dict[str, Any],
+    previous_event_hash: Optional[str] = None,
+) -> Dict[str, Any]:
+    previous_hash = previous_event_hash if previous_event_hash is not None else _latest_event_hash(db, batch_id)
+    blockchain_result = blockchain_service.record_batch_event(
+        batch_id=batch_id,
+        event_type=event_type,
+        actor_id=actor_id,
+        payload=payload,
+        previous_event_hash=previous_hash,
+    )
+    db.add(BlockchainRecord(
+        batch_id=batch_id,
+        event_type=event_type,
+        actor_id=actor_id,
+        data_hash=blockchain_result["data_hash"],
+        previous_event_hash=previous_hash,
+        tx_hash=blockchain_result.get("tx_hash"),
+        block_number=blockchain_result.get("block_number"),
+        network=blockchain_result["network"],
+        status=blockchain_result["status"],
+    ))
+    return blockchain_result
 
 
 def get_user_dict(user: User) -> Dict[str, Any]:
@@ -1652,10 +1693,27 @@ def get_nearest_centers(
 @app.get("/collection/requests")
 def get_workflow_requests(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     out = []
+    role = normalize_role(current_user.role)
+    visible_batch_ids = set()
 
     # 1. Collection Requests (Harvester -> Collector)
-    requests = db.query(CollectionRequest).order_by(desc(CollectionRequest.created_at)).all()
+    requests_query = db.query(CollectionRequest)
+    if role == "HARVESTER":
+        requests_query = requests_query.filter(CollectionRequest.harvester_id == current_user.id)
+    elif role == "COLLECTOR_PROCESSOR":
+        requests_query = requests_query.filter(
+            or_(
+                CollectionRequest.collection_centre_id == current_user.id,
+                CollectionRequest.collection_centre_id.is_(None),
+            )
+        )
+    elif role not in ("ADMIN",):
+        requests_query = requests_query.filter(CollectionRequest.harvester_id == "__none__")
+
+    requests = requests_query.order_by(desc(CollectionRequest.created_at)).all()
     for r in requests:
+        if r.batch_id:
+            visible_batch_ids.add(r.batch_id)
         harvester = db.query(User).filter(User.id == r.harvester_id).first()
         harvester_name = harvester.name if harvester else "Harvester"
         latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == r.batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
@@ -1684,8 +1742,22 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
         })
 
     # 2. Lab Requests (Collector -> Lab)
-    lab_requests = db.query(LabRequest).order_by(desc(LabRequest.created_at)).all()
+    lab_requests_query = db.query(LabRequest)
+    if role == "HARVESTER":
+        harvest_batches = db.query(CollectionBatch.batch_id).filter(CollectionBatch.harvester_id == current_user.id).all()
+        harvester_batch_ids = [b[0] for b in harvest_batches]
+        lab_requests_query = lab_requests_query.filter(LabRequest.batch_id.in_(harvester_batch_ids or ["__none__"]))
+    elif role == "COLLECTOR_PROCESSOR":
+        lab_requests_query = lab_requests_query.filter(LabRequest.requested_by_id == current_user.id)
+    elif role == "LAB":
+        lab_ids = [l.id for l in db.query(Lab).filter(Lab.user_id == current_user.id).all()]
+        lab_requests_query = lab_requests_query.filter(LabRequest.lab_id.in_((lab_ids + [current_user.id]) or ["__none__"]))
+    elif role != "ADMIN":
+        lab_requests_query = lab_requests_query.filter(LabRequest.id == "__none__")
+
+    lab_requests = lab_requests_query.order_by(desc(LabRequest.created_at)).all()
     for lr in lab_requests:
+        visible_batch_ids.add(lr.batch_id)
         batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == lr.batch_id).first()
         harvester = db.query(User).filter(User.id == batch.harvester_id).first() if batch else None
         harvester_name = harvester.name if harvester else "Harvester"
@@ -1735,7 +1807,17 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
         })
 
     # 3. Packaging Requests & Completed Batches (Lab -> Packaging)
-    batches = db.query(CollectionBatch).all()
+    batches_query = db.query(CollectionBatch)
+    if role == "HARVESTER":
+        batches_query = batches_query.filter(CollectionBatch.harvester_id == current_user.id)
+    elif role in ("COLLECTOR_PROCESSOR", "LAB"):
+        batches_query = batches_query.filter(CollectionBatch.batch_id.in_(list(visible_batch_ids) or ["__none__"]))
+    elif role == "PACKAGING":
+        batches_query = batches_query.filter(CollectionBatch.current_stage.in_(["PACKAGING", "COMPLETED"]))
+    elif role != "ADMIN":
+        batches_query = batches_query.filter(CollectionBatch.id == "__none__")
+
+    batches = batches_query.all()
     for b in batches:
         pkg = db.query(PackagingBatch).filter(PackagingBatch.batch_id == b.batch_id).first()
         is_pkg_stage = (b.current_stage in ("PACKAGING", "COMPLETED")) or (b.status in ("SENT_TO_PACKAGING", "READY_FOR_PACKAGING", "PACKAGING_ACCEPTED", "COMPLETED")) or (pkg is not None)
@@ -1804,12 +1886,31 @@ def create_workflow_request(
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only request collection for your own hives."})
 
     qty = float(payload.get("quantity") or payload.get("estimatedQuantityKg") or 15.0)
+    target_center_id = payload.get("collectionCentreId") or payload.get("toUserId")
+
+    duplicate = db.query(CollectionRequest).filter(
+        CollectionRequest.harvester_id == current_user.id,
+        CollectionRequest.batch_id == batch_code,
+        CollectionRequest.collection_centre_id == target_center_id,
+        CollectionRequest.status.in_(list(ACTIVE_REQUEST_STATUSES)),
+    ).first()
+    if duplicate:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "success": False,
+                "code": "DUPLICATE_REQUEST",
+                "message": "An active collection request already exists for this batch and center.",
+                "requestId": duplicate.request_id,
+                "status": duplicate.status,
+            },
+        )
 
     col_req = CollectionRequest(
         request_id=req_code,
         harvester_id=current_user.id,
         hive_id=hive_id,
-        collection_centre_id=payload.get("collectionCentreId") or payload.get("toUserId"),
+        collection_centre_id=target_center_id,
         batch_id=batch_code,
         status="PENDING",
         requested_quantity_kg=qty,
@@ -1835,24 +1936,13 @@ def create_workflow_request(
         batch.request_id = req_code
 
     # Record Blockchain Provenance
-    blockchain_result = blockchain_service.record_batch_event(
+    blockchain_result = _record_provenance(
+        db,
         batch_id=batch_code,
         event_type="HARVEST_AND_COLLECTION_REQUESTED",
         actor_id=current_user.id,
         payload={"batch_id": batch_code, "quantity": col_req.requested_quantity_kg, "hive_id": hive_id},
     )
-
-    bc_record = BlockchainRecord(
-        batch_id=batch_code,
-        event_type="HARVEST_AND_COLLECTION_REQUESTED",
-        actor_id=current_user.id,
-        data_hash=blockchain_result["data_hash"],
-        tx_hash=blockchain_result.get("tx_hash"),
-        block_number=blockchain_result.get("block_number"),
-        network=blockchain_result["network"],
-        status=blockchain_result["status"],
-    )
-    db.add(bc_record)
     db.commit()
 
     return {
@@ -1946,21 +2036,13 @@ def accept_workflow_request(
             batch.current_stage = "COLLECTED"
             batch.status = "ACCEPTED"
 
-        bc = blockchain_service.record_batch_event(
+        bc = _record_provenance(
+            db,
             batch_id=req_obj.batch_id or req_obj.request_id,
             event_type="REQUEST_ACCEPTED",
             actor_id=actor_id,
             payload={"request_id": req_obj.request_id, "status": "ACCEPTED", "timestamp": datetime.utcnow().isoformat()},
         )
-        db.add(BlockchainRecord(
-            batch_id=req_obj.batch_id or req_obj.request_id,
-            event_type="REQUEST_ACCEPTED",
-            actor_id=actor_id,
-            data_hash=bc["data_hash"],
-            tx_hash=bc.get("tx_hash"),
-            network=bc["network"],
-            status=bc["status"],
-        ))
         _notify(db, req_obj.harvester_id, "REQUEST_ACCEPTED", "Collection request accepted", f"Your collection request {req_obj.request_id} was accepted by {current_user.organization_name or current_user.name}.", {"requestId": req_obj.request_id})
         db.commit()
         return {"success": True, "message": "Request accepted successfully", "requestId": req_obj.request_id, "status": "ACCEPTED", "blockchain": bc}
@@ -1973,6 +2055,16 @@ def accept_workflow_request(
         (LabRequest.sample_code == request_id)
     ).first()
     if lab_req:
+        if normalize_role(current_user.role) != "LAB":
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Accredited Laboratory accounts can accept lab requests."})
+        lab_ids = [l.id for l in db.query(Lab).filter(Lab.user_id == current_user.id).all()]
+        if lab_req.lab_id and lab_req.lab_id not in lab_ids and lab_req.lab_id != current_user.id:
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "This lab request is assigned to another lab."})
+        old_status = (lab_req.status or "").upper()
+        if old_status in ("TESTING", "ACCEPTED"):
+            raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_ACCEPT", "message": "Lab request has already been accepted."})
+        if old_status != "PENDING":
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Lab request is {old_status} and can no longer be accepted."})
         if notes:
             lab_req.notes = f"{lab_req.notes or ''}\n{notes}".strip()
         lab_req.status = "TESTING"
@@ -1981,21 +2073,13 @@ def accept_workflow_request(
             batch.current_stage = "LAB_TESTING"
             batch.status = "TESTING"
 
-        bc = blockchain_service.record_batch_event(
+        bc = _record_provenance(
+            db,
             batch_id=lab_req.batch_id,
             event_type="LAB_SAMPLE_ACCEPTED_FOR_TESTING",
             actor_id=actor_id,
             payload={"request_id": lab_req.request_id, "sample_code": lab_req.sample_code, "status": "TESTING"},
         )
-        db.add(BlockchainRecord(
-            batch_id=lab_req.batch_id,
-            event_type="LAB_SAMPLE_ACCEPTED_FOR_TESTING",
-            actor_id=actor_id,
-            data_hash=bc["data_hash"],
-            tx_hash=bc.get("tx_hash"),
-            network=bc["network"],
-            status=bc["status"],
-        ))
         db.commit()
         return {"success": True, "message": "Lab sample accepted for testing", "requestId": lab_req.request_id, "status": "TESTING", "blockchain": bc}
 
@@ -2003,23 +2087,24 @@ def accept_workflow_request(
     clean_batch_id = request_id.replace("REQ-PKG-", "").strip()
     batch = db.query(CollectionBatch).filter((CollectionBatch.batch_id == clean_batch_id) | (CollectionBatch.id == clean_batch_id)).first()
     if batch:
+        if normalize_role(current_user.role) != "PACKAGING":
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Packaging accounts can accept packaging requests."})
+        report = db.query(LabReport).filter(LabReport.batch_id == batch.batch_id).order_by(desc(LabReport.created_at)).first()
+        if not report or report.overall_result != "PASS":
+            raise HTTPException(status_code=409, detail={"success": False, "code": "PACKAGING_NOT_PERMITTED", "message": "Packaging is not permitted until the lab test has passed."})
+        if (batch.status or "").upper() == "PACKAGING_ACCEPTED":
+            raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_ACCEPT", "message": "Batch has already been accepted for packaging."})
+        if (batch.status or "").upper() not in ("SENT_TO_PACKAGING", "READY_FOR_PACKAGING", "APPROVED"):
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": "Batch is not ready for packaging."})
         batch.status = "PACKAGING_ACCEPTED"
         batch.current_stage = "PACKAGING"
-        bc = blockchain_service.record_batch_event(
+        bc = _record_provenance(
+            db,
             batch_id=batch.batch_id,
             event_type="PACKAGING_BATCH_ACCEPTED",
             actor_id=actor_id,
             payload={"batch_id": batch.batch_id, "status": "PACKAGING_ACCEPTED"},
         )
-        db.add(BlockchainRecord(
-            batch_id=batch.batch_id,
-            event_type="PACKAGING_BATCH_ACCEPTED",
-            actor_id=actor_id,
-            data_hash=bc["data_hash"],
-            tx_hash=bc.get("tx_hash"),
-            network=bc["network"],
-            status=bc["status"],
-        ))
         db.commit()
         return {"success": True, "message": "Batch accepted for packaging", "requestId": request_id, "status": "PACKAGING_ACCEPTED", "blockchain": bc}
 
@@ -2036,6 +2121,8 @@ def reject_workflow_request(
     payload = payload or {}
     req_obj = db.query(CollectionRequest).filter((CollectionRequest.id == request_id) | (CollectionRequest.request_id == request_id)).first()
     if req_obj:
+        if normalize_role(current_user.role) != "COLLECTOR_PROCESSOR":
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Collection & Processing accounts can reject collection requests."})
         old_status = (req_obj.status or "").upper()
         if old_status in ("COMPLETED", "DENIED", "REJECTED"):
             raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Request already {old_status}."})
@@ -2051,6 +2138,8 @@ def reject_workflow_request(
 
     lab_req = db.query(LabRequest).filter((LabRequest.id == request_id) | (LabRequest.request_id == request_id) | (LabRequest.batch_id == request_id)).first()
     if lab_req:
+        if normalize_role(current_user.role) != "LAB":
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Accredited Laboratory accounts can reject lab requests."})
         old_status = (lab_req.status or "").upper()
         if old_status in ("COMPLETED", "REJECTED", "DENIED"):
             raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Lab request already {old_status}."})
@@ -2062,6 +2151,8 @@ def reject_workflow_request(
     clean_batch_id = request_id.replace("REQ-PKG-", "").strip()
     batch = db.query(CollectionBatch).filter((CollectionBatch.batch_id == clean_batch_id) | (CollectionBatch.id == clean_batch_id)).first()
     if batch:
+        if normalize_role(current_user.role) != "PACKAGING":
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Packaging accounts can reject packaging requests."})
         old_status = (batch.status or "").upper()
         if old_status in ("COMPLETED", "DENIED", "REJECTED"):
             raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Packaging batch already {old_status}."})
@@ -2094,16 +2185,36 @@ def send_workflow_request_next(
     lab_req_direct = db.query(LabRequest).filter((LabRequest.id == request_id) | (LabRequest.request_id == request_id) | (LabRequest.batch_id == request_id)).first()
     batch_id = req_obj.batch_id if req_obj else (lab_req_direct.batch_id if lab_req_direct else request_id.replace("REQ-PKG-", ""))
 
-    actor_role = (payload.get("actorRole") or current_user.role or "").upper().strip()
+    actor_role = normalize_role(current_user.role)
     actor_id = current_user.id
     to_user_id = payload.get("toUserId")
     notes = payload.get("notes") or ""
 
     batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
 
-    if "COLLECT" in actor_role or "PROCESS" in actor_role:
+    if actor_role == "COLLECTOR_PROCESSOR":
+        if not req_obj:
+            raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Collection request not found."})
+        if (req_obj.status or "").upper() != "ACCEPTED":
+            raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": "Collection request must be accepted before sending to lab."})
+        if not batch:
+            raise HTTPException(status_code=404, detail={"success": False, "code": "BATCH_NOT_FOUND", "message": "Batch not found."})
+        if to_user_id:
+            target_lab = db.query(Lab).filter((Lab.id == to_user_id) | (Lab.user_id == to_user_id)).first()
+            if not target_lab or not target_lab.is_active:
+                raise HTTPException(status_code=404, detail={"success": False, "code": "LAB_NOT_FOUND", "message": "Selected lab is not available."})
+        duplicate_lab = db.query(LabRequest).filter(
+            LabRequest.batch_id == batch_id,
+            LabRequest.requested_by_id == actor_id,
+            LabRequest.lab_id == to_user_id,
+            LabRequest.status.in_(list(ACTIVE_REQUEST_STATUSES)),
+        ).first()
+        if duplicate_lab:
+            raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_REQUEST", "message": "An active lab request already exists for this batch and lab.", "requestId": duplicate_lab.request_id, "status": duplicate_lab.status})
         qty_received = float(payload.get("quantityReceived", req_obj.requested_quantity_kg if req_obj else 20.0))
         qty_after = float(payload.get("quantityAfter", qty_received * 0.98))
+        if qty_received <= 0 or qty_after <= 0 or qty_after > qty_received:
+            raise HTTPException(status_code=422, detail={"success": False, "code": "VALIDATION_ERROR", "message": "Processing quantities must be positive and output quantity cannot exceed input quantity."})
         method = payload.get("method") or "Cold Extraction & Centrifugation (< 40°C)"
         moisture = float(payload.get("moistureAtReceipt", 17.0))
 
@@ -2139,26 +2250,29 @@ def send_workflow_request_next(
             batch.current_stage = "LAB_TESTING"
             batch.status = "SENT_TO_LAB"
 
-        bc = blockchain_service.record_batch_event(
+        bc = _record_provenance(
+            db,
             batch_id=batch_id,
             event_type="PROCESSING_COMPLETED_AND_DISPATCHED_TO_LAB",
             actor_id=actor_id,
             payload={"batch_id": batch_id, "target_lab_id": to_user_id, "quantity_after": qty_after, "method": method},
         )
-        db.add(BlockchainRecord(
-            batch_id=batch_id,
-            event_type="PROCESSING_COMPLETED_AND_DISPATCHED_TO_LAB",
-            actor_id=actor_id,
-            data_hash=bc["data_hash"],
-            tx_hash=bc.get("tx_hash"),
-            network=bc["network"],
-            status=bc["status"],
-        ))
         db.commit()
         return {"success": True, "message": "Batch processed and forwarded to Lab", "batchId": batch_id, "labRequestId": lab_req_code, "blockchain": bc}
 
-    elif "LAB" in actor_role:
+    elif actor_role == "LAB":
         lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
+        if not lab_req:
+            raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Lab request not found."})
+        report = db.query(LabReport).filter(LabReport.batch_id == batch_id).order_by(desc(LabReport.created_at)).first()
+        if not report:
+            raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_TEST_MISSING", "message": "Lab test has not been submitted."})
+        if report.overall_result != "PASS":
+            raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_TEST_FAILED", "message": "Only batches with PASSED lab tests can be sent to packaging."})
+        if to_user_id:
+            target_packager = db.query(PackagingFacility).filter(PackagingFacility.id == to_user_id).first()
+            if not target_packager or not target_packager.is_active:
+                raise HTTPException(status_code=404, detail={"success": False, "code": "PACKAGING_NOT_FOUND", "message": "Selected packaging facility is not available."})
         if lab_req:
             lab_req.status = "COMPLETED"
 
@@ -2169,26 +2283,17 @@ def send_workflow_request_next(
             batch.current_stage = "PACKAGING"
             batch.status = "SENT_TO_PACKAGING"
 
-        bc = blockchain_service.record_batch_event(
+        bc = _record_provenance(
+            db,
             batch_id=batch_id,
             event_type="LAB_APPROVED_DISPATCHED_TO_PACKAGING",
             actor_id=actor_id,
             payload={"batch_id": batch_id, "target_packager_id": to_user_id, "notes": notes},
         )
-        db.add(BlockchainRecord(
-            batch_id=batch_id,
-            event_type="LAB_APPROVED_DISPATCHED_TO_PACKAGING",
-            actor_id=actor_id,
-            data_hash=bc["data_hash"],
-            tx_hash=bc.get("tx_hash"),
-            network=bc["network"],
-            status=bc["status"],
-        ))
         db.commit()
         return {"success": True, "message": "Batch approved and forwarded to Packaging", "batchId": batch_id, "blockchain": bc}
 
-    db.commit()
-    return {"success": True, "message": "Batch status advanced", "batchId": batch_id}
+    raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Your role cannot advance this request."})
 
 
 @app.post("/api/harvests")
@@ -2209,8 +2314,10 @@ def create_harvest(
         if hive and hive.user_id != current_user.id and "ADMIN" not in (current_user.role or ""):
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only record harvests for your own registered hives."})
 
+    harvest_id = str(uuid.uuid4())
     # Create real Harvest record in DB
     harvest = Harvest(
+        id=harvest_id,
         harvester_id=current_user.id,
         hive_id=hive_id,
         quantity_kg=quantity,
@@ -2226,7 +2333,7 @@ def create_harvest(
     if not batch:
         batch = CollectionBatch(
             batch_id=batch_id,
-            harvest_id=harvest.id,
+            harvest_id=harvest_id,
             harvester_id=current_user.id,
             hive_id=hive_id,
             quantity_kg=quantity,
@@ -2239,22 +2346,13 @@ def create_harvest(
         batch.current_stage = "HARVESTED"
 
     # Record Blockchain Provenance
-    bc = blockchain_service.record_batch_event(
+    bc = _record_provenance(
+        db,
         batch_id=batch_id,
         event_type="HARVEST_REGISTERED",
         actor_id=current_user.id,
-        payload={"batch_id": batch_id, "harvest_id": harvest.id, "quantity_kg": quantity, "hive_id": hive_id, "location": location},
+        payload={"batch_id": batch_id, "harvest_id": harvest_id, "quantity_kg": quantity, "hive_id": hive_id, "location": location},
     )
-    db.add(BlockchainRecord(
-        batch_id=batch_id,
-        event_type="HARVEST_REGISTERED",
-        actor_id=current_user.id,
-        data_hash=bc["data_hash"],
-        tx_hash=bc.get("tx_hash"),
-        block_number=bc.get("block_number"),
-        network=bc["network"],
-        status=bc["status"],
-    ))
 
     db.commit()
     db.refresh(harvest)
@@ -2286,36 +2384,36 @@ def process_batch(
     db: Session = Depends(get_db)
 ):
     batch_id = payload.get("batchId", f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}")
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail={"success": False, "code": "BATCH_NOT_FOUND", "message": "Batch not found."})
+    if (batch.status or "").upper() not in ("ACCEPTED", "COLLECTED", "PROCESSING", "SENT_TO_LAB", "APPROVED"):
+        raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STAGE", "message": "Batch must be accepted by collection before processing."})
+    qty_received = float(payload.get("quantityReceived", 20.0))
+    qty_after = float(payload.get("quantityAfter", 19.5))
+    if qty_received <= 0 or qty_after <= 0 or qty_after > qty_received:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "VALIDATION_ERROR", "message": "Processing quantities must be positive and output quantity cannot exceed input quantity."})
     proc = ProcessingBatch(
         batch_id=batch_id,
         processor_id=current_user.id,
-        quantity_received=float(payload.get("quantityReceived", 20.0)),
-        quantity_after=float(payload.get("quantityAfter", 19.5)),
+        quantity_received=qty_received,
+        quantity_after=qty_after,
         method=payload.get("method", "Standard Cold Extraction & Centrifugation"),
         notes=payload.get("notes", "Extraction completed within optimal thermal limits."),
     )
     db.add(proc)
 
-    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
-    if batch:
-        batch.current_stage = "PROCESSING"
+    batch.current_stage = "PROCESSING"
+    batch.status = "PROCESSING"
 
     # Record Blockchain event
-    bc = blockchain_service.record_batch_event(
+    bc = _record_provenance(
+        db,
         batch_id=batch_id,
         event_type="PROCESSING_COMPLETED",
         actor_id=current_user.id,
         payload=payload,
     )
-    db.add(BlockchainRecord(
-        batch_id=batch_id,
-        event_type="PROCESSING_COMPLETED",
-        actor_id=current_user.id,
-        data_hash=bc["data_hash"],
-        tx_hash=bc.get("tx_hash"),
-        network=bc["network"],
-        status=bc["status"],
-    ))
     db.commit()
     return {"success": True, "message": "Processing recorded.", "blockchain": bc}
 
@@ -2330,6 +2428,14 @@ def create_lab_report(
     batch_id = payload.get("batchId")
     if not batch_id:
         raise HTTPException(status_code=422, detail={"success": False, "code": "VALIDATION_ERROR", "message": "batchId is required for a lab report."})
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail={"success": False, "code": "BATCH_NOT_FOUND", "message": "Batch not found."})
+    lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
+    if not lab_req:
+        raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_REQUEST_MISSING", "message": "Lab request not found for this batch."})
+    if (lab_req.status or "").upper() not in ("TESTING", "ACCEPTED"):
+        raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STAGE", "message": "Lab must accept the request before submitting a report."})
     report_id = f"LAB-RPT-2026-{uuid.uuid4().hex[:6].upper()}"
 
     # Real measured values are REQUIRED — no silent defaults that could
@@ -2356,6 +2462,16 @@ def create_lab_report(
     )
     overall_result = "PASS" if thresholds_pass else "FAIL"
     cert_code = f"HC-CERT-2026-{uuid.uuid4().hex[:6].upper()}" if thresholds_pass else None
+    document_id = payload.get("documentId") or report_id
+    document_hash = payload.get("documentHash") or hashlib.sha256(json.dumps({
+        "report_id": report_id,
+        "batch_id": batch_id,
+        "lab_id": current_user.id,
+        "moisture": moisture,
+        "hmf": hmf,
+        "diastase": diastase,
+        "overall_result": overall_result,
+    }, sort_keys=True).encode("utf-8")).hexdigest()
 
     lab_report = LabReport(
         report_id=report_id,
@@ -2375,37 +2491,29 @@ def create_lab_report(
     db.add(lab_report)
 
     # Update lab request and batch stage based on the REAL outcome
-    lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
     if lab_req:
         lab_req.status = "COMPLETED" if thresholds_pass else "REJECTED"
 
-    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
-    if batch:
-        batch.current_stage = "LAB_TESTING"
-        batch.status = "APPROVED" if thresholds_pass else "LAB_REJECTED"
+    batch.current_stage = "LAB_TESTING"
+    batch.status = "APPROVED" if thresholds_pass else "LAB_REJECTED"
 
     # Blockchain
-    bc = blockchain_service.record_batch_event(
+    bc = _record_provenance(
+        db,
         batch_id=batch_id,
         event_type="LAB_CERTIFICATION_APPROVED" if thresholds_pass else "LAB_CERTIFICATION_REJECTED",
         actor_id=current_user.id,
-        payload={"report_id": report_id, "quality_score": lab_report.quality_score, "moisture": lab_report.moisture_content, "hmf": hmf, "diastase": diastase, "result": overall_result},
+        payload={"report_id": report_id, "document_id": document_id, "document_hash": document_hash, "quality_score": lab_report.quality_score, "moisture": lab_report.moisture_content, "hmf": hmf, "diastase": diastase, "result": overall_result},
     )
-    db.add(BlockchainRecord(
-        batch_id=batch_id,
-        event_type="LAB_CERTIFICATION_APPROVED" if thresholds_pass else "LAB_CERTIFICATION_REJECTED",
-        actor_id=current_user.id,
-        data_hash=bc["data_hash"],
-        tx_hash=bc.get("tx_hash"),
-        network=bc["network"],
-        status=bc["status"],
-    ))
     db.commit()
     return {
         "success": True,
         "reportId": report_id,
         "status": "APPROVED" if thresholds_pass else "REJECTED",
         "overallResult": overall_result,
+        "documentId": document_id,
+        "documentHash": document_hash,
+        "documentIntegrityStatus": "DOCUMENT HASH ANCHORED",
         "certificationCode": cert_code,
         "thresholds": {"moistureMax": 20.0, "hmfMax": 40.0, "diastaseMin": 8.0, "measured": {"moisture": moisture, "hmf": hmf, "diastase": diastase}},
         "blockchain": bc,
@@ -2420,6 +2528,25 @@ def create_packaging_batch(
     db: Session = Depends(get_db)
 ):
     batch_id = payload.get("batchId", f"HC-BATCH-2026-{uuid.uuid4().hex[:6].upper()}")
+    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail={"success": False, "code": "BATCH_NOT_FOUND", "message": "Batch not found."})
+    missing = []
+    if not db.query(Harvest).filter(Harvest.id == batch.harvest_id).first():
+        missing.append("HARVEST")
+    if not db.query(CollectionRequest).filter(CollectionRequest.batch_id == batch_id, CollectionRequest.status.in_(["ACCEPTED", "SENT_TO_LAB", "COMPLETED"])).first():
+        missing.append("COLLECTION")
+    if not db.query(ProcessingBatch).filter(ProcessingBatch.batch_id == batch_id).first():
+        missing.append("PROCESSING")
+    lab_report = db.query(LabReport).filter(LabReport.batch_id == batch_id).order_by(desc(LabReport.created_at)).first()
+    if not lab_report:
+        missing.append("LAB_TEST")
+    elif lab_report.overall_result != "PASS":
+        raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_TEST_FAILED", "message": "Packaging is not permitted because the lab test did not pass."})
+    if missing:
+        raise HTTPException(status_code=409, detail={"success": False, "code": "PACKAGING_NOT_PERMITTED", "message": f"Packaging is not yet permitted. Missing stage(s): {', '.join(missing)}."})
+    if db.query(PackagingBatch).filter(PackagingBatch.batch_id == batch_id).first():
+        raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_PACKAGING", "message": "Packaging has already been completed for this batch."})
 
     # Generate final verifiable QR pointing to real verification endpoint
     verification_url, data_uri = generate_qr_data_uri(batch_id)
@@ -2443,27 +2570,17 @@ def create_packaging_batch(
         db.add(qr_rec)
 
     # Update collection batch stage
-    batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
-    if batch:
-        batch.current_stage = "COMPLETED"
-        batch.status = "COMPLETED"
+    batch.current_stage = "COMPLETED"
+    batch.status = "COMPLETED"
 
     # Blockchain
-    bc = blockchain_service.record_batch_event(
+    bc = _record_provenance(
+        db,
         batch_id=batch_id,
         event_type="PACKAGING_AND_FINAL_SEALED",
         actor_id=current_user.id,
         payload={"batch_id": batch_id, "packages": pkg.number_of_packages, "verification_url": verification_url},
     )
-    db.add(BlockchainRecord(
-        batch_id=batch_id,
-        event_type="PACKAGING_AND_FINAL_SEALED",
-        actor_id=current_user.id,
-        data_hash=bc["data_hash"],
-        tx_hash=bc.get("tx_hash"),
-        network=bc["network"],
-        status=bc["status"],
-    ))
     db.commit()
 
     return {
@@ -2481,7 +2598,7 @@ def create_packaging_batch(
 # ============================================================
 def generate_verification_html(data: Dict[str, Any]) -> str:
     batch_id = data.get("batchId", "Unknown")
-    status = data.get("status", "VERIFIED 100% GENUINE HONEY")
+    status = data.get("status", "TAMPER-EVIDENT TRACEABILITY VERIFIED")
     product = data.get("product") or {}
     harvester = data.get("harvester") or {}
     iot = data.get("iotTelemetry")
@@ -2743,7 +2860,7 @@ def generate_verification_html(data: Dict[str, Any]) -> str:
         </div>
 
         <div class="footer">
-            &copy; 2026 HoneyChain Cryptographic Traceability Protocol. Genuine Honey Verification.
+            &copy; 2026 HoneyChain Cryptographic Traceability Protocol. Tamper-evident supply-chain verification.
         </div>
     </div>
 </body>
@@ -2815,7 +2932,7 @@ def verify_batch(
         "found": batch_obj is not None or lab_report is not None or packaging is not None,
         "batchId": target_batch_id,
         "traceabilityId": target_batch_id,
-        "status": "VERIFIED 100% GENUINE HONEY" if (packaging is not None and lab_report is not None and lab_report.overall_result == "PASS") else ("PENDING FINAL PACKAGING & CERTIFICATION" if batch_obj else "UNVERIFIED BATCH"),
+        "status": "TAMPER-EVIDENT TRACEABILITY COMPLETE" if (packaging is not None and lab_report is not None and lab_report.overall_result == "PASS") else ("INCOMPLETE TRACEABILITY CHAIN" if batch_obj else "Invalid or unrecognized batch"),
         "currentStage": batch_obj.current_stage if batch_obj else ("COMPLETED" if packaging else "No data available yet."),
         "isFullyVerified": packaging is not None and lab_report is not None and lab_report.overall_result == "PASS",
         "verificationTimestamp": datetime.utcnow().isoformat(),
@@ -2865,6 +2982,9 @@ def verify_batch(
             "reportId": lab_report.report_id if lab_report else "No data available yet.",
             "qualityScore": lab_report.quality_score if lab_report else "No data available yet.",
             "status": "CERTIFIED APPROVED (PASS)" if lab_report and lab_report.overall_result == "PASS" else "No data available yet.",
+            "documentId": lab_report.report_id if lab_report else "No data available yet.",
+            "documentHash": next((b.data_hash for b in bc_records if "LAB_CERTIFICATION" in b.event_type), None) if lab_report else None,
+            "documentIntegrityStatus": "DOCUMENT HASH ANCHORED" if lab_report else "No lab document available",
             "parameters": [
                 {"name": "Moisture Content", "value": f"{lab_report.moisture_content}%", "standard": "<= 20.0%", "status": "PASS"},
                 {"name": "Hydroxymethylfurfural (HMF)", "value": f"{lab_report.hmf_value} mg/kg", "standard": "<= 40.0 mg/kg", "status": "PASS"},

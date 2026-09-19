@@ -9,6 +9,7 @@ import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 class PackagingHistoryScreen extends StatelessWidget {
   const PackagingHistoryScreen({super.key});
@@ -30,7 +31,7 @@ class PackagingHistoryScreen extends StatelessWidget {
               child: Row(
                 children: [
                   if (Navigator.canPop(context)) ...[
-                    const _PillBackButton(),
+                    const PillBackButton(),
                     const SizedBox(width: 14),
                   ],
                   Text(
@@ -142,25 +143,3 @@ class _HistoryCard extends StatelessWidget {
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

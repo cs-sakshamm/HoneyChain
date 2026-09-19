@@ -6,6 +6,7 @@ import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../controllers/user_controller.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 /// Form screen to Change Password
 class ChangePasswordScreen extends StatefulWidget {
@@ -75,7 +76,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  const _PillBackButton(),
+                  const PillBackButton(),
                   const SizedBox(width: 14),
                   Text(
                     context.tr('change_password') == 'change_password' ? 'Change Password' : context.tr('change_password'),
@@ -215,25 +216,3 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  const _PillBackButton();
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

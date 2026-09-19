@@ -1,6 +1,8 @@
-import React from 'react';
-import { GitCommit, CheckCircle2 } from 'lucide-react';
+﻿import React from 'react';
+import { GitCommit, CheckCircle2, Clock } from 'lucide-react';
 import { BlockchainEvent, HarvesterInfo, ProcessingInfo, LabVerificationInfo, PackagingInfoData } from '../api/honeychainApi';
+import { motion, useReducedMotion } from 'framer-motion';
+import { staggerContainer, getHoverProps } from '../utils/animations';
 
 interface Props {
   harvester: HarvesterInfo;
@@ -10,6 +12,12 @@ interface Props {
   provenanceEvents: BlockchainEvent[];
 }
 
+const missing = 'Missing stage';
+const valueOrMissing = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return missing;
+  return String(value);
+};
+
 export const ProvenanceTimeline: React.FC<Props> = ({
   harvester,
   processing,
@@ -17,6 +25,9 @@ export const ProvenanceTimeline: React.FC<Props> = ({
   packaging,
   provenanceEvents,
 }) => {
+  const shouldReduceMotion = useReducedMotion();
+  const hoverProps = getHoverProps(shouldReduceMotion ?? false);
+
   const findEvent = (typeSubstring: string) => {
     return provenanceEvents.find(e => e.eventType.toUpperCase().includes(typeSubstring));
   };
@@ -29,87 +40,102 @@ export const ProvenanceTimeline: React.FC<Props> = ({
   const stages = [
     {
       num: '01',
-      title: 'Harvest & Field Collection',
-      actor: harvester?.name || 'Verified Harvester',
-      location: harvester?.apiaryLocation || 'Apiary Zone',
-      details: `Hive: ${harvester?.hiveCode || 'HIVE-MVP-01'} • Breed: ${harvester?.beeBreed || 'Apis cerana indica'}`,
-      timestamp: harvestEvt?.timestamp || 'Recorded at harvest',
-      status: 'VERIFIED',
+      title: 'Harvest',
+      actor: valueOrMissing(harvester?.name),
+      details: `Hive: ${valueOrMissing(harvester?.hiveCode)} | Location: ${valueOrMissing(harvester?.apiaryLocation)}`,
+      timestamp: harvestEvt?.timestamp,
       dataHash: harvestEvt?.dataHash,
+      complete: Boolean(harvestEvt),
     },
     {
       num: '02',
-      title: 'Cold Extraction & Processing',
-      actor: processing?.processor || 'Sahyadri Honey Processing Hub',
-      location: 'Central Processing Centre',
-      details: `Method: ${processing?.method || 'Centrifugal Cold Extraction (< 38°C)'} • Moisture at Receipt: ${processing?.moistureAtReceipt || '17.0%'}`,
-      timestamp: processEvt?.timestamp || 'Batch filtered & cold extracted',
-      status: 'VERIFIED',
+      title: 'Collection & Processing',
+      actor: valueOrMissing(processing?.processor),
+      details: `Method: ${valueOrMissing(processing?.method)} | Quantity received: ${valueOrMissing(processing?.quantityReceivedKg)} kg`,
+      timestamp: processEvt?.timestamp,
       dataHash: processEvt?.dataHash,
+      complete: Boolean(processing && processEvt),
     },
     {
       num: '03',
-      title: 'Laboratory Chemical Verification',
-      actor: lab?.labName || 'National Apiculture Analytical Lab',
-      location: 'Accredited Testing Facility (ISO 17025 / FSSAI)',
-      details: `Report: ${lab?.reportId || 'Certified'} • Quality Score: ${lab?.qualityScore || '99.1'}/100 • Status: ${lab?.status || 'CERTIFIED APPROVED'}`,
-      timestamp: labEvt?.timestamp || 'Chemical & floral profiling passed',
-      status: 'VERIFIED',
+      title: 'Lab Test',
+      actor: valueOrMissing(lab?.labName),
+      details: `Report: ${valueOrMissing(lab?.reportId)} | Status: ${valueOrMissing(lab?.status)}`,
+      timestamp: labEvt?.timestamp,
       dataHash: labEvt?.dataHash,
+      complete: Boolean(lab && labEvt),
     },
     {
       num: '04',
-      title: 'Bottling & Induction Tamper Seal',
-      actor: packaging?.facility || 'Sahyadri Pure Honey Bottling',
-      location: 'Cleanroom Packaging Facility',
-      details: `${packaging?.numberOfPackages || '48'} units sealed • Format: ${packaging?.packageSize || '500g Glass Jar'} • Digital QR Linked`,
-      timestamp: packaging?.packagingDate || packEvt?.timestamp || 'Induction sealed & batch QR attached',
-      status: 'VERIFIED',
+      title: 'Packaging',
+      actor: valueOrMissing(packaging?.facility),
+      details: `${valueOrMissing(packaging?.numberOfPackages)} units | Format: ${valueOrMissing(packaging?.packageSize)}`,
+      timestamp: packaging?.packagingDate || packEvt?.timestamp,
       dataHash: packEvt?.dataHash,
-    },
-    {
-      num: '05',
-      title: 'Cryptographic Blockchain Ledger Registration',
-      actor: 'HoneyChain Smart Contract Protocol',
-      location: 'Decentralized Provenance Network',
-      details: `${provenanceEvents.length || 4} immutable state transition records anchored on-chain with cryptographic SHA-256 hashes`,
-      timestamp: packEvt?.timestamp || 'Ledger anchor confirmed',
-      status: 'ON-CHAIN',
-      dataHash: packEvt?.dataHash || provenanceEvents[provenanceEvents.length - 1]?.dataHash,
+      complete: Boolean(packaging && packEvt),
     },
   ];
 
+  const nodeVariants = {
+    hidden: { opacity: 0, x: -10 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.3 } }
+  };
+
+  const reducedNodeVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.3 } }
+  };
+
   return (
-    <div className="honey-card">
+    <motion.div className="honey-card" {...hoverProps}>
       <div className="card-header-row">
         <div className="card-title-group">
           <div className="card-title-icon">
             <GitCommit size={20} />
           </div>
           <div>
-            <h2 className="card-title">Full Provenance Traceability History</h2>
+            <h2 className="card-title">Full Traceability History</h2>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Chronological immutable supply chain chain of custody
+              Chronological tamper-evident supply-chain events
             </div>
           </div>
         </div>
       </div>
 
-      <div className="timeline-list">
+      <motion.div
+        className="timeline-list"
+        variants={staggerContainer}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-50px" }}
+      >
         {stages.map((stage) => (
-          <div key={stage.num} className="timeline-node active">
-            <div className="timeline-dot">
-              <CheckCircle2 size={14} />
-            </div>
+          <motion.div
+            key={stage.num}
+            className={`timeline-node ${stage.complete ? 'active' : ''}`}
+            variants={shouldReduceMotion ? reducedNodeVariants : nodeVariants}
+          >
+            <motion.div
+              className="timeline-dot"
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 10 }}
+            >
+              {stage.complete ? <CheckCircle2 size={14} /> : <Clock size={14} />}
+            </motion.div>
             <div className="timeline-node-content">
               <div className="timeline-stage-title">
                 <span>{stage.num}. {stage.title}</span>
-                <span className="status-pill success" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                  {stage.status}
+                <span className={`status-pill ${stage.complete ? 'success' : 'gold'}`} style={{ fontSize: '10px', padding: '2px 8px' }}>
+                  {stage.complete ? 'Recorded' : 'Missing'}
                 </span>
               </div>
               <div className="timeline-stage-actor">{stage.actor}</div>
               <div className="timeline-stage-details">{stage.details}</div>
+              {stage.timestamp && (
+                <div className="timeline-stage-details">{new Date(stage.timestamp).toLocaleString()}</div>
+              )}
               {stage.dataHash && (
                 <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Data Hash: </span>
@@ -117,9 +143,9 @@ export const ProvenanceTimeline: React.FC<Props> = ({
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../controllers/verification_controller.dart';
 import 'public_verification_lookup_screen.dart';
+import '../../../core/widgets/pill_back_button.dart';
 
 class VerificationCertificateScreen extends StatelessWidget {
   const VerificationCertificateScreen({super.key});
@@ -38,7 +39,7 @@ class VerificationCertificateScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _PillBackButton(onTap: () => Navigator.pop(context)),
+                  PillBackButton(onTap: () => Navigator.pop(context)),
                   Text(
                     'Verification Certificate',
                     style: GoogleFonts.manrope(
@@ -298,28 +299,3 @@ class VerificationCertificateScreen extends StatelessWidget {
   }
 }
 
-class _PillBackButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _PillBackButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.surfaceColor,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.borderColor),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: context.textPrimaryColor),
-        ),
-      ),
-    );
-  }
-}

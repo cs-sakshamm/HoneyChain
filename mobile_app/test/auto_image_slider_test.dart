@@ -17,28 +17,28 @@ void main() {
   });
 
   group('RoleImages Data Separation & Integrity Tests', () {
-    test('Harvester role returns exactly 1 relevant beekeeping hero image', () {
+    test('Harvester role provides exactly 1 image with valid fallback', () {
       final images = RoleImages.getImagesForRole('HARVESTER');
       expect(images.length, equals(1));
       expect(images[0].url.isNotEmpty, isTrue);
       expect(images[0].label.isNotEmpty, isTrue);
-      expect(images[0].localAssetFallback, equals('assets/images/beekeeping_hero.jpg'));
+      expect(images[0].localAssetFallback, equals('assets/images/beekeeping_hero.webp'));
     });
 
-    test('Collection & Processing role returns exactly 1 relevant processing hero image', () {
-      final images = RoleImages.getImagesForRole('COLLECTOR_PROCESSOR');
+    test('Collection role provides exactly 1 image with valid fallback', () {
+      final images = RoleImages.getImagesForRole('COLLECTION');
       expect(images.length, equals(1));
       expect(images[0].url.isNotEmpty, isTrue);
       expect(images[0].label.isNotEmpty, isTrue);
-      expect(images[0].localAssetFallback, equals('assets/images/collection_processing_hero.jpg'));
+      expect(images[0].localAssetFallback, equals('assets/images/collection_processing_hero.webp'));
     });
 
-    test('Lab Tester role returns exactly 1 relevant lab testing hero image', () {
-      final images = RoleImages.getImagesForRole('LAB_TESTER');
+    test('Lab role provides exactly 1 image with valid fallback', () {
+      final images = RoleImages.getImagesForRole('LAB');
       expect(images.length, equals(1));
       expect(images[0].url.isNotEmpty, isTrue);
       expect(images[0].label.isNotEmpty, isTrue);
-      expect(images[0].localAssetFallback, equals('assets/images/lab_testing_hero.jpg'));
+      expect(images[0].localAssetFallback, equals('assets/images/lab_testing_hero.webp'));
     });
 
     test('Packaging role returns exactly 1 relevant packaging hero image', () {

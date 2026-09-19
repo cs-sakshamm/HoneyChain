@@ -144,34 +144,34 @@ class RoleImages {
   // 1. HARVESTER: Beekeeping, Beehives, Bees, Honey Harvesting (Exactly 1 Hero Image)
   static const List<RoleImageItem> harvesterImages = [
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1473081556163-2a17de81fc97?auto=format&fit=crop&w=1200&q=80',
+      url: 'assets/images/beekeeping_hero.webp',
       label: 'Beekeeping and hive inspection in active apiary',
-      localAssetFallback: 'assets/images/beekeeping_hero.jpg',
+      localAssetFallback: 'assets/images/beekeeping_hero.webp',
     ),
   ];
 
   // 2. COLLECTION & PROCESSING: Honey Extraction & Processing Facility (Exactly 1 Hero Image)
   static const List<RoleImageItem> collectionProcessingImages = [
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1587049633312-d628ae50a8ae?auto=format&fit=crop&w=1200&q=80',
+      url: 'assets/images/collection_processing_hero.webp',
       label: 'Regional honey collection and centrifugal extraction facility',
-      localAssetFallback: 'assets/images/collection_processing_hero.jpg',
+      localAssetFallback: 'assets/images/collection_processing_hero.webp',
     ),
   ];
 
   // 3. LAB TESTER: Food Laboratory & Purity Testing (Exactly 1 Hero Image)
   static const List<RoleImageItem> labTesterImages = [
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=1200&q=80',
+      url: 'assets/images/lab_testing_hero.webp',
       label: 'Advanced food laboratory testing honey purity and quality',
-      localAssetFallback: 'assets/images/lab_testing_hero.jpg',
+      localAssetFallback: 'assets/images/lab_testing_hero.webp',
     ),
   ];
 
   // 4. PACKAGING: Honey Bottling & Sealed Packaging Line (Exactly 1 Hero Image)
   static const List<RoleImageItem> packagingImages = [
     RoleImageItem(
-      url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
+      url: 'assets/images/packaging_hero.jpg',
       label: 'Automated honey bottling line and sealed batch packaging',
       localAssetFallback: 'assets/images/packaging_hero.jpg',
     ),

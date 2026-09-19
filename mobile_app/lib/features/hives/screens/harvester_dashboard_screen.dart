@@ -14,6 +14,7 @@ import '../../../core/widgets/auto_image_slider.dart';
 import '../../../core/widgets/critical_alert_dialog.dart';
 import '../../../core/widgets/my_requests_view.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/global_app_bar.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../../verification/controllers/verification_controller.dart';
@@ -205,10 +206,9 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                               MaterialPageRoute(
                                 builder: (context) => Scaffold(
                                   backgroundColor: context.scaffoldBg,
-                                  appBar: AppBar(
-                                    title: Text('My Workflow Requests', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
-                                    backgroundColor: context.surfaceColor,
-                                    elevation: 0,
+                                  appBar: const GlobalAppBar(
+                                    titleText: 'My Workflow Requests',
+                                    showBackButton: true,
                                   ),
                                   body: const MyRequestsView(userRole: 'HARVESTER'),
                                 ),

@@ -185,7 +185,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                 qtyAfter: req.estimatedQuantityKg > 0 ? req.estimatedQuantityKg * 0.95 : 10.0,
                 method: '${methodCtrl.text.trim()} (Facility: ${facilityCtrl.text.trim()}, Moisture: ${moistureCtrl.text.trim()}%)',
                 notes: notesCtrl.text.trim(),
-                processorId: userCtrl.user.name.isNotEmpty ? userCtrl.user.name : 'Processor Officer',
+                processorId: userCtrl.user.id,
               );
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

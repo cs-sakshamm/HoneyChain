@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 from backend.database import SessionLocal, init_db
 from backend.main import app
-from backend.models import User, Hive, CollectionBatch
+from backend.models import User, Hive, CollectionBatch, Lab, PackagingFacility
 from backend.services.mqtt_consumer import mqtt_consumer
 from ai_ml.src.feature_builder import FeatureBuilder
 from ai_ml.src.anomaly_detector import AnomalyDetector
@@ -130,7 +130,17 @@ def test_e2e_integration():
     harvester_token = create_access_token({"sub": harvester.id, "email": harvester.email, "role": "HARVESTER"})
     harvester_headers = {"Authorization": f"Bearer {harvester_token}"}
 
+    harvest_res = client.post("/api/harvests", json={
+        "hiveId": hive.id,
+        "quantity": 25.0,
+        "location": hive.apiary_location,
+        "notes": "Premium raw forest honey harvest.",
+    }, headers=harvester_headers)
+    assert harvest_res.status_code == 200, f"Harvest creation failed: {harvest_res.text}"
+    batch_id = harvest_res.json()["batchId"]
+
     req_res = client.post("/api/requests", json={
+        "batchId": batch_id,
         "harvesterId": harvester.id,
         "hiveId": hive.id,
         "quantity": 25.0,
@@ -139,7 +149,6 @@ def test_e2e_integration():
     }, headers=harvester_headers)
     assert req_res.status_code == 200, f"Collection request failed: {req_res.text}"
     req_data = req_res.json()
-    batch_id = req_data["batchId"]
     request_id = req_data["requestId"]
     print(f"[OK] Collection Request Created: {request_id} | Batch: {batch_id}")
 
@@ -163,6 +172,9 @@ def test_e2e_integration():
 
     collector_token = create_access_token({"sub": collector.id, "email": collector.email, "role": "COLLECTOR_PROCESSOR"})
     collector_headers = {"Authorization": f"Bearer {collector_token}"}
+
+    accept_res = client.patch(f"/api/requests/{request_id}/accept", json={"notes": "Accepted for intake."}, headers=collector_headers)
+    assert accept_res.status_code == 200, f"Collection accept failed: {accept_res.text}"
 
     proc_res = client.post("/api/processing", json={
         "batchId": batch_id,
@@ -195,6 +207,28 @@ def test_e2e_integration():
 
     lab_token = create_access_token({"sub": lab_user.id, "email": lab_user.email, "role": "LAB"})
     lab_headers = {"Authorization": f"Bearer {lab_token}"}
+    if not db.query(Lab).filter((Lab.id == lab_user.id) | (Lab.user_id == lab_user.id)).first():
+        db.add(Lab(
+            id=lab_user.id,
+            user_id=lab_user.id,
+            lab_name=lab_user.organization_name or lab_user.name,
+            facility_location=lab_user.facility_location or "Pune Agri-Tech Park, MH",
+            is_active=True,
+        ))
+        db.commit()
+
+    lab_req_res = client.post(f"/api/requests/{request_id}/send-next", json={
+        "toUserId": lab_user.id,
+        "quantityReceived": 25.0,
+        "quantityAfter": 24.2,
+        "method": "Centrifugal Cold Extraction (< 38Â°C)",
+        "notes": "Processed sample ready for lab.",
+    }, headers=collector_headers)
+    assert lab_req_res.status_code == 200, f"Send to lab failed: {lab_req_res.text}"
+    lab_request_id = lab_req_res.json()["labRequestId"]
+
+    lab_accept_res = client.patch(f"/api/requests/{lab_request_id}/accept", json={"notes": "Accepted for testing."}, headers=lab_headers)
+    assert lab_accept_res.status_code == 200, f"Lab accept failed: {lab_accept_res.text}"
 
     lab_res = client.post("/api/lab-reports", json={
         "batchId": batch_id,
@@ -231,6 +265,20 @@ def test_e2e_integration():
 
     pkg_token = create_access_token({"sub": pkg_user.id, "email": pkg_user.email, "role": "PACKAGING"})
     pkg_headers = {"Authorization": f"Bearer {pkg_token}"}
+    if not db.query(PackagingFacility).filter(PackagingFacility.id == pkg_user.id).first():
+        db.add(PackagingFacility(
+            id=pkg_user.id,
+            name=pkg_user.organization_name or pkg_user.name,
+            location=pkg_user.facility_location or "Mahabaleshwar, MH",
+            is_active=True,
+        ))
+        db.commit()
+
+    send_pkg_res = client.post(f"/api/requests/{lab_request_id}/send-next", json={
+        "toUserId": pkg_user.id,
+        "notes": "Lab passed; ready for packaging.",
+    }, headers=lab_headers)
+    assert send_pkg_res.status_code == 200, f"Send to packaging failed: {send_pkg_res.text}"
 
     pkg_res = client.post("/api/packaging", json={
         "batchId": batch_id,
