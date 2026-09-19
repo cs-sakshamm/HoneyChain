@@ -157,3 +157,14 @@ Full-repo scans against the traceability/auth specification (2026-09-20):
 | On-chain vs off-chain (§6) | PASS (pre-existing) | Only hashes + structured event payloads go on-chain; lab documents stay off-chain (hash anchored) |
 
 Validation after fixes: backend **34/34** (incl. 3 new harvester-verification tests), Flutter **47/47**, `ai_ml/` untouched.
+
+## 10. Batch ID Chain Integrity (spec §4/§13/§21/§22)
+
+New test file `backend/tests/test_batch_id_chain.py` (8 tests) pins one batch ID across HARVEST → COLLECTION → PROCESSING → LAB_TEST → PACKAGING → QR verification, including DB row linkage and blockchain-record linkage for the same chain. Running it surfaced **two real backend bugs, both fixed**:
+
+1. **Harvest accepted a nonexistent hive** (`backend/main.py` `/api/harvests`) — the IDOR check only rejected *other users'* hives; a nonexistent hive passed, then died as an unhandled FK `IntegrityError` (500). Now returns a clean **404 `HIVE_NOT_FOUND`** (spec §7/§23).
+2. **Stage responses omitted `batchId`** — `/api/processing` and `/api/lab-reports` returned without the batch ID, so clients couldn't tie stage results back to the chain (spec §4). Both responses now include it (purely additive keys).
+
+Also corrected during verification: the blockchain-record assertion initially required `tx_hash` on every record; the service's designed offline degradation is `status=PENDING, tx_hash=None`, so the test now requires `data_hash` always and `tx_hash` iff `CONFIRMED`.
+
+Result: batch chain **8/8 PASS**, full backend suite **42/42 PASS**.

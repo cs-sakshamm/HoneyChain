@@ -2423,10 +2423,15 @@ def create_harvest(
     location = payload.get("location") or "Main Apiary"
     notes = payload.get("notes") or ""
 
-    # IDOR check on hive
+    # IDOR check on hive — must exist AND belong to the harvester
     if hive_id:
         hive = db.query(Hive).filter((Hive.id == hive_id) | (Hive.hive_code == hive_id)).first()
-        if hive and hive.user_id != current_user.id and "ADMIN" not in (current_user.role or ""):
+        if not hive:
+            raise HTTPException(
+                status_code=404,
+                detail={"success": False, "code": "HIVE_NOT_FOUND", "message": "Hive not found. Register the hive before recording a harvest."},
+            )
+        if hive.user_id != current_user.id and "ADMIN" not in (current_user.role or ""):
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only record harvests for your own registered hives."})
 
     harvest_id = str(uuid.uuid4())
@@ -2530,7 +2535,7 @@ def process_batch(
         payload=payload,
     )
     db.commit()
-    return {"success": True, "message": "Processing recorded.", "blockchain": bc}
+    return {"success": True, "message": "Processing recorded.", "batchId": batch_id, "blockchain": bc}
 
 
 @app.post("/api/lab-reports")
@@ -2623,6 +2628,7 @@ def create_lab_report(
     db.commit()
     return {
         "success": True,
+        "batchId": batch_id,
         "reportId": report_id,
         "status": "APPROVED" if thresholds_pass else "REJECTED",
         "overallResult": overall_result,
