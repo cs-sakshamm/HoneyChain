@@ -255,8 +255,8 @@ class PublicVerificationRecord {
     return PublicVerificationRecord(
       found: true,
       verificationId: json['verificationId'] as String?,
-      harvesterName: json['harvesterName'] as String?,
-      status: json['status'] as String? ?? 'Verified',
+      harvesterName: json['harvesterName'] as String? ?? (json['harvester']?['name'] as String?),
+      status: json['status'] as String? ?? json['verificationStatus'] as String?,
       verifiedAt: json['verifiedAt'] != null
           ? DateTime.tryParse(json['verifiedAt'] as String)
           : null,

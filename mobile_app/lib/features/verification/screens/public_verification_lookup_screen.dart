@@ -223,7 +223,7 @@ class _PublicVerificationLookupScreenState extends State<PublicVerificationLooku
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Verified Harvester ✓',
+                                    _result!.status == 'VERIFIED' ? 'Verified Harvester ✓' : 'Verification Record Found',
                                     style: GoogleFonts.manrope(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800,
@@ -248,10 +248,19 @@ class _PublicVerificationLookupScreenState extends State<PublicVerificationLooku
                         Divider(height: 1, color: context.borderColor),
                         const SizedBox(height: AppConstants.space16),
 
-                        _detailRow(context, 'Harvester Name', _result!.harvesterName ?? 'Licensed Harvester'),
-                        _detailRow(context, 'Verification Status', 'Approved & Blockchain Recorded ✓', isSuccess: true),
-                        _detailRow(context, 'Integrity Verified', _result!.integrityVerified ? 'Cryptographic Hash Match ✓' : 'Verified', isSuccess: true),
-                        _detailRow(context, 'Blockchain Ledger', _result!.blockchainNetwork ?? 'HoneyChain Provenance Ledger'),
+                        _detailRow(context, 'Harvester Name', _result!.harvesterName ?? 'Not provided'),
+                        if (_result!.status != null)
+                          _detailRow(context, 'Verification Status', _result!.status!, isSuccess: _result!.status == 'VERIFIED')
+                        else
+                          _detailRow(context, 'Verification Status', 'Not available', isSuccess: false),
+                        // Document integrity (§11): only claimed when the backend
+                        // actually performed a hash comparison — never by default.
+                        if (_result!.integrityVerified)
+                          _detailRow(context, 'Integrity Verified', 'Cryptographic Hash Match ✓', isSuccess: true)
+                        else
+                          _detailRow(context, 'Integrity Verified', 'No document hash to compare in this lookup', isSuccess: false),
+                        if (_result!.blockchainNetwork != null)
+                          _detailRow(context, 'Blockchain Ledger', _result!.blockchainNetwork!),
                         if (_result!.transactionHash != null)
                           _detailRow(context, 'Transaction Hash', '${_result!.transactionHash!.substring(0, 10)}...'),
                         if (_result!.publicDetails != null) ...[

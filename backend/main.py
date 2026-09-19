@@ -3396,14 +3396,19 @@ def get_harvester_verification(verification_id: str, db: Session = Depends(get_d
             continue
         if notes.get("verificationId") == verification_id:
             u = db.query(User).filter(User.id == p.user_id).first()
+            status = "VERIFIED" if u and u.is_verified else "PENDING"
             return {
                 "success": True,
                 "found": True,
                 "verificationId": verification_id,
-                "verificationStatus": ("VERIFIED" if u and u.is_verified else "PENDING"),
+                "verificationStatus": status,
+                # Flattened aliases so lightweight clients can read the real
+                # values without digging into the nested object.
+                "harvesterName": u.name if u else None,
+                "status": status,
                 "harvester": {
                     "name": u.name if u else None,
-                    "status": ("VERIFIED" if u and u.is_verified else "PENDING"),
+                    "status": status,
                     "beekeeperId": u.beekeeper_id if u else None,
                 },
             }
@@ -3416,6 +3421,8 @@ def get_harvester_verification(verification_id: str, db: Session = Depends(get_d
             "found": True,
             "verificationId": verification_id,
             "verificationStatus": "VERIFIED",
+            "harvesterName": u.name,
+            "status": "VERIFIED",
             "harvester": {"name": u.name, "status": "VERIFIED", "beekeeperId": u.beekeeper_id},
         }
     return JSONResponse(status_code=404, content={"success": False, "found": False, "message": "Verification record not found"})

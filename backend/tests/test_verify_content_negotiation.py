@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.database import SessionLocal, init_db
-from backend.models import CollectionBatch, Hive, User
+from backend.models import CollectionBatch, Hive, Profile, User
 
 
 @pytest.fixture(scope="module")
@@ -150,3 +150,68 @@ class TestUnknownBatch:
 
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
+
+
+class TestHarvesterVerificationLookup:
+    """Public harvester verification lookup must reflect ONLY what the
+    backend can prove — no fabricated integrity or blockchain claims
+    (spec §11: never fake hash verification)."""
+
+    def _persist_verified_harvester(self, db, client) -> tuple[str, str]:
+        suffix = uuid.uuid4().hex[:8]
+        user = User(
+            name=f"VH {suffix}",
+            email=f"vh_{suffix}@example.com",
+            phone="+919999000001",
+            role="HARVESTER",
+            organization_name="Guard Org",
+            facility_location="Demo Facility",
+            license_number=f"LIC-VH-{suffix}",
+            is_verified=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        client.post("/api/verification/harvester", json={"harvesterId": user.id})
+        db.expire_all()
+        notes = db.query(Profile).filter(Profile.user_id == user.id).first().review_notes
+        import json as _json
+
+        verif_id = _json.loads(notes)["verificationId"]
+        return user.id, verif_id
+
+    def test_verified_record_reports_real_fields_only(self, client, db):
+        _, verif_id = self._persist_verified_harvester(db, client)
+        resp = client.get(f"/api/verify/harvester/{verif_id}")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["found"] is True
+        assert data["verificationStatus"] == "VERIFIED"
+        assert data["harvester"]["name"] == "VH " + data["harvester"]["name"].split()[-1]
+        # No document-integrity claim exists in this lookup; the backend must
+        # not send one and the UI must not fabricate it.
+        assert "integrityVerified" not in data
+
+    def test_unknown_verification_id_is_honest_404(self, client):
+        resp = client.get("/api/verify/harvester/HC-VERIF-NOPE")
+
+        assert resp.status_code == 404
+        assert resp.json()["found"] is False
+
+    def test_frontend_fields_are_never_fabricated(self, client, db):
+        """The lookup response must not include transactionHash, blockNumber,
+        recordHash, publicDetails, or a hardcoded blockchainNetwork — fields
+        the mobile UI previously fell back to with fake values."""
+        _, verif_id = self._persist_verified_harvester(db, client)
+        data = client.get(f"/api/verify/harvester/{verif_id}").json()
+
+        for fabricated_field in (
+            "transactionHash",
+            "blockNumber",
+            "recordHash",
+            "publicDetails",
+            "blockchainNetwork",
+            "onChainConfirmed",
+        ):
+            assert fabricated_field not in data

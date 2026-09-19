@@ -138,3 +138,22 @@ The multi-role account switcher allowed a logged-in user to mint/enter another r
 * Tests referencing the removed model updated (`avatar_test.dart`, `role_decoupled_accounts_test.dart` — removed only the 2 dead cases; all other assertions retained).
 * `git grep` for `switch.?account|switchrole|role.?switcher` across code: only the retained signup-path `switchRole` remains.
 * **Verification:** backend 26/26 PASS, Flutter analyze 0 errors/warnings, **Flutter 47/47 PASS**.
+
+## 9. HoneyChain Specification Compliance Audit
+
+Full-repo scans against the traceability/auth specification (2026-09-20):
+
+| Area | Result | Evidence |
+|---|---|---|
+| Fake auth / hardcoded creds (§15B) | PASS | `git grep` for demo/test/admin accounts, hardcoded passwords, fake/mock tokens, auth-constant bypasses: **0 hits** in active code |
+| Password storage & verification (§15) | PASS | bcrypt cost-12 (`backend/main.py` `hash_password`); legacy SHA-256 hashes transparently upgraded to bcrypt on successful login; no plaintext comparison or hash exposure found |
+| Switch Account removal (§17) | FIXED | Removed end-to-end this session (see §8.2): profile UI, controller methods/model, backend routes |
+| Document hashing (§11) | FIXED | Lab-report SHA-256 anchoring was correct; but the **public harvester verification lookup fabricated integrity claims** — the mobile UI rendered success-styled 'Integrity Verified: Verified', 'Approved & Blockchain Recorded ✓' and a hardcoded ledger name the backend never sends. Fixed: backend returns only real fields, model parses the nested `harvester` object without fake fallbacks, UI renders integrity only when a hash comparison actually occurred. Pinned by 3 new tests |
+| Misleading blockchain claims (§2) | PASS | No 'guaranteed authentic/100% pure' wording in code/UI/docs; verifier text already reflects tamper-evidence, not physical-world truth |
+| Dummy/mock data in production screens (§19) | PASS | No dummy/mock/fake/placeholder data in `mobile_app/lib`, `web/src`, or backend routes |
+| Stage-transition & role guards (§10, §12–§14) | PASS (pre-existing) | `test_supply_chain_guards.py`: cross-role lab accept → 403, packaging after failed lab → blocked, duplicate collection request → blocked; full happy-path e2e (`test_e2e_integration.py`) |
+| Contract-level enforcement (§27–§28) | PASS (pre-existing) | `HoneyChainProvenance.sol`: owner-only `recordEvent`, non-empty verification/record-hash requires; backend is the authorized actor |
+| Batch ID consistency (§4) | PASS (pre-existing) | Single `CollectionBatch.batch_id` flows through request/accept/lab/packaging; e2e test asserts the same batch id end-to-end |
+| On-chain vs off-chain (§6) | PASS (pre-existing) | Only hashes + structured event payloads go on-chain; lab documents stay off-chain (hash anchored) |
+
+Validation after fixes: backend **34/34** (incl. 3 new harvester-verification tests), Flutter **47/47**, `ai_ml/` untouched.
