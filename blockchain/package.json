@@ -14,12 +14,15 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^22.10.0",
     "ethers": "^6.17.0",
     "ganache": "^7.9.2",
     "hardhat": "^3.16.0",
     "solc": "^0.8.37",
-    "typescript": "^5.5.3",
-    "@types/node": "^22.10.0"
+    "typescript": "^5.5.3"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^18.0.1"
+  }
 }

@@ -1,3 +1,4 @@
+import "dotenv/config"; // loads blockchain/.env (never committed); must stay first
 import { defineConfig } from "hardhat/config";
 
 /**
