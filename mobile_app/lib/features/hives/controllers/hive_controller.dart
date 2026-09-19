@@ -12,12 +12,14 @@ class HiveController extends ChangeNotifier {
   String _selectedFilter = 'All'; // All, Healthy, Needs Attention, High Production, Recently Added
   String _selectedSort = 'Name A-Z'; // Name A-Z, Production High-Low, Last Inspected, Date Added
   String? _activeUserId;
+  String? _lastError;
 
   List<Hive> get hives => _hives;
   bool get isLoading => _isLoading;
   String get searchQuery => _searchQuery;
   String get selectedFilter => _selectedFilter;
   String get selectedSort => _selectedSort;
+  String? get lastError => _lastError;
 
   HiveController() {
     loadHives();
@@ -29,9 +31,11 @@ class HiveController extends ChangeNotifier {
       _activeUserId = userId.trim();
     }
     _isLoading = true;
+    _lastError = null;
     notifyListeners();
 
     _hives = await _storageService.loadHives(userId: _activeUserId);
+    _lastError = _storageService.lastError;
     _isLoading = false;
     notifyListeners();
   }
@@ -51,6 +55,7 @@ class HiveController extends ChangeNotifier {
   /// Uses server-assigned unique ID and server-validated hive code.
   Future<bool> addHive(Hive hive, {String? userId}) async {
     final effectiveUserId = userId ?? _activeUserId;
+    _lastError = null;
     final createdHive = await _storageService.createHive(hive, userId: effectiveUserId);
 
     if (createdHive != null) {
@@ -59,12 +64,15 @@ class HiveController extends ChangeNotifier {
       notifyListeners();
       return true;
     }
+    _lastError = _storageService.lastError;
+    notifyListeners();
     return false;
   }
 
   /// Update an existing hive in PostgreSQL and local state
   Future<bool> updateHive(Hive updatedHive, {String? userId}) async {
     final effectiveUserId = userId ?? _activeUserId;
+    _lastError = null;
     final success = await _storageService.updateHiveInBackend(updatedHive, userId: effectiveUserId);
 
     if (success) {
@@ -76,12 +84,15 @@ class HiveController extends ChangeNotifier {
       notifyListeners();
       return true;
     }
+    _lastError = _storageService.lastError;
+    notifyListeners();
     return false;
   }
 
   /// Delete a hive by ID from PostgreSQL and local state
   Future<bool> deleteHive(String id, {String? userId}) async {
     final effectiveUserId = userId ?? _activeUserId;
+    _lastError = null;
     final success = await _storageService.deleteHiveFromBackend(id, userId: effectiveUserId);
 
     if (success) {
@@ -90,6 +101,8 @@ class HiveController extends ChangeNotifier {
       notifyListeners();
       return true;
     }
+    _lastError = _storageService.lastError;
+    notifyListeners();
     return false;
   }
 

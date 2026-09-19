@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/auth_token_store.dart';
 import '../models/collector_verification_model.dart';
 import '../models/harvester_verification_model.dart';
 import '../models/lab_tester_verification_model.dart';
@@ -26,6 +27,7 @@ class VerificationApiService {
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...AuthTokenStore.authHeader(),
       };
 
   /// Fetch verification status for a harvester

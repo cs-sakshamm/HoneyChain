@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/auth_token_store.dart';
 
 /// User Profile Model with full role-based profile support
 class UserProfile {
@@ -265,6 +266,7 @@ class UserController extends ChangeNotifier {
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...AuthTokenStore.authHeader(),
       };
 
   /// Reload user profile from local cache & backend
@@ -512,7 +514,15 @@ class UserController extends ChangeNotifier {
         if (data['user'] != null) {
           final u = data['user'];
           final prefs = await SharedPreferences.getInstance();
-          if (u['id'] != null) await prefs.setString(_idKey, u['id']);
+          if (data['token'] != null) {
+            await prefs.setString('auth_token', data['token']);
+            AuthTokenStore.set(token: data['token']);
+          }
+          if (u['id'] != null) {
+            await prefs.setString(_idKey, u['id']);
+            await prefs.setString('auth_user_id', u['id']);
+            AuthTokenStore.set(userId: u['id']);
+          }
           if (u['name'] != null) await prefs.setString(_nameKey, u['name']);
           if (u['email'] != null) await prefs.setString(_emailKey, u['email']);
           if (u['phone'] != null) await prefs.setString(_phoneKey, u['phone']);
@@ -609,6 +619,8 @@ class UserController extends ChangeNotifier {
       await prefs.remove(_desigKey);
     }
 
+    var backendSynced = false;
+
     // Sync with PostgreSQL backend
     try {
       final url = Uri.parse('$_baseUrl/api/profile');
@@ -657,13 +669,20 @@ class UserController extends ChangeNotifier {
           );
           notifyListeners();
           if (_user.beekeeperId != null) await prefs.setString(_beekeeperIdKey, _user.beekeeperId!);
+          backendSynced = true;
         }
+      } else {
+        debugPrint('[UserController] Profile update rejected: ${res.statusCode} ${res.body}');
       }
     } catch (e) {
       debugPrint('[UserController] Profile update backend sync error: $e');
     }
 
-    return true;
+    if (!backendSynced) {
+      await fetchProfile(userId: _user.id, role: _user.role);
+    }
+
+    return backendSynced;
   }
 
   /// Sets or updates custom avatar URL

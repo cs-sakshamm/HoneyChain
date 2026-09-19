@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/auth_token_store.dart';
 import '../models/hive_model.dart';
 
 /// Service managing Hive data communication with PostgreSQL backend API
@@ -12,6 +13,9 @@ class HiveStorageService {
   static const String _storageKey = 'honeychain_hives_data_v2';
   final http.Client _client;
   final String _baseUrl;
+  String? _lastError;
+
+  String? get lastError => _lastError;
 
   HiveStorageService({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
@@ -26,12 +30,13 @@ class HiveStorageService {
   Map<String, String> _headers([String? userId]) => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        if (userId != null && userId.trim().isNotEmpty) 'x-user-id': userId.trim(),
+        ...AuthTokenStore.authHeader(),
       };
 
   /// Load hives from PostgreSQL backend API for the specified beekeeper.
   Future<List<Hive>> loadHives({String? userId}) async {
     try {
+      _lastError = null;
       final uri = Uri.parse('$_baseUrl/api/hives').replace(
         queryParameters: {
           if (userId != null && userId.trim().isNotEmpty) 'userId': userId.trim(),
@@ -52,6 +57,7 @@ class HiveStorageService {
         return hives;
       }
     } catch (e) {
+      _lastError = 'Unable to load hives from the backend.';
       debugPrint('[HiveStorageService] Backend fetch failed: $e. Loading from local cache.');
     }
 
@@ -62,6 +68,7 @@ class HiveStorageService {
   /// Create a new Hive in PostgreSQL backend. Returns created Hive with server ID.
   Future<Hive?> createHive(Hive hive, {String? userId}) async {
     try {
+      _lastError = null;
       final url = Uri.parse('$_baseUrl/api/hives');
       final payload = hive.toJson();
       if (userId != null && userId.trim().isNotEmpty) {
@@ -79,9 +86,12 @@ class HiveStorageService {
             : data;
         return Hive.fromJson(hiveMap);
       } else {
+        _lastError = _extractErrorMessage(response.body) ??
+            'Failed to save hive data. Please try again.';
         debugPrint('[HiveStorageService] Backend create rejected: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
+      _lastError = 'Unable to reach the backend. Please verify the API server is running.';
       debugPrint('[HiveStorageService] Backend create failed: $e');
     }
     return null;
@@ -90,6 +100,7 @@ class HiveStorageService {
   /// Update an existing Hive in PostgreSQL backend
   Future<bool> updateHiveInBackend(Hive hive, {String? userId}) async {
     try {
+      _lastError = null;
       final url = Uri.parse('$_baseUrl/api/hives/${hive.id}');
       final payload = hive.toJson();
       if (userId != null && userId.trim().isNotEmpty) {
@@ -100,8 +111,13 @@ class HiveStorageService {
           .put(url, headers: _headers(userId), body: jsonEncode(payload))
           .timeout(const Duration(seconds: 5));
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) return true;
+      _lastError = _extractErrorMessage(response.body) ??
+          'Failed to update hive data. Please try again.';
+      debugPrint('[HiveStorageService] Backend update rejected: ${response.statusCode} - ${response.body}');
+      return false;
     } catch (e) {
+      _lastError = 'Unable to reach the backend. Please verify the API server is running.';
       debugPrint('[HiveStorageService] Backend update failed: $e');
       return false;
     }
@@ -110,13 +126,18 @@ class HiveStorageService {
   /// Delete a Hive in PostgreSQL backend
   Future<bool> deleteHiveFromBackend(String id, {String? userId}) async {
     try {
+      _lastError = null;
       final url = Uri.parse('$_baseUrl/api/hives/$id');
       final response = await _client
           .delete(url, headers: _headers(userId))
           .timeout(const Duration(seconds: 5));
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) return true;
+      _lastError = _extractErrorMessage(response.body) ??
+          'Failed to delete hive data. Please try again.';
+      return false;
     } catch (e) {
+      _lastError = 'Unable to reach the backend. Please verify the API server is running.';
       debugPrint('[HiveStorageService] Backend delete failed: $e');
       return false;
     }
@@ -125,6 +146,7 @@ class HiveStorageService {
   /// Generate unique hive code from PostgreSQL backend
   Future<String?> fetchUniqueHiveCode() async {
     try {
+      _lastError = null;
       final url = Uri.parse('$_baseUrl/api/hives/code/generate');
       final response = await _client
           .get(url, headers: _headers())
@@ -134,6 +156,22 @@ class HiveStorageService {
         if (data['code'] != null) {
           return data['code'] as String;
         }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String? _extractErrorMessage(String body) {
+    try {
+      final data = jsonDecode(body);
+      if (data is Map<String, dynamic>) {
+        final detail = data['detail'];
+        if (detail is Map<String, dynamic>) {
+          final message = detail['message'] ?? detail['error'];
+          if (message is String && message.trim().isNotEmpty) return message;
+        }
+        final message = data['message'] ?? data['error'];
+        if (message is String && message.trim().isNotEmpty) return message;
       }
     } catch (_) {}
     return null;

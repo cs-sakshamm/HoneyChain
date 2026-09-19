@@ -86,6 +86,16 @@ class AuthController extends ChangeNotifier {
   Future<void> _initSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
+    final savedRole = prefs.getString('user_profile_role');
+    if (savedRole != null && savedRole.isNotEmpty) {
+      _selectedRole = userRoleFromString(savedRole);
+    }
+    if (token != null && token.isNotEmpty) {
+      AuthTokenStore.set(
+        token: token,
+        userId: prefs.getString('auth_user_id') ?? prefs.getString('user_profile_id'),
+      );
+    }
     
     if (token != null && token.isNotEmpty) {
       _status = AuthStateStatus.authenticated;
@@ -196,6 +206,7 @@ class AuthController extends ChangeNotifier {
           final u = data['user'];
           if (u['id'] != null) {
             await prefs.setString('user_profile_id', u['id']);
+            await prefs.setString('auth_user_id', u['id']);
             AuthTokenStore.set(userId: u['id']);
           }
           if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
@@ -278,6 +289,7 @@ class AuthController extends ChangeNotifier {
           final u = data['user'];
           if (u['id'] != null) {
             await prefs.setString('user_profile_id', u['id']);
+            await prefs.setString('auth_user_id', u['id']);
             AuthTokenStore.set(userId: u['id']);
           }
           if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
@@ -379,6 +391,7 @@ class AuthController extends ChangeNotifier {
                 final u = data['user'];
                 if (u['id'] != null) {
                   await prefs.setString('user_profile_id', u['id']);
+                  await prefs.setString('auth_user_id', u['id']);
                   AuthTokenStore.set(userId: u['id']);
                 }
                 if (u['beekeeperId'] != null) await prefs.setString('user_profile_beekeeper_id', u['beekeeperId']);
@@ -493,6 +506,7 @@ class AuthController extends ChangeNotifier {
     await _authService.signOut();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('auth_user_id');
     await prefs.remove('user_profile_id');
     AuthTokenStore.clear();
     _currentUser = null;

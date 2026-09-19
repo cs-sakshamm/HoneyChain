@@ -358,8 +358,11 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save hive data. Please verify your profile and try again.'),
+        SnackBar(
+          content: Text(
+            controller.lastError ??
+                'Failed to save hive data. Please verify your profile and try again.',
+          ),
           backgroundColor: AppConstants.error,
         ),
       );

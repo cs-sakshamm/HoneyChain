@@ -473,6 +473,7 @@ class HiveCreateRequest(BaseModel):
     deviceId: Optional[str] = None
     apiaryLocation: str
     hiveType: Optional[str] = "Langstroth"
+    dateAdded: Optional[Any] = None
     queenStatus: Optional[str] = "Mated"
     totalFrames: Optional[int] = 10
     broodFrames: Optional[int] = 0
@@ -483,12 +484,14 @@ class HiveCreateRequest(BaseModel):
     previousYearProductionKg: Optional[float] = 0.0
     currentYearProductionKg: Optional[float] = 0.0
     honeyType: Optional[str] = "Wildflower"
+    lastInspectionDate: Optional[Any] = None
     miteStatus: Optional[str] = "None"
     diseaseStatus: Optional[str] = "None"
     feedingRequired: Optional[bool] = False
     queenCondition: Optional[str] = "Good"
     overallHealth: Optional[str] = "Healthy"
     notes: Optional[str] = None
+    updatedAt: Optional[Any] = None
 
 
 class TelemetryIngestRequest(BaseModel):
@@ -529,6 +532,35 @@ class WorkflowUpdateRequest(BaseModel):
 
 
 # ── Profile Completion & Verification Helpers ──
+def normalize_role(role: Optional[str]) -> str:
+    r = (role or "HARVESTER").upper().strip()
+    if any(k in r for k in ("HARVEST", "BEEKEEP")):
+        return "HARVESTER"
+    if any(k in r for k in ("COLLECT", "PROCESS")):
+        return "COLLECTOR_PROCESSOR"
+    if "LAB" in r:
+        return "LAB"
+    if any(k in r for k in ("PKG", "PACKAG")):
+        return "PACKAGING"
+    if "ADMIN" in r:
+        return "ADMIN"
+    return r
+
+
+def role_aliases(role: Optional[str]) -> List[str]:
+    canonical = normalize_role(role)
+    aliases = {canonical}
+    if canonical == "HARVESTER":
+        aliases.update({"BEEKEEPER", "BEE_KEEPER"})
+    elif canonical == "COLLECTOR_PROCESSOR":
+        aliases.update({"COLLECTION_PROCESSING", "COLLECTOR_PROCESSING", "COLLECTION", "PROCESSING"})
+    elif canonical == "LAB":
+        aliases.update({"LAB_TESTING", "LABORATORY", "LAB_TESTER"})
+    elif canonical == "PACKAGING":
+        aliases.update({"PACKAGING_MANAGER", "PACKAGER", "PKG"})
+    return list(aliases)
+
+
 def is_harvester_profile_complete(user: Optional[User]) -> bool:
     if not user:
         return False
@@ -575,7 +607,7 @@ def is_packager_profile_complete(user: Optional[User]) -> bool:
 def is_user_profile_complete(user: Optional[User]) -> bool:
     if not user:
         return False
-    role = (user.role or "HARVESTER").upper().strip()
+    role = normalize_role(user.role)
     if "HARVESTER" in role:
         return is_harvester_profile_complete(user)
     elif any(k in role for k in ("COLLECT", "PROCESS")):
@@ -588,7 +620,7 @@ def is_user_profile_complete(user: Optional[User]) -> bool:
 
 
 def require_verified_harvester(user: User = Depends(get_current_user)) -> User:
-    if "HARVESTER" not in (user.role or "").upper():
+    if normalize_role(user.role) != "HARVESTER":
         raise HTTPException(
             status_code=403,
             detail={"success": False, "code": "FORBIDDEN", "message": "Only Harvester accounts can perform this action."}
@@ -603,6 +635,27 @@ def require_verified_harvester(user: User = Depends(get_current_user)) -> User:
             }
         )
     return user
+
+
+def parse_optional_datetime(value: Optional[Any]) -> Optional[datetime]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(raw)
+            return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+        except ValueError:
+            return None
+    return None
 
 
 def require_verified_collector(user: User = Depends(get_current_user)) -> User:
@@ -746,9 +799,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail={"success": False, "error": "Name is required.", "code": "VALIDATION_ERROR"})
 
     clean_email = (payload.email or f"user-{uuid.uuid4().hex[:6]}@honeychain.io").strip().lower()
-    target_role = (payload.role or "HARVESTER").upper()
+    target_role = normalize_role(payload.role)
 
-    existing = db.query(User).filter(User.email == clean_email, User.role == target_role).first()
+    existing = db.query(User).filter(User.email == clean_email, User.role.in_(role_aliases(target_role))).first()
     if existing:
         raise HTTPException(
             status_code=409,
@@ -794,13 +847,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         else:
             clean_phone = raw
 
-    target_role = (payload.role or "HARVESTER").upper()
+    target_role = normalize_role(payload.role)
 
     user = None
     if clean_email:
-        user = db.query(User).filter(User.email == clean_email, User.role == target_role).first()
+        user = db.query(User).filter(User.email == clean_email, User.role.in_(role_aliases(target_role))).first()
     elif clean_phone:
-        user = db.query(User).filter(User.phone == clean_phone, User.role == target_role).first()
+        user = db.query(User).filter(User.phone == clean_phone, User.role.in_(role_aliases(target_role))).first()
 
     if not user:
         raise HTTPException(
@@ -883,15 +936,16 @@ def switch_role(
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
-    target_role = (payload.targetRole or payload.role or "").upper().strip()
-    if not target_role:
+    raw_target_role = (payload.targetRole or payload.role or "").strip()
+    if not raw_target_role:
         raise HTTPException(status_code=400, detail={"success": False, "error": "targetRole is required.", "code": "VALIDATION_ERROR"})
+    target_role = normalize_role(raw_target_role)
 
     target_email = (payload.email or (current_user.email if current_user else "")).strip().lower()
     if not target_email:
         raise HTTPException(status_code=400, detail={"success": False, "error": "Email is required to switch roles.", "code": "VALIDATION_ERROR"})
 
-    user = db.query(User).filter(User.email == target_email, User.role == target_role).first()
+    user = db.query(User).filter(User.email == target_email, User.role.in_(role_aliases(target_role))).first()
     if not user and payload.createIfNotExists:
         user = User(
             name=payload.name or (current_user.name if current_user else "HoneyChain User"),
@@ -966,9 +1020,9 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
                 detail={"success": False, "error": "Google ID token could not be verified.", "code": "INVALID_GOOGLE_TOKEN"},
             )
 
-    target_role = (payload.role or "HARVESTER").upper()
+    target_role = normalize_role(payload.role)
 
-    user = db.query(User).filter(User.email == verified_email, User.role == target_role).first()
+    user = db.query(User).filter(User.email == verified_email, User.role.in_(role_aliases(target_role))).first()
     if not user:
         user = User(
             name=verified_name,
@@ -1216,11 +1270,12 @@ def create_hive(
     db: Session = Depends(get_db)
 ):
     code = payload.hiveCode or f"HIVE-{uuid.uuid4().hex[:6].upper()}"
+    code = code.strip()
     existing_code = db.query(Hive).filter(Hive.hive_code == code).first()
     if existing_code:
         code = f"{code}-{uuid.uuid4().hex[:4].upper()}"
 
-    dev_id = payload.deviceId or f"SIH_HIVE_{code[-4:]}"
+    dev_id = (payload.deviceId or f"SIH_HIVE_{code[-4:]}").strip()
 
     # Check duplicate device id
     existing_dev = db.query(Hive).filter(Hive.device_id == dev_id).first()
@@ -1230,9 +1285,9 @@ def create_hive(
     hive = Hive(
         user_id=current_user.id,
         device_id=dev_id,
-        name=payload.name,
+        name=payload.name.strip(),
         hive_code=code,
-        apiary_location=payload.apiaryLocation,
+        apiary_location=payload.apiaryLocation.strip(),
         hive_type=payload.hiveType or "Langstroth",
         queen_status=payload.queenStatus or "Mated",
         total_frames=payload.totalFrames or 10,
@@ -1241,13 +1296,18 @@ def create_hive(
         queen_age_months=payload.queenAgeMonths or 0,
         bee_breed=payload.beeBreed or "Italian",
         expected_production_kg=payload.expectedProductionKg or 0.0,
+        previous_year_production_kg=payload.previousYearProductionKg or 0.0,
+        current_year_production_kg=payload.currentYearProductionKg or 0.0,
         honey_type=payload.honeyType or "Wildflower",
+        last_inspection_date=parse_optional_datetime(payload.lastInspectionDate) or datetime.utcnow(),
         mite_status=payload.miteStatus or "None",
         disease_status=payload.diseaseStatus or "None",
         feeding_required=payload.feedingRequired or False,
         queen_condition=payload.queenCondition or "Good",
         overall_health=payload.overallHealth or "Healthy",
         notes=payload.notes,
+        created_at=parse_optional_datetime(payload.dateAdded) or datetime.utcnow(),
+        updated_at=parse_optional_datetime(payload.updatedAt) or datetime.utcnow(),
     )
     db.add(hive)
     db.commit()
@@ -1285,15 +1345,49 @@ def update_hive(
         raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only update your own hives."})
 
     hive.name = payload.name
+    if payload.hiveCode:
+        new_code = payload.hiveCode.strip()
+        if new_code and new_code != hive.hive_code:
+            existing_code = db.query(Hive).filter(Hive.hive_code == new_code, Hive.id != hive.id).first()
+            if existing_code:
+                raise HTTPException(
+                    status_code=409,
+                    detail={"success": False, "code": "HIVE_CODE_EXISTS", "message": "Hive code is already in use."}
+                )
+            hive.hive_code = new_code
     hive.apiary_location = payload.apiaryLocation
+    hive.hive_type = payload.hiveType or hive.hive_type
+    hive.queen_status = payload.queenStatus or hive.queen_status
+    if payload.totalFrames is not None:
+        hive.total_frames = payload.totalFrames
+    if payload.broodFrames is not None:
+        hive.brood_frames = payload.broodFrames
+    hive.colony_strength = payload.colonyStrength or hive.colony_strength
+    if payload.queenAgeMonths is not None:
+        hive.queen_age_months = payload.queenAgeMonths
     if payload.beeBreed:
         hive.bee_breed = payload.beeBreed
     if payload.honeyType:
         hive.honey_type = payload.honeyType
     if payload.expectedProductionKg is not None:
         hive.expected_production_kg = payload.expectedProductionKg
+    if payload.previousYearProductionKg is not None:
+        hive.previous_year_production_kg = payload.previousYearProductionKg
+    if payload.currentYearProductionKg is not None:
+        hive.current_year_production_kg = payload.currentYearProductionKg
+    last_inspection = parse_optional_datetime(payload.lastInspectionDate)
+    if last_inspection:
+        hive.last_inspection_date = last_inspection
+    hive.mite_status = payload.miteStatus or hive.mite_status
+    hive.disease_status = payload.diseaseStatus or hive.disease_status
+    if payload.feedingRequired is not None:
+        hive.feeding_required = payload.feedingRequired
+    hive.queen_condition = payload.queenCondition or hive.queen_condition
+    hive.overall_health = payload.overallHealth or hive.overall_health
+    hive.notes = payload.notes
     if payload.deviceId:
         hive.device_id = payload.deviceId
+    hive.updated_at = parse_optional_datetime(payload.updatedAt) or datetime.utcnow()
     db.commit()
     db.refresh(hive)
     return {"success": True, "hive": get_hive_dict(hive)}
