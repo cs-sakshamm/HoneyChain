@@ -35,8 +35,8 @@ Copy-Item backend\.env.example backend\.env
 
 Edit untracked `backend\.env`:
 
-- `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/honeychain`
-- `DEV_OFFLINE_SQLITE=false`
+- `DATABASE_URL=postgresql://<user>:<password>@<supabase-host>:5432/postgres` (Supabase PostgreSQL is authoritative; localhost Postgres is not used)
+- `DEV_OFFLINE_SQLITE=false` (test-only offline mode; the app never falls back to SQLite automatically)
 - `MQTT_HOST=localhost`
 - `MQTT_PORT=1883`
 - `MQTT_USERNAME=` and `MQTT_PASSWORD=` for this development broker (anonymous LAN/local config)
@@ -101,7 +101,7 @@ Terminal 5 — AI processor — repository root:
 cd C:\Users\saksh\OneDrive\Desktop\HoneyChain
 $env:MQTT_BROKER="localhost"
 $env:MQTT_PORT="1883"
-$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/honeychain"
+$env:DATABASE_URL="postgresql://<user>:<password>@<supabase-host>:5432/postgres"  # same DATABASE_URL as backend/.env
 $env:AI_HISTORY_RELOAD="true"
 .\.test-venv\Scripts\python -m ai_ml.mqtt.mqtt_processor
 ```

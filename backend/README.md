@@ -1,17 +1,18 @@
 # HoneyChain — Backend Services & API Architecture
 
-The HoneyChain backend serves as the core integration and business logic engine of the HoneyChain ecosystem. It ingests IoT telemetry, interfaces with AI anomaly detection, coordinates supply chain transactions across five role stages, anchors cryptographic provenance to EVM smart contracts, and exposes RESTful and real-time WebSocket APIs to the Flutter mobile application and public consumers.
+The HoneyChain backend is the integration and business-logic core of the platform: it ingests IoT telemetry over MQTT, persists AI/ML hive analyses, coordinates the harvest → collection → processing → lab → packaging supply chain, anchors provenance to an EVM smart contract, and exposes REST + WebSocket APIs consumed by the Flutter app.
 
 ---
 
-## 1. Technologies & Frameworks
+## 1. Technology Stack
 
-* **Python FastAPI (`main.py`):** High-performance asynchronous REST and WebSocket API server.
-* **SQLAlchemy 2.0 (`database.py`, `models.py`):** Enterprise ORM managing relational schemas across SQLite (default development) and PostgreSQL 16 (production).
-* **Paho-MQTT 2.0 (`services/mqtt_consumer.py`):** Background worker subscribing to IoT telemetry and AI/ML processed insights.
-* **Web3.py 6.x (`services/blockchain_service.py`):** Client for deploying, querying, and recording batch events to EVM smart contracts (`HoneyChainProvenance.sol`).
-* **QRCode & Pillow (`services/qr_service.py`):** Base64 Data URI generator for batch and bottle traceability QR tags.
-* **Node.js Express & Prisma (`src/`, `prisma/`):** Dedicated microservice module for Aadhaar eKYC, SMS OTP gateway routing, and TypeScript workflow validations.
+* **Python FastAPI** (`main.py`): REST API, WebSocket endpoints, lifespan-managed background services.
+* **SQLAlchemy 2.x** (`database.py`, `models.py`): ORM layer. **Supabase PostgreSQL is the authoritative database** (required `DATABASE_URL`). SQLite is used *only* when explicitly requested for tests (`ENV=test` or `DEV_OFFLINE_SQLITE=true`) — there is **no silent fallback**.
+* **Paho-MQTT 2.x** (`services/mqtt_consumer.py`): background consumer for telemetry and AI/ML processed messages, started/stopped with the FastAPI lifespan.
+* **Web3.py 8.x** (`services/blockchain_service.py`): EVM contract client for `HoneyChainProvenance.sol`.
+* **qrcode + Pillow** (`services/qr_service.py`): QR tag generation as base64 data URIs.
+* **python-jose / passlib**: JWT issuing/verification and password hashing.
+* **Node.js** (blockchain toolchain only): the Hardhat TypeScript toolchain lives in `blockchain/` — there is **no** Express/Prisma service inside `backend/` (an older implementation is quarantined under `legacy/` and is not part of the running system).
 
 ---
 
@@ -19,197 +20,185 @@ The HoneyChain backend serves as the core integration and business logic engine 
 
 ```text
 backend/
-├── database.py                 # SQLAlchemy database engine, session factory, & table initializer
-├── honeychain.db               # SQLite development database (auto-generated)
-├── main.py                     # Central FastAPI application with all route definitions & lifespan hooks
-├── models.py                   # SQLAlchemy ORM models covering users, hives, batches, labs, & QR
+├── main.py                     # FastAPI app: routes, auth, WebSocket, lifespan wiring
+├── database.py                 # DATABASE_URL loading, engine/session factory, health check
+├── db_base.py                  # Shared SQLAlchemy declarative Base (single registry)
+├── models.py                   # ORM models: users → hives → telemetry → AI → supply chain → QR
+├── alembic/                    # Migrations (same DATABASE_URL as the app)
 ├── services/
-│   ├── blockchain_service.py   # Web3 EVM contract connector and transaction recorder
-│   ├── mqtt_consumer.py        # Background MQTT thread listening to telemetry & processed topics
-│   └── qr_service.py           # QR code generation utilities returning base64 data URIs
-├── prisma/
-│   ├── schema.prisma           # Prisma relational schema for Node service
-│   ├── dev.db                  # Prisma SQLite database
-│   └── seed.ts                 # Database seeding script for demo data
-├── src/                        # Express / TypeScript KYC & verification service
-│   ├── index.ts                # Express application entrypoint
-│   ├── routes/                 # Express route handlers (auth, hive, telemetry, verification, workflow)
-│   └── services/               # KYC providers (sandbox, signzy, hyperverge, digio) & SMS gateways
-├── tests/
-│   ├── test_e2e_integration.py # Full Pytest suite testing end-to-end supply chain progression
-│   └── test_scenario_49.py     # Targeted integration test for hive alert & batch scenarios
-├── .env.example                # Template configuration for environment variables
-├── .gitignore                  # Git ignore rules tailored for Python, Node, and Prisma
-├── README.md                   # Backend documentation (this file)
-└── REQUIREMENT.txt             # Complete Python and Node dependency specifications
+│   ├── blockchain_service.py   # Web3 contract connector + transaction recorder
+│   ├── mqtt_consumer.py        # MQTT consumer: validation, persistence, WS bridge
+│   └── qr_service.py           # QR generation utilities
+├── tests/                      # Pytest suite (18 tests)
+├── .env.example                # Template configuration (names only, no secrets)
+└── README.md
 ```
 
 ---
 
-## 3. Database Schema & Models (`models.py`)
+## 3. Data Model (`models.py`)
 
-The backend models map directly to real-world honey supply chain entities:
-
-1. **`User` & `Profile`:** Role-based identity (`HARVESTER`, `COLLECTOR`, `LAB_TESTER`, `PACKAGING_MANAGER`, `PUBLIC_CONSUMER`) with Aadhaar number, phone verification, and apiary coordinates.
-2. **`Hive`:** Represents a physical beehive linked to a unique `device_id` (e.g., `SIH_HIVE_MVP_01`) and `hive_code`.
-3. **`HiveTelemetry`:** Time-series telemetry readings:
-   * `weight_kg`, `temperature_c`, `humidity_pct`, `acoustics_hz`, `battery_v`, `wifi_rssi_dbm`, `timestamp`.
-4. **`HiveAIAnalysis`:** AI-evaluated diagnostic metrics:
-   * `risk_level` (`LOW`, `MEDIUM`, `HIGH`), `status` (`HEALTHY`, `ATTENTION`, `ALERT`), `anomaly_detected` (bool), `anomaly_score` (float), breakdown statuses for temperature, humidity, weight trend, and acoustics.
-5. **`HiveAlert`:** Actionable alerts (`SEVERITY_LOW`, `SEVERITY_MEDIUM`, `SEVERITY_HIGH`, `SEVERITY_CRITICAL`) dispatched to beekeepers with resolution tracking.
-6. **`CollectionCentre` & `CollectionRequest`:** Geo-located hubs and collection requests created by harvesters.
-7. **`CollectionBatch`:** Aggregated raw honey batches created by collectors upon physical receipt.
-8. **`ProcessingBatch`:** Refined batches documenting filtration type (e.g., Ultrafiltration, Gravity), heating temperature (°C), and net yield.
-9. **`Lab` & `LabRequest`:** Testing facilities and official sample submission records.
-10. **`LabReport`:** Lab results documenting moisture %, pollen count, HMF (mg/kg), purity score (0–100), adulteration flag, quality grade (Grade A/B/C), and cryptographic certificate hash.
-11. **`PackagingBatch`:** Retail packaging records linking container size (e.g., 250g, 500g, 1000g), unit count, serial numbers, and assigned QR codes.
-12. **`QRCode`:** Mapping of `qr_hash` to physical entities with downloadable base64 image data.
-13. **`BlockchainRecord`:** Audit trail indexing on-chain transaction hashes, block numbers, and payload hashes.
+1. **`User`** — role-based identity (`HARVESTER`, `COLLECTOR`, `LAB_TESTER`, `PACKAGING_MANAGER`, `PUBLIC_CONSUMER`), email/password + Firebase identity, OTP state.
+2. **`Hive`** — physical hive; unique `device_id` (e.g. `SIH_HIVE_MVP_01`) → `hive_code` → owner `user_id`.
+3. **`HiveTelemetry`** — time-series readings (`temperature_c`, `humidity_pct`, `weight_kg`, `acoustics_hz`, `battery_v`, `wifi_rssi_dbm`, `timestamp`); indexed by device + timestamp; idempotent on `(hive_id, device_id, timestamp)`.
+4. **`HiveAIAnalysis`** — stored AI/ML output: `risk_level` (LOW/MEDIUM/HIGH), `status` (HEALTHY/ATTENTION/ALERT), `anomaly_detected`, `anomaly_score`, per-parameter breakdowns, analysis JSON.
+5. **`HiveAlert`** — alerts produced by the AI/ML pipeline with acknowledgment tracking.
+6. **`CollectionCentre` / `CollectionRequest` / `CollectionBatch`** — collection stage.
+7. **`ProcessingBatch`** — filtration/heating parameters and yield.
+8. **`Lab` / `LabRequest` / `LabReport`** — lab metrics (moisture, pollen, HMF, purity, C4 adulteration), grade, certificate hash.
+9. **`PackagingBatch`** — container sizes, unit counts, QR assignment.
+10. **`QRCode`** — `qr_hash` → entity mapping + base64 image.
+11. **`BlockchainRecord`** — on-chain tx hash / block number / payload hash audit trail.
 
 ---
 
-## 4. API Endpoints Architecture (`main.py`)
+## 4. API Surface (`main.py`)
+
+All application routes are mounted under both `/api/...` (canonical, used by the Flutter app) and legacy un-prefixed aliases where noted. JWT auth via `Authorization: Bearer`; ownership is enforced (a user cannot read another user's hive by swapping IDs).
 
 ### Core & Health
-* `GET /`: API root status.
-* `GET /health`: Detailed service health check (DB connectivity, MQTT status, Web3 status).
-* `GET /stats`: Aggregated system statistics (total hives, batches, lab tests, packaged jars).
+* `GET /` — API root
+* `GET /api/health` (alias `/health`) — DB engine type/latency, MQTT, blockchain status
 
-### Authentication & Profiles
-* `POST /auth/register`: Register user with specific role.
-* `POST /auth/login`: Authenticate and receive session tokens.
-* `GET /auth/me`: Fetch currently authenticated user context.
-* `POST /auth/otp/send`: Dispatch 6-digit SMS OTP (sandbox / MSG91 / 2Factor).
-* `POST /auth/otp/verify`: Validate submitted OTP.
-* `GET /profile`: Retrieve harvester/collector profile.
-* `PUT /profile`: Update profile information.
-* `POST /profile/kyc`: Submit Aadhaar / government ID verification.
+### Authentication
+* `POST /api/auth/register` — register (email/password; roles)
+* `POST /api/auth/login` — JWT login
+* `POST /api/auth/google` — Firebase Google sign-in exchange
+* `GET /api/auth/accounts` — saved accounts
+* `POST /api/auth/switch-role`
+* `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
+* `POST /api/verification/send-otp`, `POST /api/verification/verify-otp`
+* `POST /api/verification/{role}/{step}` (and sub-step variants) — role verification workflow
+* `GET /api/verification/{role}/status/{user_id}`
+* `GET /api/profile`, `PUT /api/profile`
 
-### Hives & Telemetry
-* `GET /hives`: List hives belonging to the authenticated harvester.
-* `POST /hives`: Register a new hive and link an ESP32 `device_id`.
-* `GET /hives/{hive_id}`: Retrieve detailed hive metrics and recent telemetry.
-* `GET /hives/{hive_id}/telemetry`: Fetch paginated historical sensor readings.
-* `GET /hives/{hive_id}/analysis`: Fetch latest AI risk analysis and diagnostic breakdown.
-* `GET /hives/{hive_id}/alerts`: Fetch active alerts for a hive.
-* `POST /hives/{hive_id}/alerts/{alert_id}/resolve`: Mark an alert as resolved.
+### Hives & Telemetry (ownership-enforced)
+* `GET /api/hives`, `POST /api/hives`, `GET /api/hives/{id}`, `DELETE /api/hives/{id}`
+* `GET /api/hives/code/generate`, `GET /api/hives/unique-code`
+* `GET /api/hives/{id}/telemetry/latest` — latest snapshot + AI status + AI readiness (`requiredReadings` ≈ 145)
+* `GET /api/hives/{id}/telemetry?limit=` — history (newest first)
+* `GET /api/hives/{id}/status` — AI status bundle
+* `GET /api/telemetry/live/{id}` — legacy live view (auth required)
+* `GET /api/telemetry/alerts`, `POST /api/telemetry/alerts/{id}/acknowledge`
+* `POST /api/telemetry/ingest` — manual ingestion (validation enforced; no fabricated defaults)
 
-### Real-Time WebSockets
-* `WebSocket /ws/telemetry`: Bi-directional WebSocket connection. Broadcasts real-time telemetry packets and critical alerts directly to mobile dashboards as soon as MQTT messages arrive.
+### Supply Chain
+* `POST /api/harvests` — record harvest session
+* `GET /api/requests`, `POST /api/requests` — collection requests
+* `PATCH /api/requests/{id}/accept|reject|status`, `POST /api/requests/{id}/send-next`
+* `GET /api/centers/nearest`, `GET /api/requests/nearest-centers`
+* `POST /api/processing` — processing parameters
+* `POST /api/lab-reports` — lab metrics + certificate hash
+* `POST /api/packaging` — packaging batches + QR generation
 
-### Supply Chain Management
-* `GET /collection/centers`: Query nearby registered collection hubs with GPS coordinates.
-* `POST /collection/requests`: Harvester submits raw honey batch for collection.
-* `PATCH /collection/requests/{id}/status`: Collector accepts, schedules, or rejects request.
-* `POST /collection/batches`: Collector creates an aggregated collection batch and triggers on-chain anchor.
-* `POST /processing/batches`: Record processing parameters (filtration grade, temperature).
-* `POST /lab/requests`: Submit honey sample for accredited laboratory analysis.
-* `POST /lab/reports`: Lab technician records chemical metrics, grade, and commits certificate hash to blockchain.
-* `POST /packaging/batches`: Packaging manager logs packaged jars and generates traceability QR codes.
+### Verification & Traceability (public)
+* `GET /api/verify/{batch_id}` (alias `/verify/{batch_id}`) — full provenance payload
+* `GET /api/traceability/{batch_id}`
+* `GET /api/verify/harvester/{verification_id}`
 
-### Public Verification
-* `GET /verify/{code}`: Public endpoint returning full provenance history, lab metrics, and blockchain transaction proof for a batch or QR code.
-* `GET /qr/{code}/image`: Generates and serves a PNG QR code image directly for printing.
-
----
-
-## 5. Subsystem Integrations
-
-### IoT & MQTT Consumer (`mqtt_consumer.py`)
-* Connects to Mosquitto MQTT broker on startup via FastAPI `lifespan`.
-* Subscribes to:
-  * `honeychain/hive/telemetry`: Direct sensor stream from ESP32 nodes.
-  * `honeychain/hive/processed`: AI/ML analyzed stream containing risk scores and feature evaluations.
-* Performs database insertion into `HiveTelemetry` and `HiveAIAnalysis`.
-* Automatically identifies abnormal readings and creates `HiveAlert` entries.
-* Broadcasts payload over `/ws/telemetry` to active mobile clients.
-
-### Blockchain Client (`blockchain_service.py`)
-* Connects via Web3 to the configured Ethereum RPC (`BLOCKCHAIN_RPC_URL`).
-* Interacts with `HoneyChainProvenance.sol`:
-  * `recordEvent(batchId, eventType, actorId, dataHash, previousEventHash)`
-  * `recordHarvesterVerification(verificationId, harvesterId, recordHash, status)`
-  * `getEvents(batchId)`
-* Automatically computes SHA-256 payload digests ensuring cryptographic proof of origin.
+### WebSockets (JWT-authenticated)
+* `WS /ws`, `WS /ws/telemetry`, `WS /api/telemetry/live` — server pushes telemetry/AI/alert events as they are persisted from MQTT; unauthenticated connections are rejected (close code 4401).
 
 ---
 
-## 6. Environment Variables Reference
+## 5. MQTT Integration
 
-Create `.env` in `backend/` using the following verified keys:
+Flow (the `ai_ml/` processor is external and untouched by this layer):
+
+```text
+ESP32/simulator → honeychain/hive/telemetry → (existing AI/ML processor)
+              → honeychain/hive/processed → backend MQTT consumer
+              → validation → PostgreSQL → WebSocket broadcast → Flutter
+```
+
+* Consumes both topics; AI/ML `processed` messages are handled on a priority queue so insights are never stuck behind a raw-telemetry burst.
+* Strict payload validation: `device_id`, valid epoch `timestamp`, and all four sensor channels (`temperature_c`, `humidity_pct`, `weight_kg`, `acoustics_hz`) must exist and be numeric — malformed messages are logged and rejected, never stored with fabricated values.
+* Idempotent persistence keyed on `(hive_id, device_id, timestamp)` — MQTT QoS-1 redelivery cannot create duplicates.
+* Automatic reconnect; MQTT failures never take FastAPI down.
+
+---
+
+## 6. Environment Variables (names only — never commit values)
 
 ```env
-# Server Configuration
+# Server
 PORT=8000
 ENVIRONMENT=development
 
-# Relational Database (Supabase PostgreSQL — authoritative)
-# Place the real password only in backend/.env (never commit it) and
-# URL-encode special characters (@ : / ? # % &).
-# SQLite is NOT used as an automatic fallback; a failing PostgreSQL
-# connection surfaces a clear error instead.
-DATABASE_URL="postgresql://postgres:<URL-ENCODED-PASSWORD>@db.<project-ref>.supabase.co:5432/postgres"
-# Explicit test-only offline mode (otherwise never used):
+# Database (Supabase PostgreSQL — authoritative; URL-encode the password)
+DATABASE_URL=postgresql://<user>:<password>@<host>:5432/postgres
+# Test-only offline mode (otherwise unused):
 # DEV_OFFLINE_SQLITE=true
 
-# MQTT Broker Configuration
-MQTT_HOST="localhost"
+# MQTT
+MQTT_HOST=localhost
 MQTT_PORT=1883
-MQTT_INPUT_TOPIC="honeychain/hive/telemetry"
-MQTT_OUTPUT_TOPIC="honeychain/hive/processed"
+MQTT_USERNAME=            # optional
+MQTT_PASSWORD=            # optional
+MQTT_INPUT_TOPIC=honeychain/hive/telemetry
+MQTT_OUTPUT_TOPIC=honeychain/hive/processed
 
-# Blockchain Node & Smart Contract
-BLOCKCHAIN_RPC_URL="http://127.0.0.1:8545"
-CONTRACT_ADDRESS="0x5FbDB2315678afecb367f032d93F642f64180aa3"
-BLOCKCHAIN_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+# Blockchain
+BLOCKCHAIN_PROVIDER_URL=http://127.0.0.1:8545
+BLOCKCHAIN_CHAIN_ID=31337
+CONTRACT_ADDRESS=<deployed address>
+BLOCKCHAIN_PRIVATE_KEY=<funded key for the target network>
 
-# KYC & SMS Provider Configuration
-AADHAAR_PROVIDER="sandbox"
-OTP_PROVIDER="sandbox"
+# Auth
+JWT_SECRET_KEY=<random secret>
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# External providers (optional)
+GOOGLE_CLIENT_ID=
+AADHAAR_PROVIDER=sandbox
+OTP_PROVIDER=sandbox
+
+# Public verification portal used inside generated QR payloads
+PUBLIC_APP_URL=https://<public-host>
 ```
 
 ---
 
-## 7. Running the Backend
-
-### Running the Python FastAPI Backend
-
-```bash
-# 1. Activate Python virtual environment
-.\.venv\Scripts\Activate.ps1  # Windows
-# source .venv/bin/activate    # Linux/macOS
-
-# 2. Install dependencies
-pip install -r backend/REQUIREMENT.txt
-
-# 3. Start server with uvicorn
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Interactive API documentation will be available at:
-* Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
-* ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
-
-### Running the Node.js Express / Prisma Service (Optional)
+## 7. Running
 
 ```bash
 cd backend
-npm install
-npx prisma generate
-npx prisma db push
-npm run dev
+python -m venv .venv
+.venv\Scripts\activate            # Windows  (source .venv/bin/activate on Unix)
+pip install -r REQUIREMENT.txt
+
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Docs at `http://localhost:8000/docs` (Swagger) and `/redoc`. On startup the app runs Alembic-compatible schema init (`init_db`), connects to PostgreSQL (fail-fast with a sanitized error if unreachable), and starts the MQTT consumer.
+
+### Migrations
+
+```bash
+cd backend
+python -m alembic upgrade head    # same DATABASE_URL as the app
 ```
 
 ---
 
 ## 8. Testing
 
-Run automated end-to-end integration tests using `pytest`:
-
 ```bash
-# Run all backend integration tests
-pytest backend/tests/test_e2e_integration.py -v
-
-# Run targeted scenario tests
-pytest backend/tests/test_scenario_49.py -v
+# from the repository root
+backend\.venv\Scripts\python.exe -m pytest backend/tests -q     # 18 tests
 ```
+
+Covers: end-to-end supply chain, telemetry persistence + idempotency, malformed-payload rejection, REST latest/history/status, cross-user authorization (403), WebSocket auth, and startup behavior. Tests default to an isolated SQLite database (`conftest.py`); run against PostgreSQL by exporting `DATABASE_URL` and clearing `DEV_OFFLINE_SQLITE`.
+
+The blockchain EVM integration of the backend service is exercised from the blockchain layer: `cd blockchain && npm run test:backend-evm`.
+
+---
+
+## 9. Security Notes
+
+* Passwords hashed (passlib); JWTs signed server-side; role checks on all state-changing routes.
+* Hive-scoped endpoints enforce ownership — ID-swapping returns 403/404, not data.
+* WebSocket connections require a valid token.
+* Database URLs and driver errors are sanitized before logging; secrets live only in `backend/.env` (gitignored).
+* No automatic SQLite fallback in production paths — a broken PostgreSQL connection is surfaced, not masked.

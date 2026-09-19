@@ -1,17 +1,18 @@
-# HoneyChain — Cross-Platform Flutter Mobile Application
+# HoneyChain — Flutter Mobile Application
 
-The HoneyChain mobile app provides a unified, role-based user experience for all stakeholders across the honey supply chain: beekeepers, regional collection hubs, quality testing laboratories, packaging facilities, and retail consumers.
+Role-based mobile client for the HoneyChain honey traceability platform: beekeepers monitor hives and record harvests, collection centres aggregate batches, labs certify quality, packaging facilities jar and QR-tag product, and consumers verify provenance.
 
 ---
 
 ## 1. Technical Overview
 
-* **Framework:** Flutter (Dart SDK `>=3.0.0 <4.0.0`)
-* **State Management:** Provider pattern (`provider: ^6.1.2`)
-* **Networking:** HTTP REST client (`http: ^1.6.0`) communicating with the FastAPI backend
-* **Authentication:** Role-based authentication with Firebase Auth (`firebase_auth: ^5.5.1`) & Google Sign-In (`google_sign_in: ^6.2.2`)
-* **QR Rendering:** `qr_flutter: ^4.1.0` for generating dynamic high-density QR codes
-* **Supported Platforms:** Android (API 21+), iOS (12.0+), and Web (Chrome/Edge/Safari)
+* **Framework:** Flutter (Dart SDK `>=3.0.0 <4.0.0`), Material 3
+* **State management:** Provider (`provider: ^6.1.2`) — controllers as `ChangeNotifier`s registered in `MultiProvider`
+* **Networking:** `http: ^1.6.0` REST client against the FastAPI backend; JWT bearer tokens held in `AuthTokenStore`
+* **Authentication:** Firebase Auth (`firebase_auth: ^5.5.1`, `firebase_core: ^3.12.0`) + Google Sign-In (`google_sign_in: ^6.2.2`), plus backend email/password and OTP flows
+* **QR rendering:** `qr_flutter: ^4.1.0`
+* **Fonts/theming:** `google_fonts`, single honey-accent design system in `core/theme/`
+* **Platforms:** Android (API 21+), iOS (12.0+), Web
 
 ---
 
@@ -20,135 +21,120 @@ The HoneyChain mobile app provides a unified, role-based user experience for all
 ```text
 mobile_app/
 ├── lib/
-│   ├── main.dart                                # Application bootstrap, theme configuration, & Provider setup
-│   ├── core/                                    # Shared application core
-│   │   ├── constants/                           # AppConstants (API endpoints, route names, colors)
-│   │   ├── controllers/                         # TelemetryAlertController, WorkflowController
-│   │   ├── localization/                        # Multi-language localization utilities
-│   │   ├── models/                              # HiveAlertModel, UserSessionModel
-│   │   ├── services/                            # Local storage & shared preferences
-│   │   ├── theme/                               # HoneyChain gold/dark amber theme & typography
-│   │   ├── utils/                               # Formatters, validators, & date parsers
-│   │   └── widgets/                             # Global reusable widgets (AppBar, AppLogo, StatusBadge, EmptyState)
-│   │
-│   └── features/                                # Feature modules by functional domain
-│       ├── authentication/                      # Login, signup, role selection, & OAuth buttons
-│       ├── hives/                               # Harvester dashboard, hive cards, telemetry charts, & alerts
-│       ├── collection/                          # Collector dashboard, batch timeline, nearest centres, & requests
-│       ├── lab/                                 # Lab tester dashboard, sample testing, reports, & certificates
-│       ├── packaging/                           # Packaging dashboard, jar batching, & QR code screens
-│       ├── verification/                        # Role verification models & public QR verification lookup
-│       ├── profile/                             # User profile, edit screens, KYC verification, & settings
-│       ├── notifications/                       # Critical hive anomaly alert modals
-│       └── navigation/                          # Main bottom navigation & drawer controllers
-│
-├── assets/images/                               # Vector assets, logos, and illustration graphics
-├── pubspec.yaml                                 # Flutter dependencies and asset configuration
-├── .gitignore                                   # Ignore rules for Flutter, Dart, Android, and iOS artifacts
-├── README.md                                    # Mobile app documentation (this file)
-└── REQUIREMENT.txt                              # Flutter SDK and package requirements
+│   ├── main.dart                 # Bootstrap: Firebase init, providers, routes
+│   ├── app.dart                  # Root widget / navigation host
+│   ├── core/
+│   │   ├── constants/            # AppConstants: backend base URL, design tokens
+│   │   ├── controllers/          # TelemetryAlertController, WorkflowController
+│   │   ├── localization/         # Multi-language support
+│   │   ├── models/               # HiveAlertModel, hive_telemetry_models, session models
+│   │   ├── services/             # Auth token store, audio alerts, storage
+│   │   ├── theme/                # Light/dark honey theme + BuildContext extensions
+│   │   └── widgets/              # Reusable widgets incl. HiveTelemetryDashboard
+│   └── features/
+│       ├── authentication/       # Login, signup, Google sign-in, role selection
+│       ├── hives/                # Harvester dashboard, hive CRUD, telemetry dashboard
+│       ├── collection/           # Collector dashboard & requests
+│       ├── lab/                  # Lab testing & reports
+│       ├── packaging/            # Packaging & QR generation
+│       ├── verification/         # Role verification + public QR verification
+│       ├── profile/              # Profile, KYC, settings
+│       ├── notifications/        # Critical alert modals
+│       └── navigation/           # Bottom navigation / drawer
+├── assets/                       # Images (assets/images/, hero assets)
+├── test/                         # 49 Flutter tests
+└── pubspec.yaml
 ```
 
 ---
 
-## 3. Role-Based Dashboards & Workflows
+## 3. Role-Based Screens
 
-### 1. Harvester / Beekeeper
-* **Hive Monitoring:** View live hive cards with real-time temperature (°C), humidity (%), weight (kg), and acoustic frequency (Hz).
-* **AI Telemetry Alerts:** Immediate visual warnings when the backend AI flags anomalies (thermal stress, high humidity, swarming risks).
-* **Harvest Recording:** Start a harvest session, select the target hive, record harvested weight (kg), and specify floral source (Mustard, Acacia, Multifloral).
-* **Collection Requests:** Create collection requests, select preferred nearby collection hubs with GPS distance calculation, and track acceptance status.
-
-### 2. Collection Centre / Collector
-* **Incoming Queue:** View pending collection requests submitted by registered harvesters.
-* **Batch Aggregation:** Verify raw honey weights, inspect moisture, accept batches, and aggregate multiple harvests into consolidated collection batches.
-* **Timeline Tracking:** Inspect batch history and verify collector cryptographic signatures.
-
-### 3. Quality Testing Laboratory
-* **Sample Testing:** Receive batches and log official laboratory metrics:
-  * Moisture Content (%)
-  * Pollen Count
-  * Hydroxymethylfurfural (HMF in mg/kg)
-  * Purity Score (0–100)
-  * C4 Adulteration Test (Negative/Positive)
-* **Lab Certification:** Assign quality grades (Grade A / Premium, Grade B, Grade C) and issue digitally signed certificates linked to on-chain hashes.
-
-### 4. Packaging Facility
-* **Packaging Batches:** Package refined, certified honey into standardized retail containers (250g, 500g, 1000g).
-* **QR Generation:** Generate individual and batch QR codes using `qr_flutter` linking directly to the public traceability portal.
-
-### 5. Public Consumer Verification
-* **Public QR Scanner / Lookup:** Any consumer can scan a physical jar QR code or manually enter a batch code to view the complete provenance trail from apiary to shelf.
+1. **Harvester/Beekeeper** — hive dashboard backed by real telemetry (temperature °C, humidity %, weight kg, acoustic Hz, battery V, Wi-Fi dBm), AI status/risk from the backend's stored Isolation Forest output, harvest recording, collection requests.
+2. **Collector** — incoming request queue, batch aggregation, timeline.
+3. **Lab tester** — sample metrics (moisture, pollen, HMF, purity, C4 adulteration), grading, certificates.
+4. **Packaging** — batch packaging (250g/500g/1000g), QR generation.
+5. **Public consumer** — QR scan / batch-code lookup against the public verification endpoint.
 
 ---
 
-## 4. API Configuration & Backend Integration
+## 4. Hive Telemetry Dashboard (real data only)
 
-The mobile application connects to the central FastAPI backend. The base URL is configured in `lib/core/constants/app_constants.dart`:
+`core/widgets/hive_telemetry_dashboard.dart` renders strictly backend-sourced data — sensor values are **never fabricated** when absent (they render as `--`). Its states, covered by widget tests:
 
-```dart
-class AppConstants {
-  // Use http://10.0.2.2:8000 for Android Emulator
-  // Use http://localhost:8000 for Web (Chrome)
-  // Use http://<YOUR_LAN_IP>:8000 for physical mobile devices
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
-  );
-}
-```
+| State | Trigger | UI |
+|---|---|---|
+| Waiting | No telemetry yet / backend unreachable | "Waiting for telemetry..." explainer |
+| Live | Snapshot with telemetry | Real sensor + diagnostic values, "Updated" time |
+| AI result | Stored analysis exists | Status pill (HEALTHY/ATTENTION/ALERT · risk), anomaly score, real alert messages |
+| Collecting | AI history < ~145 readings | "Collecting telemetry history... (n/145)" + progress bar |
+
+Data comes from `GET /api/hives/{id}/telemetry/latest` (snapshot), `/status`, and `/telemetry` (history), polled through `TelemetryAlertController` with JWT headers.
 
 ---
 
-## 5. Build & Run Instructions
+## 5. Configuration
 
-### Prerequisites
-* Flutter SDK 3.x installed and added to `PATH` (`flutter doctor` must report no issues)
-* Chrome (for Web testing) or Android Studio / Xcode (for mobile emulators)
+Backend base URL resolution (`AppConstants.backendBaseUrl`), single source of truth for app → backend calls:
 
-### Step 1: Install Dependencies
+1. `--dart-define=BACKEND_URL=<url>` override (always wins)
+2. Web / desktop: `http://localhost:8000`
+3. Android emulator: `http://10.0.2.2:8000` (host loopback alias)
+4. Physical devices: pass the host machine's LAN IP via `BACKEND_URL`
+
+Firebase options are generated (`lib/firebase_options.dart`); API secrets are never stored in the app — all privileged operations go through the backend.
+
+---
+
+## 6. Install & Run
 
 ```bash
 cd mobile_app
 flutter pub get
+
+# Web
+flutter run -d chrome --dart-define=BACKEND_URL=http://localhost:8000
+
+# Android emulator
+flutter run -d android
+
+# Physical device (same Wi-Fi as the backend host)
+flutter run -d <DEVICE_ID> --dart-define=BACKEND_URL=http://<PC_LAN_IP>:8000
 ```
 
-### Step 2: Run in Development Mode
+Release builds:
 
-#### Running on Chrome (Web):
 ```bash
-flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000
-```
-
-#### Running on Android Emulator:
-```bash
-flutter run -d android --dart-define=API_BASE_URL=http://10.0.2.2:8000
-```
-
-#### Running on Physical Android Device:
-Ensure your computer and phone are connected to the same Wi-Fi network, replace `<PC_LAN_IP>` with your machine's local IP (e.g., `192.168.1.105`):
-```bash
-flutter run -d <DEVICE_ID> --dart-define=API_BASE_URL=http://<PC_LAN_IP>:8000
+flutter build apk --release --dart-define=BACKEND_URL=https://<api-host>
+flutter build web --release
 ```
 
 ---
 
-## 6. Release Build & APK Generation
+## 7. Animation
 
-To generate an optimized release Android APK:
+```text
+Framer Motion: NOT APPLICABLE — Mobile app uses Flutter/Dart.
+```
+
+No JavaScript animation library is used or needed. Motion is handled with Flutter's built-in Material 3 transitions (page navigation, modals, `CircularProgressIndicator`/`LinearProgressIndicator` for loading and AI-history progress). No custom animation system was added or replaced.
+
+---
+
+## 8. Testing
 
 ```bash
 cd mobile_app
-flutter build apk --release --dart-define=API_BASE_URL=https://api.honeychain.io
+flutter test        # 49 tests, all passing
+flutter analyze     # static analysis
 ```
 
-The compiled release APK will be located at:
-```text
-mobile_app/build/app/outputs/flutter-apk/app-release.apk
-```
+Suites: role-image integrity & slider (31), avatar priority (7), telemetry alert model/modal (2), full-app smoke (1), telemetry dashboard states (8): waiting/live/attention/collecting/offline rendering, snapshot JSON parsing, and JWT-header request paths via a faked HTTP backend.
 
-To build a web bundle for production hosting:
-```bash
-flutter build web --release
-```
-The output directory will be `mobile_app/build/web`.
+---
+
+## 9. Known Limitations
+
+* Telemetry reaches the dashboard only while the backend (and Mosquitto + the AI/ML processor) are running; there is deliberately no cached/fake offline telemetry.
+* Full AI analyses require ~145 distinct readings (≈24 h at 10-minute sampling) per the existing AI/ML feature builder; until then the UI shows collection progress.
+* `PUBLIC_VERIFY_URL` currently defaults to a temporary trycloudflare tunnel host in `AppConstants` — set a stable host for production QR payloads.

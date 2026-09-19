@@ -61,7 +61,7 @@ Deploy to Polygon Amoy testnet:
 ```bash
 cd blockchain
 npm install
-npx hardhat run scripts/deploy.js --network amoy
+node scripts/deploy.ts
 ```
 Copy the deployed contract address to `backend/.env` under `CONTRACT_ADDRESS`.
 

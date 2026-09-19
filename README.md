@@ -196,7 +196,7 @@ PORT=8000
 ENVIRONMENT=development
 LOG_LEVEL=INFO
 
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/honeychain
+DATABASE_URL=postgresql://<user>:<password>@<supabase-host>:5432/postgres
 DEV_OFFLINE_SQLITE=false
 
 JWT_SECRET_KEY=your_secret_key_here

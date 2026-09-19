@@ -5,8 +5,11 @@
 # ------------------------------------------------------------------------------
 # 1. Runtime & Compiler Environment
 # ------------------------------------------------------------------------------
-# Node.js: >= 18.0.0 LTS (with npm >= 9.0.0)
-# Solidity Compiler: ^0.8.20 (hardhat.config.js configured for 0.8.20+)
+# Node.js: >= 22.7 LTS (with npm >= 10) - toolchain scripts are TypeScript and
+#          are executed directly via native type stripping; no build step.
+# TypeScript: ^5.5 (type-checking only via `npm run typecheck`, tsc --noEmit)
+# Solidity Compiler: ^0.8.20 (hardhat.config.ts configured for 0.8.20+,
+#          EVM target "paris" in scripts)
 # EVM Network: Ganache CLI / UI (v7.9+) or Hardhat Network (localhost:8545)
 
 # ------------------------------------------------------------------------------
@@ -23,3 +26,9 @@ solc>=0.8.20,<0.9.0
 
 # Local EVM Blockchain Emulator for Fast Testing
 ganache>=7.9.2,<8.0.0
+
+# TypeScript Compiler (dev, typecheck only - noEmit)
+typescript>=5.5.0,<6.0.0
+
+# Node.js Type Definitions (dev)
+@types/node>=22.0.0,<23.0.0

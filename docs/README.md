@@ -68,7 +68,7 @@ sequenceDiagram
     participant MOS as Mosquitto Broker
     participant AI as AI Isolation Forest
     participant BE as FastAPI Backend
-    participant DB as PostgreSQL / SQLite
+    participant DB as Supabase PostgreSQL
     participant WS as Flutter Mobile App
 
     ESP->>MOS: PUBLISH honeychain/hive/telemetry (weight, temp, humidity, acoustics)

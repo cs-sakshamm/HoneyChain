@@ -1,15 +1,16 @@
 # HoneyChain — Blockchain & Smart Contract Provenance Layer
 
-The `blockchain` module implements the decentralized trust, auditability, and immutability layer of HoneyChain. It anchors every critical supply chain milestone (harvest, collection, processing, laboratory quality certification, packaging) onto an Ethereum Virtual Machine (EVM)-compatible blockchain network.
+The `blockchain/` module anchors HoneyChain supply-chain milestones (harvest, collection, processing, lab certification, packaging) on an EVM network and exposes the verification surface consumed by the Python backend.
 
 ---
 
 ## 1. Module Overview
 
-* **Smart Contract:** `contracts/HoneyChainProvenance.sol` (Solidity `^0.8.20`)
-* **Development Framework:** Hardhat & Ganache
-* **Web3 Libraries:** Ethers.js v6 (deployment and Node scripts) & Web3.py v6 (FastAPI backend integration)
-* **Default Network:** Local Ganache / Hardhat Node (`http://127.0.0.1:8545`)
+* **Smart contract:** `contracts/HoneyChainProvenance.sol` (Solidity `^0.8.20`, EVM target `paris`)
+* **Toolchain:** Hardhat 3 — configuration and all scripts are **TypeScript** (`.ts`). Node.js ≥ 22 runs them directly (native type stripping); `tsc --noEmit` is available as a typecheck.
+* **Web3 libraries:** ethers v6 (scripts) · Web3.py 8.x (backend service in `backend/services/blockchain_service.py`)
+* **Local networks:** Hardhat node / Ganache at `http://127.0.0.1:8545` (chain ID 31337)
+* **Testnet:** Polygon Amoy (chain ID 80002), configured via environment variables only
 
 ---
 
@@ -18,134 +19,127 @@ The `blockchain` module implements the decentralized trust, auditability, and im
 ```text
 blockchain/
 ├── contracts/
-│   └── HoneyChainProvenance.sol  # Solidity smart contract for provenance events & harvester KYC
+│   └── HoneyChainProvenance.sol      # Provenance events + harvester verification
 ├── scripts/
-│   └── deploy.js                 # Deployment script using ethers.js
-├── compile_and_deploy.js         # Standalone compilation and deployment script
-├── deployed_address.txt          # Stores the active deployed contract address
-├── hardhat.config.js             # Hardhat network configuration and compiler settings
-├── package.json                  # Hardhat, ethers, and ganache dependencies
-├── .gitignore                    # Git rules ignoring artifacts, cache, and node_modules
-├── README.md                     # Blockchain documentation (this file)
-└── REQUIREMENT.txt               # Node & Solidity runtime dependencies
+│   ├── deploy.ts                     # Compile + deploy (ethers), env-driven
+│   └── verify_backend_evm.ts         # Ephemeral local-EVM integration check of the Python backend
+├── test/
+│   └── provenance.test.ts            # node:test contract test (in-process ganache)
+├── compile_and_deploy.ts             # Backwards-compatible entry point → scripts/deploy.ts
+├── hardhat.config.ts                 # Hardhat 3 defineConfig; env-only credentials
+├── tsconfig.json                     # strict, noEmit (Node runs TS directly)
+├── package.json                      # scripts: node / test / test:backend-evm / deploy / typecheck
+├── deployed_address.txt              # Active deployed contract address
+└── REQUIREMENT.txt                   # Runtime/dependency specification
 ```
 
 ---
 
-## 3. Smart Contract Architecture (`HoneyChainProvenance.sol`)
+## 3. Smart Contract (`HoneyChainProvenance.sol`)
 
-### Data Structures
+### Data structures
 
-#### `BatchEvent`
-Records an atomic supply chain transition for a honey batch:
 ```solidity
 struct BatchEvent {
-    string batchId;           // Identifier of the collection/processing batch
-    string eventType;         // Event type: "HARVEST", "COLLECTION", "PROCESSING", "LAB_TEST", "PACKAGING"
-    string actorId;           // ID of the authenticated user performing the event
-    string dataHash;          // SHA-256 hash of the complete event payload
-    string previousEventHash;  // Hash of the prior event in the batch lineage
-    uint256 timestamp;        // Block timestamp
+    string batchId;             // Collection/processing batch identifier
+    string eventType;           // "HARVEST" | "COLLECTION" | "PROCESSING" | "LAB_TEST" | "PACKAGING"
+    string actorId;             // Authenticated user performing the event
+    string dataHash;            // SHA-256 hash of the canonical event payload
+    string previousEventHash;   // Hash of the previous event in the batch lineage
+    uint256 timestamp;          // Block timestamp
 }
-```
 
-#### `HarvesterVerificationRecord`
-Anchors harvester identity verification and KYC state:
-```solidity
 struct HarvesterVerificationRecord {
-    string verificationId;    // Unique verification identifier
-    string harvesterId;       // Harvester account ID
-    string recordHash;        // Cryptographic digest of verified government/apiary credentials
-    string status;            // "VERIFIED", "PENDING", or "REJECTED"
-    uint256 timestamp;        // Verification block timestamp
+    string verificationId;      // Unique verification identifier
+    string harvesterId;         // Harvester account ID
+    string recordHash;          // Digest of verified credentials
+    string status;              // "VERIFIED" | "PENDING" | "REJECTED"
+    uint256 timestamp;
 }
 ```
 
-### Events
+### Events (Solidity events)
 
-* `event ProvenanceRecorded(string indexed batchId, string eventType, string actorId, string dataHash, string previousEventHash, uint256 timestamp)`
-* `event HarvesterVerified(string indexed verificationId, string indexed harvesterId, string recordHash, string status, uint256 timestamp)`
+* `ProvenanceRecorded(batchId, eventType, actorId, dataHash, previousEventHash, timestamp)`
+* `HarvesterVerified(verificationId, harvesterId, recordHash, status, timestamp)`
 
-### Key Functions
+### Functions
 
-* `recordEvent(batchId, eventType, actorId, dataHash, previousEventHash)`: Commits a new supply chain event to storage (restricted to `onlyOwner`).
-* `getEvents(batchId) returns (BatchEvent[])`: Public view returning the complete event history of a batch.
-* `recordHarvesterVerification(verificationId, harvesterId, recordHash, status)`: Stores verified harvester identity hashes.
-* `getHarvesterVerification(verificationId) returns (HarvesterVerificationRecord)`: Fetches harvester verification state.
-* `isHarvesterVerified(verificationId) returns (bool)`: Quick boolean check for verification existence.
+| Function | Access | Purpose |
+|---|---|---|
+| `recordEvent(batchId, eventType, actorId, dataHash, previousEventHash)` | `onlyOwner` | Commit a supply-chain event |
+| `getEvents(batchId) → BatchEvent[]` | public view | Full event history of a batch |
+| `recordHarvesterVerification(verificationId, harvesterId, recordHash, status)` | `onlyOwner` | Store verification state |
+| `getHarvesterVerification(verificationId) → HarvesterVerificationRecord` | public view | Read verification state |
+| `isHarvesterVerified(verificationId) → bool` | public view | Existence check |
+
+The contract **owner is the backend's deployer account**; end users never sign transactions — the FastAPI service submits events after authorizing the workflow server-side.
 
 ---
 
-## 4. Setup & Deployment Instructions
+## 4. Traceability Flow
 
-### Prerequisites
-* Node.js >= 18.0.0 LTS
-* npm >= 9.0.0
+```text
+HARVEST → COLLECTION → PROCESSING → LAB TEST → PACKAGING → QR VERIFICATION
+```
 
-### Step 1: Install Dependencies
+Each stage is recorded via `recordEvent` by the backend with a SHA-256 `dataHash` of the canonical event payload, chained to the previous event's hash. Consumers scan the packaging QR (or enter the batch code) and read the full history from `GET /api/verify/{batch_id}`.
+
+### On-chain vs off-chain
+
+| Layer | Content |
+|---|---|
+| **ON-CHAIN** | Batch/event identifiers, event type, actor ID, `dataHash`, lineage hash, timestamps |
+| **OFF-CHAIN** | Full event payloads, lab reports, images, personal data (PostgreSQL) |
+| **HASHED** | `dataHash` = SHA-256 of the canonical event JSON; `recordHash` for credentials |
+
+> **Principle:** the blockchain verifies authorized submissions, contract rules, and tamper-evident history. It does **not** independently prove that physical-world data entered by a participant is truthful — it proves what was submitted, when, by whom, and that it has not changed since.
+
+---
+
+## 5. Setup & Deployment
 
 ```bash
 cd blockchain
 npm install
+
+# 1. Local node (Terminal 1)
+npm run node                     # http://127.0.0.1:8545, funded dev accounts
+
+# 2. Deploy (Terminal 2) — credentials from the environment only
+export BLOCKCHAIN_PRIVATE_KEY=<dev account key>       # never commit
+node scripts/deploy.ts
+# or: node compile_and_deploy.ts
+
+# The script prints the exact values to copy into backend/.env:
+#   BLOCKCHAIN_PROVIDER_URL, BLOCKCHAIN_CHAIN_ID, CONTRACT_ADDRESS
 ```
 
-### Step 2: Start Local Blockchain Node
+Network configuration (`hardhat.config.ts`):
 
-In Terminal 1, run Hardhat's local JSON-RPC node:
+* `localhost` — `http://127.0.0.1:8545`, chain 31337
+* `amoy` — `POLYGON_AMOY_RPC_URL` (default public Amoy RPC), account from `BLOCKCHAIN_PRIVATE_KEY`, chain 80002
 
-```bash
-npm run node
-```
-
-This starts a local EVM network listening on `http://127.0.0.1:8545` with 20 funded test accounts.
-
-Alternatively, launch Ganache:
-
-```bash
-npx ganache --port 8545
-```
-
-### Step 3: Compile and Deploy Contract
-
-In Terminal 2, run the deployment script:
-
-```bash
-node scripts/deploy.js
-```
-
-Or run the all-in-one deployer:
-
-```bash
-node compile_and_deploy.js
-```
-
-The script:
-1. Compiles `contracts/HoneyChainProvenance.sol`.
-2. Deploys the contract to the local node.
-3. Prints the deployed contract address.
-4. Writes the address to `blockchain/deployed_address.txt`.
-
-Example output:
-```text
-HoneyChainProvenance deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
-```
+No private key is ever hardcoded; deploy to Amoy by exporting the two variables and running the same script (RPC URL is selected via `BLOCKCHAIN_RPC_URL`/`BLOCKCHAIN_PROVIDER_URL` in `scripts/deploy.ts`).
 
 ---
 
-## 5. Backend Integration
+## 6. Testing
 
-The backend interacts with the smart contract using `backend/services/blockchain_service.py` via Web3.py.
-
-### Required Environment Variables in `backend/.env`
-
-```env
-BLOCKCHAIN_RPC_URL="http://127.0.0.1:8545"
-CONTRACT_ADDRESS="0x5FbDB2315678afecb367f032d93F642f64180aa3"
-BLOCKCHAIN_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+```bash
+npm run typecheck          # tsc --noEmit over the toolchain
+npm test                   # contract test: deploy + recordEvent + getEvents (in-process ganache)
+npm run test:backend-evm   # spins up ephemeral ganache, deploys, drives the REAL
+                           # Python BlockchainService in a child process (PYTHON=... to
+                           # point at your venv python); nothing is persisted to disk
 ```
 
-Whenever a collection batch, lab certification, or packaging event occurs, the backend:
-1. Computes `dataHash = sha256(canonical_event_json)`.
-2. Obtains `previousEventHash` from the batch lineage.
-3. Submits an authenticated transaction executing `recordEvent()`.
-4. Saves the resulting transaction hash to the database `blockchain_records` table.
+Expected: typecheck passes; `# tests 1 / # pass 1`; the EVM check prints `Backend EVM service check passed: <tx hash>`.
+
+---
+
+## 7. Verification Flow
+
+1. Backend persists a workflow event (collection batch, lab report, packaging) and computes its canonical SHA-256 hash.
+2. Backend submits `recordEvent(...)` (owner account) and stores the tx hash/block in `BlockchainRecord`.
+3. Public `GET /api/verify/{batch_id}` returns the off-chain payload **plus** on-chain proof; `scripts/verify_backend_evm.ts` regression-tests exactly this service path against a disposable chain.
