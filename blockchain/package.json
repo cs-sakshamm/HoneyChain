@@ -5,9 +5,10 @@
   "main": "index.js",
   "scripts": {
     "node": "hardhat node --hostname 127.0.0.1",
-    "test": "node --test test/*.test.js",
-    "test:backend-evm": "node scripts/verify_backend_evm.js",
-    "deploy": "node scripts/deploy.js"
+    "test": "node --test test/*.test.ts",
+    "test:backend-evm": "node scripts/verify_backend_evm.ts",
+    "deploy": "node scripts/deploy.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +17,9 @@
     "ethers": "^6.17.0",
     "ganache": "^7.9.2",
     "hardhat": "^3.16.0",
-    "solc": "^0.8.37"
+    "solc": "^0.8.37",
+    "typescript": "^5.5.3",
+    "@types/node": "^22.10.0"
   },
   "type": "module"
 }

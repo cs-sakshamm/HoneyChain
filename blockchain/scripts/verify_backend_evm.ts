@@ -14,22 +14,46 @@ import ganache from "ganache";
 import solc from "solc";
 import { ContractFactory, JsonRpcProvider, Wallet } from "ethers";
 
-function compileContract() {
-  const source = fs.readFileSync(path.resolve("contracts/HoneyChainProvenance.sol"), "utf8");
-  const output = JSON.parse(solc.compile(JSON.stringify({
-    language: "Solidity",
-    sources: { "HoneyChainProvenance.sol": { content: source } },
-    settings: {
-      evmVersion: "paris",
-      outputSelection: { "*": { "*": ["abi", "evm.bytecode.object"] } },
-    },
-  })));
-  const errors = (output.errors || []).filter((item) => item.severity === "error");
-  if (errors.length) throw new Error(errors.map((item) => item.formattedMessage).join("\n"));
+interface SolcOutput {
+  errors?: Array<{ severity: string; formattedMessage: string }>;
+  contracts: Record<
+    string,
+    Record<string, { abi: unknown; evm: { bytecode: { object: string } } }>
+  >;
+}
+
+interface GanacheAccount {
+  secretKey: string;
+  balance: bigint;
+}
+
+function compileContract(): { abi: unknown; evm: { bytecode: { object: string } } } {
+  const source = fs.readFileSync(
+    path.resolve("contracts/HoneyChainProvenance.sol"),
+    "utf8",
+  );
+  const output = JSON.parse(
+    solc.compile(
+      JSON.stringify({
+        language: "Solidity",
+        sources: { "HoneyChainProvenance.sol": { content: source } },
+        settings: {
+          evmVersion: "paris",
+          outputSelection: { "*": { "*": ["abi", "evm.bytecode.object"] } },
+        },
+      }),
+    ),
+  ) as SolcOutput;
+  const errors = (output.errors ?? []).filter(
+    (item) => item.severity === "error",
+  );
+  if (errors.length) {
+    throw new Error(errors.map((item) => item.formattedMessage).join("\n"));
+  }
   return output.contracts["HoneyChainProvenance.sol"].HoneyChainProvenance;
 }
 
-async function main() {
+async function main(): Promise<void> {
   const server = ganache.server({
     chain: { chainId: 1337 },
     logging: { quiet: true },
@@ -40,20 +64,23 @@ async function main() {
   try {
     const port = server.address().port;
     const rpcUrl = `http://127.0.0.1:${port}`;
-    const account = Object.values(server.provider.getInitialAccounts())[0];
+    const account = Object.values(
+      server.provider.getInitialAccounts() as Record<string, GanacheAccount>,
+    )[0];
     const provider = new JsonRpcProvider(rpcUrl);
     const signer = new Wallet(account.secretKey, provider);
     const artifact = compileContract();
     const contract = await new ContractFactory(
-      artifact.abi,
+      artifact.abi as never,
       `0x${artifact.evm.bytecode.object}`,
       signer,
     ).deploy();
     await contract.waitForDeployment();
 
-    const defaultPython = process.platform === "win32"
-      ? path.resolve("..", ".test-venv", "Scripts", "python.exe")
-      : "python3";
+    const defaultPython =
+      process.platform === "win32"
+        ? path.resolve("..", ".test-venv", "Scripts", "python.exe")
+        : "python3";
     const python = process.env.PYTHON || defaultPython;
     const backendCheck = [
       "from backend.services.blockchain_service import BlockchainService",
@@ -66,14 +93,14 @@ async function main() {
       "assert events['events'][0]['eventType'] == 'PACKAGED', events",
       "print('Backend EVM service check passed:', result['tx_hash'])",
     ].join("; ");
-    const childEnvironment = {
+    const childEnvironment: NodeJS.ProcessEnv = {
       ...process.env,
       BLOCKCHAIN_PROVIDER_URL: rpcUrl,
       BLOCKCHAIN_CHAIN_ID: "1337",
       BLOCKCHAIN_PRIVATE_KEY: account.secretKey,
       CONTRACT_ADDRESS: await contract.getAddress(),
     };
-    const status = await new Promise((resolve, reject) => {
+    const status: number = await new Promise<number>((resolve, reject) => {
       const child = spawn(python, ["-c", backendCheck], {
         cwd: path.resolve(".."),
         env: childEnvironment,
@@ -82,13 +109,15 @@ async function main() {
       child.on("error", reject);
       child.on("close", resolve);
     });
-    if (status !== 0) throw new Error(`Backend EVM service check exited with status ${status}.`);
+    if (status !== 0) {
+      throw new Error(`Backend EVM service check exited with status ${status}.`);
+    }
   } finally {
     await server.close();
   }
 }
 
-main().catch((error) => {
+main().catch((error: unknown) => {
   console.error(error);
   process.exitCode = 1;
 });
