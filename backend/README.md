@@ -29,7 +29,7 @@ backend/
 │   ├── blockchain_service.py   # Web3 contract connector + transaction recorder
 │   ├── mqtt_consumer.py        # MQTT consumer: validation, persistence, WS bridge
 │   └── qr_service.py           # QR generation utilities
-├── tests/                      # Pytest suite (18 tests)
+├── tests/                      # Pytest suite (26 tests)
 ├── .env.example                # Template configuration (names only, no secrets)
 └── README.md
 ```
@@ -186,10 +186,10 @@ python -m alembic upgrade head    # same DATABASE_URL as the app
 
 ```bash
 # from the repository root
-backend\.venv\Scripts\python.exe -m pytest backend/tests -q     # 18 tests
+backend\.venv\Scripts\python.exe -m pytest backend/tests -q     # 26 tests
 ```
 
-Covers: end-to-end supply chain, telemetry persistence + idempotency, malformed-payload rejection, REST latest/history/status, cross-user authorization (403), WebSocket auth, and startup behavior. Tests default to an isolated SQLite database (`conftest.py`); run against PostgreSQL by exporting `DATABASE_URL` and clearing `DEV_OFFLINE_SQLITE`.
+Covers: end-to-end supply chain, telemetry persistence + idempotency, malformed-payload rejection, REST latest/history/status, cross-user authorization (403), WebSocket auth, public verification content negotiation (HTML for browsers, JSON for API clients), and startup behavior. Tests default to an isolated SQLite database (`conftest.py`); run against PostgreSQL by exporting `DATABASE_URL` and clearing `DEV_OFFLINE_SQLITE`.
 
 The blockchain EVM integration of the backend service is exercised from the blockchain layer: `cd blockchain && npm run test:backend-evm`.
 

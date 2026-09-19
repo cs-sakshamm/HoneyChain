@@ -95,7 +95,7 @@ No invented endpoints/contracts/commands: every README statement was derived fro
 ```text
 TypeScript (blockchain tsc --noEmit):        PASS
 Lint (flutter analyze):                      PASS (0 errors; pre-existing warnings only)
-Tests — backend (pytest backend/tests):      PASS (18/18)
+Tests — backend (pytest backend/tests):      PASS (26/26, incl. 8 public-verify content-negotiation tests added after the migration)
 Tests — AI/ML (pytest ai_ml/tests):          PASS (10/10, read-only run)
 Tests — blockchain (npm test):               PASS (1/1)
 Tests — Flutter (flutter test):              PASS (49/49)
