@@ -1,29 +1,34 @@
 """
 Deprecation regression guard for the backend.
 
-`datetime.utcnow()` and `datetime.utcfromtimestamp()` were removed from the
-backend source (replaced by the naive-UTC helpers `_utcnow()`/`_utcfromts()`
-in `backend.main` and `_utcfromtimestamp()` in `services.mqtt_consumer`)
-because Python 3.12 deprecated them and they are deleted in later versions.
+`datetime.utcnow` / `datetime.utcfromtimestamp` were removed from the
+backend source (replaced by the shared naive-UTC helpers in
+`backend.time_utils`) because Python 3.12 deprecated them and they are
+deleted in later versions.
 
 These tests pin that guarantee so the deprecated APIs cannot silently
-reappear:
+reappear, in EITHER form:
 
-1. No backend module calls the deprecated APIs while warnings are escalated
-   to errors (import + helper execution).
-2. A static source scan of every backend module rejects
-   `datetime.utcnow()` / `datetime.utcfromtimestamp()` call sites outside
-   `ai_ml/` (which is out of scope for backend changes).
+* direct calls — ``datetime.utcnow()`` or a bare ``utcnow()`` name call;
+* **callable references** — ``Column(DateTime, default=datetime.utcnow)``
+  (no parentheses), which execute the deprecated API on every row insert
+  and are invisible to a call-only scan.
 
-The naive-UTC contract of the replacement helpers is also asserted, since
-downstream comparisons (e.g. OTP expiry) depend on it.
+1. Runtime: importing the backend under ``DeprecationWarning -> error``
+   must stay clean, and the replacement helpers must keep their
+   naive-UTC contract (downstream comparisons, e.g. OTP expiry, rely on
+   it).
+2. Static: an AST scan of every backend source file rejects both forms.
+   A meta-test proves the scanner catches planted violations so it
+   cannot rot into a no-op.
+
+`ai_ml/` is intentionally out of scope (read-only by project rule).
 """
 from __future__ import annotations
 
 import ast
 import os
 import re
-import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,8 +36,9 @@ import pytest
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
-# Matches utcnow()/utcfromtimestamp() *call sites* while ignoring the words
-# appearing in docstrings/comments/identifiers like `_utcnow`.
+DEPRECATED_NAMES = ("utcnow", "utcfromtimestamp")
+
+# Regex companion for quick greps of actual call sites.
 DEPRECATED_CALL_RE = re.compile(
     r"(?<![\w.])(?:datetime\.)?(?:utcnow|utcfromtimestamp)\(\s*\)"
 )
@@ -71,10 +77,36 @@ def test_mqtt_consumer_import_clean_under_deprecation_error():
     assert dt.tzinfo is None
 
 
-# ── 2. Static: no deprecated call sites in backend source ───────────────────
+# ── 2. Static: no deprecated calls OR references in backend source ─────────
+
+def _deprecated_datetime_nodes(tree: ast.AST) -> list[tuple[int, str]]:
+    """Find deprecated datetime usage in both dangerous forms.
+
+    Returns (lineno, label) pairs where label is ``datetime.utcnow``-style
+    for attribute access (calls AND bare references) or the bare function
+    name for ``from datetime import utcnow`` name calls.
+    """
+    offenders: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        # Form 1: attribute access on something datetime-ish — catches
+        # `datetime.utcnow()` calls and `default=datetime.utcnow` references.
+        if isinstance(node, ast.Attribute) and node.attr in DEPRECATED_NAMES:
+            base = node.value
+            base_name = getattr(base, "id", None) or getattr(base, "attr", None)
+            if base_name is None or "datetime" in base_name or base_name.endswith("dt"):
+                offenders.append((node.lineno, f"datetime.{node.attr}"))
+        # Form 2: bare name call — `utcnow()` after `from datetime import utcnow`.
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in DEPRECATED_NAMES
+        ):
+            offenders.append((node.lineno, node.func.id))
+    return sorted(offenders)
+
 
 def _backend_python_files() -> list[str]:
-    """All tracked backend .py files (tests included), excluding caches."""
+    """All backend .py files (tests included), excluding caches/venvs."""
     result: list[str] = []
     for root, _dirs, files in os.walk(BACKEND_DIR):
         if "__pycache__" in root or ".venv" in root:
@@ -86,7 +118,7 @@ def _backend_python_files() -> list[str]:
 
 
 def test_no_deprecated_datetime_calls_in_backend_source():
-    """Static AST scan: `utcnow()`/`utcfromtimestamp()` must not be called."""
+    """Static AST scan: no deprecated datetime calls or references."""
     offenders: list[str] = []
 
     for path in _backend_python_files():
@@ -96,31 +128,39 @@ def test_no_deprecated_datetime_calls_in_backend_source():
         except SyntaxError:
             continue  # not Python-parseable content; runtime tests cover imports
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                func = node.func
-                name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-                if name in ("utcnow", "utcfromtimestamp"):
-                    offenders.append(f"{path}:{node.lineno} {name}()")
+        for lineno, label in _deprecated_datetime_nodes(tree):
+            offenders.append(f"{path}:{lineno} {label}")
 
     assert offenders == [], (
         "Deprecated datetime APIs reappeared in backend source — use "
-        "`_utcnow()` / `_utcfromts()` (backend.main) or "
-        "`datetime.now(timezone.utc)` instead:\n" + "\n".join(offenders)
+        "`utcnow_naive()` / `utcfromtimestamp_naive()` from "
+        "backend.time_utils (or `_utcnow()` in backend.main) instead:\n"
+        + "\n".join(offenders)
     )
 
 
 def test_static_scan_would_catch_regression():
-    """Guard the guard: the scanner itself detects a planted violation."""
-    snippet = "x = datetime.utcnow()\ny = utcfromtimestamp(0)\n"
-    matches = [
-        n
-        for n in ast.walk(ast.parse(snippet))
-        if isinstance(n, ast.Call)
-        and (
-            getattr(n.func, "attr", "") in ("utcnow", "utcfromtimestamp")
-            or getattr(n.func, "id", "") in ("utcnow", "utcfromtimestamp")
-        )
+    """Guard the guard: the scanner detects planted violations of both kinds."""
+    call_tree = ast.parse(
+        "x = datetime.utcnow()\n"
+        "y = utcfromtimestamp(0)\n"
+    )
+    ref_tree = ast.parse(
+        "col = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)\n"
+    )
+    clean_tree = ast.parse(
+        "col = Column(DateTime, default=utcnow_naive)\n"
+        "t = utcnow_naive()\n"
+    )
+    assert _deprecated_datetime_nodes(call_tree) == [
+        (1, "datetime.utcnow"),
+        (2, "utcfromtimestamp"),
     ]
-    assert len(matches) == 2
-    assert DEPRECATED_CALL_RE.search(snippet) is not None
+    assert _deprecated_datetime_nodes(ref_tree) == [
+        (1, "datetime.utcnow"),
+        (1, "datetime.utcnow"),
+    ]
+    assert _deprecated_datetime_nodes(clean_tree) == []
+    assert DEPRECATED_CALL_RE.search("datetime.utcnow()") is not None
+    assert DEPRECATED_CALL_RE.search("_utcnow()") is None
+    assert DEPRECATED_CALL_RE.search("default=utcnow_naive") is None

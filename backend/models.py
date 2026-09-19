@@ -7,6 +7,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+
+try:
+    from backend.time_utils import utcnow_naive
+except ImportError:  # pragma: no cover - bare import from backend/ cwd
+    from time_utils import utcnow_naive
 from sqlalchemy import (
     Column,
     String,
@@ -49,8 +54,8 @@ class User(Base):
     license_number = Column(String(128), nullable=True)
     designation = Column(String(128), nullable=True)
     is_verified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     # Relationships
     profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -81,8 +86,8 @@ class Profile(Base):
     verification_status = Column(String(32), default="Not Started")  # Not Started, In Progress, Verified
     verified_at = Column(DateTime, nullable=True)
     review_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     user = relationship("User", back_populates="profile")
 
@@ -107,15 +112,15 @@ class Hive(Base):
     previous_year_production_kg = Column(Float, default=0.0)
     current_year_production_kg = Column(Float, default=0.0)
     honey_type = Column(String(64), default="Wildflower")
-    last_inspection_date = Column(DateTime, default=datetime.utcnow)
+    last_inspection_date = Column(DateTime, default=utcnow_naive)
     mite_status = Column(String(64), default="None")
     disease_status = Column(String(64), default="None")
     feeding_required = Column(Boolean, default=False)
     queen_condition = Column(String(64), default="Good")
     overall_health = Column(String(64), default="Healthy")
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     user = relationship("User", back_populates="hives")
     telemetry = relationship("HiveTelemetry", back_populates="hive", cascade="all, delete-orphan")
@@ -143,8 +148,8 @@ class HiveTelemetry(Base):
     battery_v = Column(Float, nullable=True, default=4.12)
     wifi_rssi_dbm = Column(Float, nullable=True, default=-68.0)
     bee_activity = Column(Float, nullable=True, default=85.0)
-    recorded_at = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    recorded_at = Column(DateTime, default=utcnow_naive)
+    created_at = Column(DateTime, default=utcnow_naive)
 
     hive = relationship("Hive", back_populates="telemetry")
 
@@ -176,7 +181,7 @@ class HiveAIAnalysis(Base):
     reasons_json = Column(Text, nullable=True)  # JSON string of reasons
     alerts_json = Column(Text, nullable=True)  # JSON string of generated alerts
     raw_output_json = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
     hive = relationship("Hive", back_populates="ai_analysis")
 
@@ -201,10 +206,10 @@ class HiveAlert(Base):
     severity = Column(String(32), default="CRITICAL")  # CRITICAL, WARNING, MEDIUM
     message = Column(Text, nullable=False)
     status = Column(String(32), default="ACTIVE")  # ACTIVE, ACKNOWLEDGED
-    detected_at = Column(DateTime, default=datetime.utcnow)
+    detected_at = Column(DateTime, default=utcnow_naive)
     acknowledged_at = Column(DateTime, nullable=True)
     acknowledged_by = Column(String(64), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
     hive = relationship("Hive", back_populates="alerts")
 
@@ -227,7 +232,7 @@ class CollectionCentre(Base):
     contact_email = Column(String(128), nullable=True)
     license_number = Column(String(128), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class Harvest(Base):
@@ -241,7 +246,7 @@ class Harvest(Base):
     location = Column(String(256), nullable=True)
     status = Column(String(32), default="HARVESTED")
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class CollectionRequest(Base):
@@ -261,8 +266,8 @@ class CollectionRequest(Base):
     location = Column(String(256), nullable=True)
     notes = Column(Text, nullable=True)
     accepted_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     __table_args__ = (
         Index("ix_col_requests_request_id", "request_id"),
@@ -283,8 +288,8 @@ class CollectionBatch(Base):
     quantity_kg = Column(Float, default=0.0)
     current_stage = Column(String(32), default="COLLECTED")  # HARVESTED, COLLECTED, PROCESSING, LAB_TESTING, PACKAGING, COMPLETED
     status = Column(String(32), default="COLLECTED")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
 
 class ProcessingBatch(Base):
@@ -298,7 +303,7 @@ class ProcessingBatch(Base):
     method = Column(String(128), default="Cold Extraction & Centrifugation")
     moisture_at_receipt = Column(Float, default=17.0)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class Lab(Base):
@@ -315,7 +320,7 @@ class Lab(Base):
     registration_number = Column(String(128), nullable=True)
     accreditation = Column(String(128), default="NABL / FSSAI / ISO 17025")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class PackagingFacility(Base):
@@ -330,7 +335,7 @@ class PackagingFacility(Base):
     contact_email = Column(String(128), nullable=True)
     license_number = Column(String(128), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class LabRequest(Base):
@@ -348,8 +353,8 @@ class LabRequest(Base):
     sample_code = Column(String(64), nullable=True)
     status = Column(String(32), default="PENDING")  # PENDING, TESTING, COMPLETED, REJECTED
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
 
 class LabReport(Base):
@@ -371,8 +376,8 @@ class LabReport(Base):
     overall_result = Column(String(32), default="PASS")  # PASS, FAIL
     status = Column(String(32), default="APPROVED")  # APPROVED, REJECTED
     remarks = Column(Text, nullable=True)
-    test_date = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    test_date = Column(DateTime, default=utcnow_naive)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class PackagingBatch(Base):
@@ -387,7 +392,7 @@ class PackagingBatch(Base):
     seal_type = Column(String(128), default="Induction Tamper-Evident Seal with Batch QR")
     qr_code_url = Column(String(512), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class BlockchainRecord(Base):
@@ -404,8 +409,8 @@ class BlockchainRecord(Base):
     network = Column(String(64), default="Hardhat Localhost (Chain ID: 31337)")
     contract_address = Column(String(128), nullable=True)
     status = Column(String(32), default="PENDING")  # PENDING, CONFIRMED, FAILED
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=utcnow_naive)
+    created_at = Column(DateTime, default=utcnow_naive)
 
     __table_args__ = (
         Index("ix_blockchain_batch_id", "batch_id"),
@@ -420,7 +425,7 @@ class QRCode(Base):
     batch_id = Column(String(64), unique=True, nullable=False)
     verification_url = Column(String(512), nullable=False)
     qr_image_data_uri = Column(Text, nullable=True)  # data:image/png;base64,...
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
 
 class Notification(Base):
@@ -439,7 +444,7 @@ class Notification(Base):
     details_json = Column(Text, nullable=True)
     status = Column(String(32), default="ACTIVE")  # ACTIVE, ACKNOWLEDGED
     acknowledged_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
     user = relationship("User", back_populates="notifications")
 
@@ -459,4 +464,4 @@ class OTPVerification(Base):
     session_id = Column(String(64), nullable=True)
     is_verified = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)

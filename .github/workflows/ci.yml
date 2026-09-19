@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest, DeprecationWarning = error)
+    runs-on: ubuntu-latest
+    env:
+      ENV: test
+      DEV_OFFLINE_SQLITE: "true"
+      JWT_SECRET: ci-only-not-a-real-secret
+      # DeprecationWarning -> error is enforced by backend/pytest.ini
+      # (scoped to the backend suite, with narrow ignores for unfixable
+      # third-party warnings from starlette/anyio testclient imports).
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Run backend tests
+        run: python -m pytest backend/tests/ -q
+
+  blockchain:
+    name: Blockchain (typecheck + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: blockchain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: blockchain/package-lock.json
+      - run: npm ci
+      - name: TypeScript strict typecheck
+        run: npm run typecheck
+      - name: Contract tests
+        run: npm test
+
+  web:
+    name: Web verifier (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Build (tsc + vite)
+        run: npm run build
+
+  mobile:
+    name: Mobile (analyze + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze (errors block; pre-existing warnings/infos don't)
+        # 14 pre-existing lint warnings exist in the repo; until they are
+        # triaged, only errors fail CI.
+        run: flutter analyze --no-pub --no-fatal-warnings --no-fatal-infos
+      - name: Tests
+        run: flutter test

@@ -10,7 +10,12 @@ import logging
 import os
 import queue
 import threading
-from datetime import datetime, timezone
+from datetime import datetime
+
+try:
+    from backend.time_utils import utcfromtimestamp_naive
+except ImportError:  # pragma: no cover - bare import from backend/ cwd
+    from time_utils import utcfromtimestamp_naive
 from typing import Dict, Any, Callable, List, Optional
 
 import paho.mqtt.client as mqtt
@@ -26,10 +31,8 @@ logger = logging.getLogger("MQTTConsumer")
 
 
 def _utcfromtimestamp(ts: float) -> datetime:
-    """Naive UTC datetime from an epoch timestamp — replacement for the
-    deprecated ``datetime.utcfromtimestamp``. Returns the identical value
-    (naive UTC) so existing DB conventions and comparisons are unchanged."""
-    return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+    """Naive UTC datetime from an epoch (see :mod:`backend.time_utils`)."""
+    return utcfromtimestamp_naive(ts)
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))

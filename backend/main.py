@@ -35,24 +35,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
-def _utcnow() -> datetime:
-    """Naive UTC timestamp, identical in value to the removed
-    ``datetime.utcnow()`` (deprecated since Python 3.12).
+try:
+    from backend.time_utils import utcfromtimestamp_naive, utcnow_naive
+except ImportError:  # pragma: no cover - bare import from backend/ cwd
+    from time_utils import utcfromtimestamp_naive, utcnow_naive
 
-    The project's database columns and comparisons (e.g. OTP expiry)
-    use naive UTC datetimes throughout, so returning an aware datetime
-    here would break naive/aware comparisons. Reads the clock in UTC
-    explicitly, so the result is identical to ``utcnow()`` regardless of
-    the host's local timezone.
-    """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+def _utcnow() -> datetime:
+    """Naive UTC timestamp (see :mod:`backend.time_utils`)."""
+    return utcnow_naive()
 
 
 def _utcfromtimestamp(ts: float) -> datetime:
-    """Naive UTC datetime from an epoch timestamp (replacement for the
-    deprecated ``datetime.utcfromtimestamp``), preserving the exact
-    naive-UTC convention above."""
-    return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+    """Naive UTC datetime from an epoch (see :mod:`backend.time_utils`)."""
+    return utcfromtimestamp_naive(ts)
 
 
 try:
