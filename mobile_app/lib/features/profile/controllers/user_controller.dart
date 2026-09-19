@@ -144,76 +144,6 @@ class UserProfile {
   }
 }
 
-/// Summary of a role-specific account for multi-role switching
-class RoleAccountSummary {
-  final String id;
-  final String role;
-  final String email;
-  final String name;
-  final String? phone;
-  final String? avatarUrl;
-  final String? googlePhotoUrl;
-  final String? photoUrl;
-  final String? authProvider;
-  final String? organizationName;
-  final String? facilityLocation;
-  final String? licenseNumber;
-  final bool isProfileComplete;
-  final bool isVerified;
-  final String verificationStatus;
-  final int completedSteps;
-  final int totalSteps;
-
-  const RoleAccountSummary({
-    required this.id,
-    required this.role,
-    required this.email,
-    required this.name,
-    this.phone,
-    this.avatarUrl,
-    this.googlePhotoUrl,
-    this.photoUrl,
-    this.authProvider,
-    this.organizationName,
-    this.facilityLocation,
-    this.licenseNumber,
-    required this.isProfileComplete,
-    required this.isVerified,
-    required this.verificationStatus,
-    this.completedSteps = 0,
-    this.totalSteps = 3,
-  });
-
-  /// Effective profile photo URL following 3-tier priority
-  String? get effectivePhotoUrl {
-    if (avatarUrl != null && avatarUrl!.trim().isNotEmpty) return avatarUrl!.trim();
-    if (googlePhotoUrl != null && googlePhotoUrl!.trim().isNotEmpty) return googlePhotoUrl!.trim();
-    if (photoUrl != null && photoUrl!.trim().isNotEmpty) return photoUrl!.trim();
-    return null;
-  }
-
-  factory RoleAccountSummary.fromJson(Map<String, dynamic> json) {
-    return RoleAccountSummary(
-      id: json['id'] ?? '',
-      role: json['role'] ?? 'HARVESTER',
-      email: json['email'] ?? '',
-      name: json['name'] ?? '',
-      phone: json['phone'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
-      googlePhotoUrl: json['googlePhotoUrl'] as String?,
-      photoUrl: json['photoUrl'] as String?,
-      authProvider: json['authProvider'] as String?,
-      organizationName: json['organizationName'] as String?,
-      facilityLocation: json['facilityLocation'] as String?,
-      licenseNumber: json['licenseNumber'] as String?,
-      isProfileComplete: json['isProfileComplete'] == true,
-      isVerified: json['isVerified'] == true,
-      verificationStatus: json['verificationStatus'] ?? 'Not Started',
-      completedSteps: json['completedSteps'] is int ? json['completedSteps'] : 0,
-      totalSteps: json['totalSteps'] is int ? json['totalSteps'] : 3,
-    );
-  }
-}
 
 /// Controller managing user profile details, password updating, and the
 /// persistent harvester identity (BSID + BSP Pass) backed by PostgreSQL.
@@ -246,11 +176,7 @@ class UserController extends ChangeNotifier {
     role: 'HARVESTER',
   );
 
-  List<RoleAccountSummary> _roleAccounts = [];
-
   UserProfile get user => _user;
-  List<RoleAccountSummary> get roleAccounts => _roleAccounts;
-
   UserController({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
         _baseUrl = baseUrl ?? _resolveBaseUrl() {
@@ -468,90 +394,7 @@ class UserController extends ChangeNotifier {
     }
   }
 
-  /// Fetch all registered role accounts associated with this email
-  Future<void> fetchRoleAccounts([String? email]) async {
-    final targetEmail = email ?? _user.email;
-    if (targetEmail.isEmpty) return;
-    try {
-      final uri = Uri.parse('$_baseUrl/api/auth/accounts').replace(
-        queryParameters: {'email': targetEmail},
-      );
-      final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        if (data['accounts'] is List) {
-          _roleAccounts = (data['accounts'] as List)
-              .map((acc) => RoleAccountSummary.fromJson(acc as Map<String, dynamic>))
-              .toList();
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      debugPrint('[UserController] fetchRoleAccounts warning: $e');
-    }
-  }
-
   /// Switch the active account to another role
-  Future<bool> switchAccountRole(String targetRole) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/api/auth/switch-role');
-      final res = await _client
-          .post(
-            uri,
-            headers: _headers,
-            body: jsonEncode({
-              'email': _user.email,
-              'targetRole': targetRole,
-              'createIfNotExists': true,
-              'name': _user.name,
-              'phone': _user.phone,
-            }),
-          )
-          .timeout(const Duration(seconds: 4));
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        if (data['user'] != null) {
-          final u = data['user'];
-          final prefs = await SharedPreferences.getInstance();
-          if (data['token'] != null) {
-            await prefs.setString('auth_token', data['token']);
-            AuthTokenStore.set(token: data['token']);
-          }
-          if (u['id'] != null) {
-            await prefs.setString(_idKey, u['id']);
-            await prefs.setString('auth_user_id', u['id']);
-            AuthTokenStore.set(userId: u['id']);
-          }
-          if (u['name'] != null) await prefs.setString(_nameKey, u['name']);
-          if (u['email'] != null) await prefs.setString(_emailKey, u['email']);
-          if (u['phone'] != null) await prefs.setString(_phoneKey, u['phone']);
-          if (u['role'] != null) await prefs.setString(_roleKey, u['role']);
-          if (u['avatarUrl'] != null) {
-            await prefs.setString(_avatarUrlKey, u['avatarUrl']);
-          } else {
-            await prefs.remove(_avatarUrlKey);
-          }
-          if (u['googlePhotoUrl'] != null) {
-            await prefs.setString(_googlePhotoUrlKey, u['googlePhotoUrl']);
-          } else {
-            await prefs.remove(_googlePhotoUrlKey);
-          }
-          if (u['photoUrl'] != null) await prefs.setString(_photoUrlKey, u['photoUrl']);
-          if (u['bsid'] != null) await prefs.setString(_bsidKey, u['bsid']);
-          if (u['bspPass'] != null) await prefs.setString(_bspKey, u['bspPass']);
-
-          await _loadProfile(u['role'] as String?);
-          await fetchRoleAccounts(_user.email);
-          return true;
-        }
-      }
-    } catch (e) {
-      debugPrint('[UserController] switchAccountRole error: $e');
-    }
-    return false;
-  }
-
   /// Update profile details across all role fields
   Future<bool> updateProfile({
     required String name,

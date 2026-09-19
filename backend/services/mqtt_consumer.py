@@ -10,7 +10,7 @@ import logging
 import os
 import queue
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Callable, List, Optional
 
 import paho.mqtt.client as mqtt
@@ -23,6 +23,13 @@ except ImportError:
     from models import Hive, HiveTelemetry, HiveAIAnalysis, HiveAlert, User
 
 logger = logging.getLogger("MQTTConsumer")
+
+
+def _utcfromtimestamp(ts: float) -> datetime:
+    """Naive UTC datetime from an epoch timestamp — replacement for the
+    deprecated ``datetime.utcfromtimestamp``. Returns the identical value
+    (naive UTC) so existing DB conventions and comparisons are unchanged."""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
@@ -198,7 +205,7 @@ class MQTTConsumer:
                 logger.warning(f"Telemetry received for unmapped device/hive: {device_id}. Skipping processing.")
                 return
 
-            recorded_dt = datetime.utcfromtimestamp(timestamp)
+            recorded_dt = _utcfromtimestamp(timestamp)
 
             # 2. The raw packet normally reaches this consumer before AI output.
             # Reuse it so one physical reading is represented by one telemetry row.
@@ -345,7 +352,7 @@ class MQTTConsumer:
                 logger.debug(f"Raw telemetry for unmapped device {device_id}; skipping direct persistence.")
                 return
 
-            rec_time = datetime.utcfromtimestamp(timestamp)
+            rec_time = _utcfromtimestamp(timestamp)
 
             # Flat legacy aliases for diagnostics only. Sensor values are
             # never defaulted: a missing channel means a malformed packet.

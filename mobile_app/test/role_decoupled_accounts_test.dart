@@ -122,31 +122,5 @@ void main() {
       expect(completePkg.isProfileComplete, true);
     });
 
-    test('RoleAccountSummary correctly parses JSON from API multi-account response', () {
-      final json = {
-        'id': 'usr-lab-uuid-1234',
-        'role': 'LAB',
-        'email': 'maria@honeychain.io',
-        'name': 'Dr. Evelyn Vance',
-        'phone': '+15551234567',
-        'organizationName': 'Pacific Pure Labs',
-        'facilityLocation': 'Corvallis, OR',
-        'licenseNumber': 'NABL-ISO-17025',
-        'isProfileComplete': true,
-        'isVerified': true,
-        'verificationStatus': 'Verified',
-        'completedSteps': 3,
-        'totalSteps': 3,
-      };
-
-      final summary = RoleAccountSummary.fromJson(json);
-      expect(summary.id, 'usr-lab-uuid-1234');
-      expect(summary.role, 'LAB');
-      expect(summary.email, 'maria@honeychain.io');
-      expect(summary.isProfileComplete, true);
-      expect(summary.isVerified, true);
-      expect(summary.completedSteps, 3);
-      expect(summary.totalSteps, 3);
-    });
   });
 }

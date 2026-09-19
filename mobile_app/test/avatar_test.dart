@@ -58,36 +58,6 @@ void main() {
       expect(profileWithoutPhotos.initial, equals('T'));
     });
 
-    test('RoleAccountSummary effectivePhotoUrl respects 3-tier priority', () {
-      final summaryWithCustom = RoleAccountSummary.fromJson({
-        'id': 'acc-1',
-        'role': 'HARVESTER',
-        'email': 'user@honeychain.io',
-        'name': 'Harvester User',
-        'avatarUrl': 'https://example.com/custom.png',
-        'googlePhotoUrl': 'https://google.com/photo.png',
-        'isProfileComplete': true,
-        'isVerified': true,
-        'verificationStatus': 'Verified',
-      });
-
-      expect(summaryWithCustom.effectivePhotoUrl, equals('https://example.com/custom.png'));
-
-      final summaryWithGoogleOnly = RoleAccountSummary.fromJson({
-        'id': 'acc-2',
-        'role': 'COLLECTOR_PROCESSOR',
-        'email': 'user@honeychain.io',
-        'name': 'Collector User',
-        'avatarUrl': null,
-        'googlePhotoUrl': 'https://google.com/photo.png',
-        'isProfileComplete': true,
-        'isVerified': true,
-        'verificationStatus': 'Verified',
-      });
-
-      expect(summaryWithGoogleOnly.effectivePhotoUrl, equals('https://google.com/photo.png'));
-    });
-
     testWidgets('UserAvatar renders initial letter when effectivePhotoUrl is null', (WidgetTester tester) async {
       await tester.pumpWidget(
         MultiProvider(

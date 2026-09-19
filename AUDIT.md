@@ -95,10 +95,13 @@ No invented endpoints/contracts/commands: every README statement was derived fro
 ```text
 TypeScript (blockchain tsc --noEmit):        PASS
 Lint (flutter analyze):                      PASS (0 errors; pre-existing warnings only)
-Tests — backend (pytest backend/tests):      PASS (26/26, incl. 8 public-verify content-negotiation tests added after the migration)
+Tests — backend (pytest backend/tests):      PASS (26/26, incl. 8 public-verify content-negotiation tests added after the migration;
+                                             re-verified after §8.1/§8.2 fixes)
 Tests — AI/ML (pytest ai_ml/tests):          PASS (10/10, read-only run)
 Tests — blockchain (npm test):               PASS (1/1)
-Tests — Flutter (flutter test):              PASS (49/49)
+Tests — Flutter (flutter test):              PASS (49/49 at migration time; 47/47 after
+                                             removing 2 tests of the deleted role-switcher
+                                             model, see §8.2)
 Build — web (tsc && vite build):             PASS
 Build — blockchain (npx hardhat compile):    PASS
 Integration — backend ↔ EVM service check:   PASS (Backend EVM service check passed: 0xddd7…)
@@ -117,4 +120,21 @@ Baseline comparison (pre-migration): blockchain test 1/1 PASS, web build PASS, a
 * ~~`legacy/` remains in-tree, unreferenced~~ → **resolved:** removed from the repository (94 files, ~1.2 MB) after full reference verification; recoverable at tag `legacy-express-backend-archive`.
 * `scripts/start_dev.ps1` is UTF-16 encoded; works with PowerShell but is inconsistent with the repo's UTF-8 convention (left untouched — functioning tooling).
 * The web verifier ships a `framer-motion` dependency already in use by its components (pre-existing; verified via `web/src/utils/animations.ts` usage) — unchanged.
-* `mobile_app` `AppConstants.publicVerificationBaseUrl` still defaults to a temporary trycloudflare host — flagged in `mobile_app/README.md` §9.
+* ~~`mobile_app` `AppConstants.publicVerificationBaseUrl` defaults to a temporary trycloudflare host~~ → **resolved:** QR URLs now default to `backendBaseUrl` (the FastAPI backend serves `/verify/{batch_id}` with HTML/JSON content negotiation); build-time `--dart-define=PUBLIC_VERIFY_URL` override retained.
+
+## 8. Maintenance Fixes (behavior-preserving, this session)
+
+### 8.1 `datetime.utcnow()` deprecation — FIXED
+* 21 call sites (`datetime.utcnow()` / `datetime.utcfromtimestamp()`) in `backend/main.py` + `backend/services/mqtt_consumer.py` replaced with TZ-independent epoch-based helpers (`_utcnow()` / `_utcfromts()`).
+* **Behavior-identical:** helpers return the same naive-UTC datetimes the project stores (no aware/naive comparison drift); verified correct under `TZ=America/New_York` and epoch equality.
+* Pytest deprecation warnings dropped 328 → 254; **backend suite 26/26 PASS** post-change.
+* `ai_ml/` inspected only — **not modified** (its internal `utcnow` usage is out of scope by rule).
+
+### 8.2 "Switch Account" removal — FIXED (spec-mandated)
+The multi-role account switcher allowed a logged-in user to mint/enter another role's account by email (frontend-selected role context) — an authorization-isolation hazard, removed end-to-end:
+* `mobile_app/profile_screen.dart`: role-switcher card + `_buildRoleAccountsCard` builder + `fetchRoleAccounts()` call removed (~205 lines). Logout and all other profile features intact.
+* `mobile_app/user_controller.dart`: `switchAccountRole()`, `fetchRoleAccounts()`, `roleAccounts` state, and the `RoleAccountSummary` model removed. **`switchRole()` retained** — it is the signup-time role selection used by `role_selection_screen.dart`, not account switching.
+* `backend/main.py`: `POST /api/auth/switch-role` and `GET /api/auth/accounts` routes, `SwitchRoleRequest` model, and the now-unreferenced `get_optional_current_user` helper removed (~155 lines). Real auth (`get_current_user`-protected routes), OTP, Google login untouched.
+* Tests referencing the removed model updated (`avatar_test.dart`, `role_decoupled_accounts_test.dart` — removed only the 2 dead cases; all other assertions retained).
+* `git grep` for `switch.?account|switchrole|role.?switcher` across code: only the retained signup-path `switchRole` remains.
+* **Verification:** backend 26/26 PASS, Flutter analyze 0 errors/warnings, **Flutter 47/47 PASS**.

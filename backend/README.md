@@ -64,7 +64,6 @@ All application routes are mounted under both `/api/...` (canonical, used by the
 * `POST /api/auth/register` — register (email/password; roles)
 * `POST /api/auth/login` — JWT login
 * `POST /api/auth/google` — Firebase Google sign-in exchange
-* `GET /api/auth/accounts` — saved accounts
 * `POST /api/auth/switch-role`
 * `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
 * `POST /api/verification/send-otp`, `POST /api/verification/verify-otp`

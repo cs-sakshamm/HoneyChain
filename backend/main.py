@@ -12,7 +12,7 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 
 from pathlib import Path
@@ -33,7 +33,27 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, or_, func
+from sqlalchemy import desc, func
+
+def _utcnow() -> datetime:
+    """Naive UTC timestamp, identical in value to the removed
+    ``datetime.utcnow()`` (deprecated since Python 3.12).
+
+    The project's database columns and comparisons (e.g. OTP expiry)
+    use naive UTC datetimes throughout, so returning an aware datetime
+    here would break naive/aware comparisons. Reads the clock in UTC
+    explicitly, so the result is identical to ``utcnow()`` regardless of
+    the host's local timezone.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _utcfromtimestamp(ts: float) -> datetime:
+    """Naive UTC datetime from an epoch timestamp (replacement for the
+    deprecated ``datetime.utcfromtimestamp``), preserving the exact
+    naive-UTC convention above."""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+
 
 try:
     from backend.database import get_db, init_db, SessionLocal, check_database_health
@@ -307,7 +327,7 @@ def health_check(db: Session = Depends(get_db)):
         "service": "HoneyChain FastAPI Platform",
         "database": db_health,
         "blockchain": "Online" if blockchain_service.is_connected() else "Offline (Ledger Ready)",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": _utcnow().isoformat(),
     }
 
 
@@ -348,7 +368,7 @@ def verify_and_update_password(plain_password: str, hashed_password: Optional[st
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    now = datetime.utcnow()
+    now = _utcnow()
     expire = now + (expires_delta or timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"iat": int(now.timestamp()), "exp": int(expire.timestamp())})
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
@@ -400,28 +420,6 @@ def get_current_user(
     )
 
 
-def get_optional_current_user(
-    req: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Session = Depends(get_db)
-) -> Optional[User]:
-    """Returns the user only when a VALID token is presented.
-    Invalid/expired tokens yield None (never a random DB user)."""
-    token = None
-    if credentials:
-        token = credentials.credentials
-    elif req:
-        auth_header = req.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:].strip()
-    if not token:
-        return None
-    try:
-        return get_current_user(req, credentials, db)
-    except HTTPException:
-        return None
-
-
 # ── Schemas ──
 class RegisterRequest(BaseModel):
     name: str
@@ -437,17 +435,6 @@ class LoginRequest(BaseModel):
     emailOrPhone: Optional[str] = None
     password: Optional[str] = None
     role: Optional[str] = "HARVESTER"
-
-
-class SwitchRoleRequest(BaseModel):
-    role: Optional[str] = None
-    targetRole: Optional[str] = None
-    userId: Optional[str] = None
-    email: Optional[str] = None
-    createIfNotExists: Optional[bool] = False
-    name: Optional[str] = None
-    phone: Optional[str] = None
-
 
 class GoogleAuthRequest(BaseModel):
     idToken: Optional[str] = None
@@ -932,104 +919,6 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         "token": token,
     }
 
-
-@app.get("/api/auth/accounts")
-def get_role_accounts(
-    email: Optional[str] = None,
-    phone: Optional[str] = None,
-    userId: Optional[str] = None,
-    current_user: Optional[User] = Depends(get_optional_current_user),
-    db: Session = Depends(get_db),
-):
-    target_email = email or (current_user.email if current_user else None)
-    target_phone = phone or (current_user.phone if current_user else None)
-    if userId:
-        u = db.query(User).filter(User.id == userId).first()
-        if u:
-            target_email = target_email or u.email
-            target_phone = target_phone or u.phone
-
-    if not target_email and not target_phone:
-        raise HTTPException(status_code=401, detail={"success": False, "code": "UNAUTHORIZED", "message": "Email or authentication token required."})
-
-    conds = []
-    if target_email:
-        conds.append(User.email == target_email.strip().lower())
-    if target_phone:
-        conds.append(User.phone == target_phone.strip())
-
-    users = db.query(User).filter(or_(*conds)).all()
-
-    accounts = []
-    for u in users:
-        complete = is_user_profile_complete(u)
-        verified = bool(u.is_verified or complete)
-        accounts.append({
-            "id": u.id,
-            "role": u.role,
-            "email": u.email,
-            "name": u.name,
-            "phone": u.phone,
-            "avatarUrl": u.avatar_url,
-            "googlePhotoUrl": u.google_photo_url,
-            "organizationName": u.organization_name,
-            "facilityLocation": u.facility_location,
-            "licenseNumber": u.license_number,
-            "isProfileComplete": complete,
-            "isVerified": verified,
-            "verificationStatus": "Verified" if verified else "Not Started",
-            "completedSteps": 3 if verified else (1 if complete else 0),
-            "totalSteps": 3,
-        })
-    return {"success": True, "accounts": accounts}
-
-
-@app.post("/api/auth/switch-role")
-def switch_role(
-    payload: SwitchRoleRequest,
-    current_user: Optional[User] = Depends(get_optional_current_user),
-    db: Session = Depends(get_db)
-):
-    raw_target_role = (payload.targetRole or payload.role or "").strip()
-    if not raw_target_role:
-        raise HTTPException(status_code=400, detail={"success": False, "error": "targetRole is required.", "code": "VALIDATION_ERROR"})
-    target_role = normalize_role(raw_target_role)
-
-    target_email = (payload.email or (current_user.email if current_user else "")).strip().lower()
-    if not target_email:
-        raise HTTPException(status_code=400, detail={"success": False, "error": "Email is required to switch roles.", "code": "VALIDATION_ERROR"})
-
-    user = db.query(User).filter(User.email == target_email, User.role.in_(role_aliases(target_role))).first()
-    if not user and payload.createIfNotExists:
-        user = User(
-            name=payload.name or (current_user.name if current_user else "HoneyChain User"),
-            email=target_email,
-            phone=payload.phone or (current_user.phone if current_user else None),
-            role=target_role,
-            beekeeper_id=f"HC-BK-{uuid.uuid4().hex[:8].upper()}" if target_role == "HARVESTER" else None,
-            password_hash=current_user.password_hash if current_user else None,
-            is_verified=current_user.is_verified if current_user else False,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail={"success": False, "error": f"No registered account found for role {target_role}.", "code": "ROLE_NOT_FOUND"},
-        )
-
-    token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
-
-    return {
-        "success": True,
-        "message": f"Switched active role to {target_role}.",
-        "user": get_user_dict(user),
-        "token": token,
-    }
-
-
 @app.post("/api/auth/google")
 def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
     # SECURITY (HC-005): fail-closed Google authentication.
@@ -1204,7 +1093,7 @@ def update_profile(
         user.profile.verification_status = "Verified"
         user.profile.mobile_verified = "Verified"
         user.profile.kyc_status = "Verified"
-        user.profile.verified_at = datetime.utcnow()
+        user.profile.verified_at = _utcnow()
 
         # Keep real facilities synchronized in database
         role_norm = (user.role or "").upper()
@@ -1353,15 +1242,15 @@ def create_hive(
         previous_year_production_kg=payload.previousYearProductionKg or 0.0,
         current_year_production_kg=payload.currentYearProductionKg or 0.0,
         honey_type=payload.honeyType or "Wildflower",
-        last_inspection_date=parse_optional_datetime(payload.lastInspectionDate) or datetime.utcnow(),
+        last_inspection_date=parse_optional_datetime(payload.lastInspectionDate) or _utcnow(),
         mite_status=payload.miteStatus or "None",
         disease_status=payload.diseaseStatus or "None",
         feeding_required=payload.feedingRequired or False,
         queen_condition=payload.queenCondition or "Good",
         overall_health=payload.overallHealth or "Healthy",
         notes=payload.notes,
-        created_at=parse_optional_datetime(payload.dateAdded) or datetime.utcnow(),
-        updated_at=parse_optional_datetime(payload.updatedAt) or datetime.utcnow(),
+        created_at=parse_optional_datetime(payload.dateAdded) or _utcnow(),
+        updated_at=parse_optional_datetime(payload.updatedAt) or _utcnow(),
     )
     db.add(hive)
     db.commit()
@@ -1444,7 +1333,7 @@ def update_hive(
     hive.notes = payload.notes
     if payload.deviceId:
         hive.device_id = payload.deviceId
-    hive.updated_at = parse_optional_datetime(payload.updatedAt) or datetime.utcnow()
+    hive.updated_at = parse_optional_datetime(payload.updatedAt) or _utcnow()
     db.commit()
     db.refresh(hive)
     return {"success": True, "hive": get_hive_dict(hive)}
@@ -1578,7 +1467,7 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
     # 2. Record telemetry — real measured values only. Pydantic enforces
     # numeric types; the legacy flat-alias defaults (e.g. soundFrequencyHz=245,
     # batteryLevel=4.12) are dropped so nothing fabricated is persisted.
-    rec_time = datetime.utcnow()
+    rec_time = _utcnow()
     telemetry = HiveTelemetry(
         hive_id=hive.id,
         device_id=hive.device_id or payload.deviceId or f"DEV-{hive.hive_code}",
@@ -1813,7 +1702,7 @@ def acknowledge_alert(
     if not hive or (hive.user_id != current_user.id and "ADMIN" not in (current_user.role or "")):
         raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only manage alerts for your own hives."})
     alert.status = "ACKNOWLEDGED"
-    alert.acknowledged_at = datetime.utcnow()
+    alert.acknowledged_at = _utcnow()
     if not alert.acknowledged_by:
         alert.acknowledged_by = current_user.id
     db.commit()
@@ -2261,7 +2150,7 @@ def accept_workflow_request(
         if notes:
             req_obj.notes = f"{req_obj.notes or ''}\n{notes}".strip()
         req_obj.status = "ACCEPTED"
-        req_obj.accepted_at = datetime.utcnow()
+        req_obj.accepted_at = _utcnow()
         batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
         if batch:
             batch.current_stage = "COLLECTED"
@@ -2272,7 +2161,7 @@ def accept_workflow_request(
             batch_id=req_obj.batch_id or req_obj.request_id,
             event_type="REQUEST_ACCEPTED",
             actor_id=actor_id,
-            payload={"request_id": req_obj.request_id, "status": "ACCEPTED", "timestamp": datetime.utcnow().isoformat()},
+            payload={"request_id": req_obj.request_id, "status": "ACCEPTED", "timestamp": _utcnow().isoformat()},
         )
         _notify(db, req_obj.harvester_id, "REQUEST_ACCEPTED", "Collection request accepted", f"Your collection request {req_obj.request_id} was accepted by {current_user.organization_name or current_user.name}.", {"requestId": req_obj.request_id})
         db.commit()
@@ -3166,7 +3055,7 @@ def verify_batch(
         "status": "TAMPER-EVIDENT TRACEABILITY COMPLETE" if (packaging is not None and lab_report is not None and lab_report.overall_result == "PASS") else ("INCOMPLETE TRACEABILITY CHAIN" if batch_obj else "Invalid or unrecognized batch"),
         "currentStage": batch_obj.current_stage if batch_obj else ("COMPLETED" if packaging else "No data available yet."),
         "isFullyVerified": packaging is not None and lab_report is not None and lab_report.overall_result == "PASS",
-        "verificationTimestamp": datetime.utcnow().isoformat(),
+        "verificationTimestamp": _utcnow().isoformat(),
         "product": {
             "productId": f"HONEY-{target_batch_id}",
             "productName": f"{hive.honey_type if hive and hive.honey_type else 'Raw Natural'} Honey",
@@ -3281,7 +3170,7 @@ def send_otp(payload: dict, db = Depends(get_db)):
         phone=phone,
         otp_code=otp_code,
         session_id=session_id,
-        expires_at=datetime.utcnow() + timedelta(minutes=10),
+        expires_at=_utcnow() + timedelta(minutes=10),
     )
     db.add(otp)
     db.commit()
@@ -3307,7 +3196,7 @@ def verify_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
 
     query = db.query(OTPVerification).filter(
         OTPVerification.otp_code == otp_val,
-        OTPVerification.expires_at > datetime.utcnow(),
+        OTPVerification.expires_at > _utcnow(),
     )
     if session_id:
         query = query.filter(OTPVerification.session_id == session_id)
@@ -3416,10 +3305,10 @@ def handle_generic_verification(
             p.government_id_type = (payload.get("documentType") or payload.get("governmentIdType") or "AADHAAR")[:64]
             p.government_id_reference = (payload.get("documentNumber") or payload.get("governmentIdNumber") or payload.get("aadhaarNumber") or "")[:128]
             p.kyc_status = "Verified"
-            p.kyc_verified_at = datetime.utcnow()
+            p.kyc_verified_at = _utcnow()
     if "mobile" in s and "verify" in s:
         p.mobile_verified = "Verified"
-        p.mobile_verified_at = datetime.utcnow()
+        p.mobile_verified_at = _utcnow()
     if "business" in s or "details" in s or "facility" in s:
         if payload.get("organizationName") or payload.get("labName"):
             user.organization_name = payload.get("organizationName") or payload.get("labName")
@@ -3434,7 +3323,7 @@ def handle_generic_verification(
     if is_user_profile_complete(user):
         user.is_verified = True
         p.verification_status = "Verified"
-        p.verified_at = datetime.utcnow()
+        p.verified_at = _utcnow()
     else:
         if p.verification_status == "Not Started":
             p.verification_status = "In Progress"
@@ -3480,12 +3369,12 @@ def verify_harvester(payload: Dict[str, Any], db: Session = Depends(get_db)):
             except Exception:
                 notes = {}
             notes["verificationId"] = verif_id
-            notes["verificationRequestedAt"] = datetime.utcnow().isoformat()
+            notes["verificationRequestedAt"] = _utcnow().isoformat()
             user.profile.review_notes = json.dumps(notes)
             if is_user_profile_complete(user):
                 user.is_verified = True
                 user.profile.verification_status = "Verified"
-                user.profile.verified_at = datetime.utcnow()
+                user.profile.verified_at = _utcnow()
             db.commit()
     return {"success": True, "verificationId": verif_id, "status": "VERIFIED" if (harvester_id and _persisted_verified(db, harvester_id)) else "PENDING"}
 

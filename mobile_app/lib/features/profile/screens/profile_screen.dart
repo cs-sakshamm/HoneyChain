@@ -29,7 +29,7 @@ import 'edit_profile_screen.dart';
 import 'language_setting_screen.dart';
 import 'theme_setting_screen.dart';
 
-/// Profile page — polished card-based layout, role-aware accounts, and multi-role switcher.
+/// Profile page — polished card-based layout with profile details and settings.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -44,7 +44,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserController>().user;
       final userId = user.id ?? user.email;
-      context.read<UserController>().fetchRoleAccounts();
       if (userId.isNotEmpty) {
         context.read<VerificationController>().loadVerificationStatus(role: user.role, userId: userId);
       }
@@ -389,8 +388,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: AppConstants.space24),
 
-              // ── Your HoneyChain Accounts (Role Switcher) ──
-              _buildRoleAccountsCard(context, userCtrl, context.read<AuthController>()),
 
               const SizedBox(height: AppConstants.space24),
 
@@ -561,212 +558,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildRoleAccountsCard(
-    BuildContext context,
-    UserController userCtrl,
-    AuthController authCtrl,
-  ) {
-    final currentRole = userCtrl.user.role;
-    final accounts = userCtrl.roleAccounts;
-
-    final roles = [
-      {
-        'role': 'HARVESTER',
-        'title': 'Harvester Account',
-        'desc': 'Hive monitoring & honey harvesting',
-        'icon': Icons.agriculture_rounded,
-        'userRole': UserRole.harvester,
-      },
-      {
-        'role': 'COLLECTOR_PROCESSOR',
-        'title': 'Collection & Processing',
-        'desc': 'Batch intake & honey processing',
-        'icon': Icons.local_shipping_rounded,
-        'userRole': UserRole.collectionProcessing,
-      },
-      {
-        'role': 'LAB',
-        'title': 'Lab Tester Account',
-        'desc': 'Sample analysis & official reports',
-        'icon': Icons.science_rounded,
-        'userRole': UserRole.labTesting,
-      },
-      {
-        'role': 'PACKAGING',
-        'title': 'Packaging Manager',
-        'desc': 'Batch packaging & QR traceability',
-        'icon': Icons.inventory_2_rounded,
-        'userRole': UserRole.packaging,
-      },
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Your HoneyChain Accounts',
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: context.textPrimaryColor,
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.refresh_rounded, size: 18, color: context.textSecondaryColor),
-              onPressed: () => userCtrl.fetchRoleAccounts(),
-              tooltip: 'Refresh accounts',
-            ),
-          ],
-        ),
-        const SizedBox(height: AppConstants.space12),
-        Container(
-          padding: const EdgeInsets.all(AppConstants.space16),
-          decoration: BoxDecoration(
-            color: context.surfaceColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: Column(
-            children: roles.map((rInfo) {
-              final roleKey = rInfo['role'] as String;
-              final title = rInfo['title'] as String;
-              final icon = rInfo['icon'] as IconData;
-              final userRole = rInfo['userRole'] as UserRole;
-
-              final isCurrent = currentRole.toUpperCase().trim() == roleKey;
-              final existingAcc = accounts.where((a) => a.role == roleKey).firstOrNull;
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6.0),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isCurrent ? context.primarySoftColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isCurrent
-                          ? context.honeyAccent.withValues(alpha: 0.4)
-                          : context.borderColor.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: context.primarySoftColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(icon, size: 18, color: context.textPrimaryColor),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: GoogleFonts.manrope(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: context.textPrimaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            if (isCurrent)
-                              Text(
-                                'Active Account',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: context.honeyAccent,
-                                ),
-                              )
-                            else if (existingAcc != null)
-                              Text(
-                                existingAcc.isVerified
-                                    ? 'Verified (3/3) ✓'
-                                    : 'Profile: ${existingAcc.completedSteps}/3 Steps',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: existingAcc.isVerified ? context.successColor : context.warningColor,
-                                ),
-                              )
-                            else
-                              Text(
-                                'Not Created',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: context.textMutedColor,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (isCurrent)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: context.honeyAccent.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Current',
-                            style: GoogleFonts.manrope(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: context.textPrimaryColor,
-                            ),
-                          ),
-                        )
-                      else
-                        InkWell(
-                          onTap: () async {
-                            authCtrl.setRole(userRole);
-                            await userCtrl.switchAccountRole(roleKey);
-                            if (context.mounted) {
-                              context.read<VerificationController>().loadVerificationStatus(role: roleKey);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Switched to $title'),
-                                  backgroundColor: AppConstants.primaryDark,
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: existingAcc != null ? context.primarySoftColor : context.surfaceColor,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: context.borderColor),
-                            ),
-                            child: Text(
-                              existingAcc != null ? 'Switch' : '+ Register',
-                              style: GoogleFonts.manrope(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: context.textPrimaryColor,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
     );
   }
 
