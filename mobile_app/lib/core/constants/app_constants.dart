@@ -27,11 +27,18 @@ class AppConstants {
   }
 
   /// Public verification base URL for customer QR codes.
+  ///
+  /// The verifier web app is served by the FastAPI backend itself, so by
+  /// default QR codes point at the same host as the API. Override for
+  /// production with `--dart-define=PUBLIC_VERIFY_URL=https://<public-host>`
+  /// (that host must reach the backend and serve /verify/{batchId}).
   static const String _publicVerifyUrlOverride = String.fromEnvironment('PUBLIC_VERIFY_URL');
 
   static String get publicVerificationBaseUrl {
-    if (_publicVerifyUrlOverride.isNotEmpty) return _publicVerifyUrlOverride.replaceAll(RegExp(r'/+$'), '');
-    return 'https://generates-keep-michael-truck.trycloudflare.com';
+    if (_publicVerifyUrlOverride.isNotEmpty) {
+      return _publicVerifyUrlOverride.replaceAll(RegExp(r'/+$'), '');
+    }
+    return backendBaseUrl;
   }
 
   static const String legalDisclaimer =

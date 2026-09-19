@@ -137,4 +137,4 @@ Suites: role-image integrity & slider (31), avatar priority (7), telemetry alert
 
 * Telemetry reaches the dashboard only while the backend (and Mosquitto + the AI/ML processor) are running; there is deliberately no cached/fake offline telemetry.
 * Full AI analyses require ~145 distinct readings (≈24 h at 10-minute sampling) per the existing AI/ML feature builder; until then the UI shows collection progress.
-* `PUBLIC_VERIFY_URL` currently defaults to a temporary trycloudflare tunnel host in `AppConstants` — set a stable host for production QR payloads.
+* QR verification URLs default to the backend base URL (`AppConstants.publicVerificationBaseUrl`), since the backend serves the verifier web app. For a production deployment with a separate public host, pass `--dart-define=PUBLIC_VERIFY_URL=https://<public-host>` at build time.
