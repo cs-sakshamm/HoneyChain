@@ -118,7 +118,12 @@ def test_e2e_integration():
     mqtt_consumer.process_processed_payload(processed_payload)
 
     # Verify Telemetry stored in DB
-    telemetry_res = client.get(f"/api/telemetry/live/{hive.id}")
+    # (telemetry endpoints are authentication-scoped, so the harvester JWT
+    # is required — exactly like the Flutter app does)
+    from backend.main import create_access_token
+    harvester_token = create_access_token({"sub": harvester.id, "email": harvester.email, "role": "HARVESTER"})
+    harvester_headers = {"Authorization": f"Bearer {harvester_token}"}
+    telemetry_res = client.get(f"/api/telemetry/live/{hive.id}", headers=harvester_headers)
     assert telemetry_res.status_code == 200, "Failed to retrieve live telemetry"
     telemetry_data = telemetry_res.json().get("telemetry", [])
     assert len(telemetry_data) > 0, "No telemetry was saved in DB"
@@ -126,9 +131,6 @@ def test_e2e_integration():
 
     # 6. Test Harvester Collection Request
     print("\n[STEP 3] Harvester Submitting Collection Request...")
-    from backend.main import create_access_token
-    harvester_token = create_access_token({"sub": harvester.id, "email": harvester.email, "role": "HARVESTER"})
-    harvester_headers = {"Authorization": f"Bearer {harvester_token}"}
 
     harvest_res = client.post("/api/harvests", json={
         "hiveId": hive.id,

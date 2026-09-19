@@ -143,11 +143,14 @@ Create `.env` in `backend/` using the following verified keys:
 PORT=8000
 ENVIRONMENT=development
 
-# Relational Database
-# SQLite (development default):
-DATABASE_URL="sqlite:///./honeychain.db"
-# PostgreSQL (production via docker-compose):
-# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/honeychain"
+# Relational Database (Supabase PostgreSQL — authoritative)
+# Place the real password only in backend/.env (never commit it) and
+# URL-encode special characters (@ : / ? # % &).
+# SQLite is NOT used as an automatic fallback; a failing PostgreSQL
+# connection surfaces a clear error instead.
+DATABASE_URL="postgresql://postgres:<URL-ENCODED-PASSWORD>@db.<project-ref>.supabase.co:5432/postgres"
+# Explicit test-only offline mode (otherwise never used):
+# DEV_OFFLINE_SQLITE=true
 
 # MQTT Broker Configuration
 MQTT_HOST="localhost"

@@ -88,3 +88,4 @@ __pycache__/
 *.log.*
 secrets/
 iot/firmware/secrets.h
+scripts/ai_processor_last_run.log

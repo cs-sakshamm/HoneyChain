@@ -33,7 +33,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, func
 
 try:
     from backend.database import get_db, init_db, SessionLocal, check_database_health
@@ -274,6 +274,19 @@ def serve_root():
 @app.websocket("/ws/telemetry")
 @app.websocket("/api/telemetry/live")
 async def websocket_endpoint(websocket: WebSocket):
+    # Telemetry broadcasts carry per-user hive data, so a valid JWT is
+    # required (query param works where browser WS cannot set headers).
+    token = websocket.query_params.get("token") or ""
+    user_id: Optional[str] = None
+    if token:
+        try:
+            payload = decode_token(token)
+            user_id = payload.get("sub")
+        except HTTPException:
+            user_id = None
+    if not user_id:
+        await websocket.close(code=4401)  # 4401: unauthorized (policy code)
+        return
     await manager.connect(websocket)
     try:
         while True:
@@ -1364,10 +1377,13 @@ def create_hive(
 
 @app.get("/api/hives/{hive_id}")
 @app.get("/hives/{hive_id}")
-def get_hive_detail(hive_id: str, db: Session = Depends(get_db)):
+def get_hive_detail(hive_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     hive = db.query(Hive).filter((Hive.id == hive_id) | (Hive.hive_code == hive_id)).first()
     if not hive:
         raise HTTPException(status_code=404, detail="Hive not found")
+    # Authorization: only the owning harvester (or an admin) may read a hive.
+    if hive.user_id != current_user.id and "ADMIN" not in (current_user.role or ""):
+        raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only access your own hives."})
     return {"success": True, "hive": get_hive_dict(hive)}
 
 
@@ -1455,6 +1471,96 @@ def delete_hive(
 # ============================================================
 # 3. TELEMETRY & AI ANALYSIS
 # ============================================================
+def get_owned_hive_or_404(
+    hive_id: str,
+    current_user: User,
+    db: Session,
+) -> Hive:
+    """Resolve a hive by id/code/device and enforce ownership (spec §21).
+
+    A user must not read another user's hive telemetry by swapping the
+    hive_id in the URL. Admins may access any hive.
+    """
+    hive = db.query(Hive).filter(
+        (Hive.id == hive_id) | (Hive.hive_code == hive_id) | (Hive.device_id == hive_id)
+    ).first()
+    if not hive:
+        # Do not leak hive existence across accounts.
+        raise HTTPException(status_code=404, detail={"success": False, "code": "HIVE_NOT_FOUND", "message": "Hive not found."})
+    if hive.user_id != current_user.id and "ADMIN" not in (current_user.role or ""):
+        raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only access your own hives."})
+    return hive
+
+
+def _telemetry_dict(t: HiveTelemetry) -> Dict[str, Any]:
+    return {
+        "id": t.id,
+        "hiveId": t.hive_id,
+        "deviceId": t.device_id,
+        "timestamp": t.timestamp,
+        "temperature": t.temperature_c,
+        "humidity": t.humidity_pct,
+        "weightKg": t.weight_kg,
+        "acousticsHz": t.acoustics_hz,
+        "batteryLevel": t.battery_v,
+        "signalStrength": t.wifi_rssi_dbm,
+        "recordedAt": t.recorded_at.isoformat() if t.recorded_at else None,
+    }
+
+
+def _ai_analysis_dict(a: HiveAIAnalysis) -> Dict[str, Any]:
+    """Serialize stored AI/ML output (matches the existing AI processed contract)."""
+    try:
+        reasons = json.loads(a.reasons_json) if a.reasons_json else []
+    except Exception:
+        reasons = []
+    try:
+        alerts = json.loads(a.alerts_json) if a.alerts_json else []
+    except Exception:
+        alerts = []
+    return {
+        "id": a.id,
+        "hiveId": a.hive_id,
+        "deviceId": a.device_id,
+        "timestamp": a.timestamp,
+        "riskLevel": a.risk_level,
+        "status": a.status,
+        "anomalyDetected": bool(a.anomaly_detected),
+        "anomalyScore": a.anomaly_score,
+        "temperatureStatus": a.temperature_status,
+        "humidityStatus": a.humidity_status,
+        "weightStatus": a.weight_status,
+        "weightTrend": a.weight_trend,
+        "acousticStatus": a.acoustic_status,
+        "reasons": reasons,
+        "alerts": alerts,
+        "analyzedAt": a.created_at.isoformat() if a.created_at else None,
+    }
+
+
+def _hive_ai_readiness(db: Session, hive: Hive, latest_analysis: Optional[HiveAIAnalysis]) -> Dict[str, Any]:
+    """AI-readiness per the existing AI/ML feature-builder contract (~145
+    readings at 10-minute sampling = 24h history). Never fabricates an AI
+    result; reports honest progress toward the first complete analysis."""
+    reading_count = (
+        db.query(func.count(HiveTelemetry.id))
+        .filter(HiveTelemetry.hive_id == hive.id)
+        .scalar()
+    ) or 0
+    reading_count = int(reading_count)
+    return {
+        "requiredReadings": 145,
+        "currentReadings": reading_count,
+        "ready": latest_analysis is not None,
+        "samplingIntervalSeconds": 600,
+        "message": (
+            "AI analysis available."
+            if latest_analysis is not None
+            else "Collecting telemetry history... AI analysis will become available after sufficient history is collected."
+        ),
+    }
+
+
 @app.post("/api/telemetry/ingest")
 def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_db)):
     # 1. Resolve hive
@@ -1469,7 +1575,9 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
             detail={"error": "Target hive not found for telemetry ingestion. Please provide a registered hiveId, hiveCode, or deviceId.", "code": "HIVE_NOT_FOUND"},
         )
 
-    # 2. Record telemetry
+    # 2. Record telemetry — real measured values only. Pydantic enforces
+    # numeric types; the legacy flat-alias defaults (e.g. soundFrequencyHz=245,
+    # batteryLevel=4.12) are dropped so nothing fabricated is persisted.
     rec_time = datetime.utcnow()
     telemetry = HiveTelemetry(
         hive_id=hive.id,
@@ -1478,10 +1586,10 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
         temperature_c=payload.temperature,
         humidity_pct=payload.humidity,
         weight_kg=payload.weightKg,
-        acoustics_hz=payload.soundFrequencyHz or 245.0,
-        battery_v=payload.batteryLevel or 4.12,
-        wifi_rssi_dbm=payload.signalStrength or -68.0,
-        bee_activity=payload.beeActivity or 85.0,
+        acoustics_hz=payload.soundFrequencyHz,
+        battery_v=payload.batteryLevel,
+        wifi_rssi_dbm=payload.signalStrength,
+        bee_activity=payload.beeActivity,
         recorded_at=rec_time,
     )
     db.add(telemetry)
@@ -1515,17 +1623,113 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
     }
 
 
+@app.get("/api/hives/{hive_id}/telemetry/latest")
+@app.get("/hives/{hive_id}/telemetry/latest")
+def get_hive_telemetry_latest(
+    hive_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Latest real telemetry + stored AI status for one hive (spec §10).
+
+    Honest empty state: when nothing has arrived over MQTT yet the response
+    reports hasTelemetry=false instead of fabricated sensor values.
+    """
+    hive = get_owned_hive_or_404(hive_id, current_user, db)
+
+    telemetry = (
+        db.query(HiveTelemetry)
+        .filter(HiveTelemetry.hive_id == hive.id)
+        .order_by(desc(HiveTelemetry.timestamp), desc(HiveTelemetry.recorded_at))
+        .first()
+    )
+    analysis = (
+        db.query(HiveAIAnalysis)
+        .filter(HiveAIAnalysis.hive_id == hive.id)
+        .order_by(desc(HiveAIAnalysis.timestamp), desc(HiveAIAnalysis.created_at))
+        .first()
+    )
+
+    return {
+        "success": True,
+        "hiveId": hive.id,
+        "hiveCode": hive.hive_code,
+        "deviceId": hive.device_id,
+        "hasTelemetry": telemetry is not None,
+        "hasAiAnalysis": analysis is not None,
+        "telemetry": _telemetry_dict(telemetry) if telemetry else None,
+        "aiStatus": _ai_analysis_dict(analysis) if analysis else None,
+        "aiReadiness": _hive_ai_readiness(db, hive, analysis),
+    }
+
+
+@app.get("/api/hives/{hive_id}/telemetry")
+@app.get("/hives/{hive_id}/telemetry/history")
+def get_hive_telemetry_history(
+    hive_id: str,
+    limit: int = Query(144, ge=1, le=1000),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Historical telemetry (newest first, default 144 = ~24h at 10-min)."""
+    hive = get_owned_hive_or_404(hive_id, current_user, db)
+    telemetries = (
+        db.query(HiveTelemetry)
+        .filter(HiveTelemetry.hive_id == hive.id)
+        .order_by(desc(HiveTelemetry.timestamp), desc(HiveTelemetry.recorded_at))
+        .limit(limit)
+        .all()
+    )
+    return {
+        "success": True,
+        "hiveId": hive.id,
+        "count": len(telemetries),
+        "telemetry": [_telemetry_dict(t) for t in telemetries],
+    }
+
+
+@app.get("/api/hives/{hive_id}/status")
+@app.get("/hives/{hive_id}/status")
+def get_hive_ai_status(
+    hive_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Stored AI/ML hive status (risk, anomaly, per-channel analysis, alerts)
+    produced by the existing AI processor — plus the 145-reading readiness."""
+    hive = get_owned_hive_or_404(hive_id, current_user, db)
+    analysis = (
+        db.query(HiveAIAnalysis)
+        .filter(HiveAIAnalysis.hive_id == hive.id)
+        .order_by(desc(HiveAIAnalysis.timestamp), desc(HiveAIAnalysis.created_at))
+        .first()
+    )
+    return {
+        "success": True,
+        "hiveId": hive.id,
+        "hiveCode": hive.hive_code,
+        "deviceId": hive.device_id,
+        "hasAnalysis": analysis is not None,
+        "aiStatus": _ai_analysis_dict(analysis) if analysis else None,
+        "aiReadiness": _hive_ai_readiness(db, hive, analysis),
+    }
+
+
 @app.get("/api/telemetry/live/{hive_id}")
 @app.get("/hives/{hive_id}/telemetry")
-def get_hive_telemetry(hive_id: str, db: Session = Depends(get_db)):
-    hive = db.query(Hive).filter((Hive.id == hive_id) | (Hive.hive_code == hive_id) | (Hive.device_id == hive_id)).first()
-    if not hive:
-        return {"success": True, "telemetry": []}
+def get_hive_telemetry(
+    hive_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Legacy live-telemetry feed kept for the existing Flutter controller.
+    Now authentication-scoped like the newer hive telemetry endpoints."""
+    hive = get_owned_hive_or_404(hive_id, current_user, db)
 
     telemetries = (
         db.query(HiveTelemetry)
         .filter(HiveTelemetry.hive_id == hive.id)
-        .order_by(desc(HiveTelemetry.recorded_at))
+        .order_by(desc(HiveTelemetry.timestamp), desc(HiveTelemetry.recorded_at))
         .limit(30)
         .all()
     )
@@ -1548,12 +1752,29 @@ def get_hive_telemetry(hive_id: str, db: Session = Depends(get_db)):
 
 @app.get("/api/telemetry/alerts")
 @app.get("/hives/{hive_id}/alerts")
-def get_alerts(hive_id: Optional[str] = None, status: Optional[str] = "ACTIVE", db: Session = Depends(get_db)):
-    query = db.query(HiveAlert)
+def get_alerts(
+    hive_id: Optional[str] = None,
+    status: Optional[str] = "ACTIVE",
+    userId: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Alerts are authentication-scoped: a harvester only ever sees alerts for
+    their own hives, regardless of any hive_id/userId query parameters."""
+    owned_hive_ids = [
+        h.id for h in db.query(Hive.id).filter(Hive.user_id == current_user.id).all()
+    ]
+    if not owned_hive_ids:
+        return {"success": True, "alerts": []}
+
+    query = db.query(HiveAlert).filter(HiveAlert.hive_id.in_(owned_hive_ids))
     if hive_id:
-        hive = db.query(Hive).filter((Hive.id == hive_id) | (Hive.hive_code == hive_id)).first()
-        if hive:
-            query = query.filter(HiveAlert.hive_id == hive.id)
+        hive = db.query(Hive).filter(
+            (Hive.id == hive_id) | (Hive.hive_code == hive_id) | (Hive.device_id == hive_id)
+        ).first()
+        if not hive or (hive.user_id != current_user.id and "ADMIN" not in (current_user.role or "")):
+            return {"success": True, "alerts": []}
+        query = query.filter(HiveAlert.hive_id == hive.id)
     if status:
         query = query.filter(HiveAlert.status == status)
 
@@ -1579,12 +1800,22 @@ def get_alerts(hive_id: Optional[str] = None, status: Optional[str] = "ACTIVE", 
 
 
 @app.post("/api/telemetry/alerts/{alert_id}/acknowledge")
-def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)):
+def acknowledge_alert(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     alert = db.query(HiveAlert).filter(HiveAlert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+    # Ownership: only the hive owner (or an admin) may acknowledge its alerts.
+    hive = db.query(Hive).filter(Hive.id == alert.hive_id).first()
+    if not hive or (hive.user_id != current_user.id and "ADMIN" not in (current_user.role or "")):
+        raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only manage alerts for your own hives."})
     alert.status = "ACKNOWLEDGED"
     alert.acknowledged_at = datetime.utcnow()
+    if not alert.acknowledged_by:
+        alert.acknowledged_by = current_user.id
     db.commit()
     return {"success": True, "message": "Alert acknowledged."}
 

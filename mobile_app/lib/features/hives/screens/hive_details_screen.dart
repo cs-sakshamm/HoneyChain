@@ -6,13 +6,13 @@ import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
-import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
 import 'start_harvesting_screen.dart';
 import '../../../core/controllers/telemetry_alert_controller.dart';
+import '../../../core/models/hive_telemetry_models.dart';
 import '../../../core/widgets/pill_back_button.dart';
 
 /// Clean, Minimal Field Overview & Harvest Details Screen
@@ -576,6 +576,7 @@ class _TelemetryHistorySection extends StatefulWidget {
 
 class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
   List<Map<String, dynamic>> _history = [];
+  HiveSnapshot? _snapshot;
   bool _isLoading = true;
 
   @override
@@ -586,10 +587,14 @@ class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
 
   Future<void> _loadData() async {
     final ctrl = context.read<TelemetryAlertController>();
-    final data = await ctrl.fetchHiveTelemetry(widget.hiveId);
+    final results = await Future.wait<dynamic>([
+      ctrl.fetchHiveSnapshot(widget.hiveId),
+      ctrl.fetchHiveTelemetry(widget.hiveId),
+    ]);
     if (mounted) {
       setState(() {
-        _history = data;
+        _snapshot = results[0] as HiveSnapshot?;
+        _history = (results[1] as List).cast<Map<String, dynamic>>();
         _isLoading = false;
       });
     }
@@ -607,6 +612,26 @@ class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
     }
   }
 
+  /// Sensor values are shown ONLY from real backend data. Absent values
+  /// render as '--' — never fabricated defaults.
+  String _fmt(double? v, String unit, {int digits = 1}) {
+    if (v == null) return '--$unit';
+    return '${v.toStringAsFixed(digits)}$unit';
+  }
+
+  Color _statusColor(String? status) {
+    switch ((status ?? '').toUpperCase()) {
+      case 'HEALTHY':
+        return context.successColor;
+      case 'ATTENTION':
+        return context.warningColor;
+      case 'ALERT':
+        return AppConstants.error;
+      default:
+        return context.textMutedColor;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -616,8 +641,15 @@ class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
         child: const CircularProgressIndicator(),
       );
     }
-    
-    if (_history.isEmpty) {
+
+    final telemetry = _snapshot?.telemetry;
+    final ai = _snapshot?.aiStatus;
+    final readiness = _snapshot?.aiReadiness;
+    final hasTelemetry = _snapshot?.hasTelemetry ?? false;
+
+    // Empty state: no real telemetry has arrived over MQTT yet. Show an
+    // explicit waiting state — never placeholder sensor values.
+    if (!hasTelemetry || telemetry == null) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(AppConstants.space16),
@@ -631,7 +663,7 @@ class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
             Icon(Icons.sensors_off_rounded, size: 28, color: context.textMutedColor),
             const SizedBox(height: 8),
             Text(
-              'No Sensor Data',
+              'Waiting for telemetry...',
               style: GoogleFonts.manrope(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -640,7 +672,7 @@ class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Telemetry data not available for this hive yet.',
+              'No telemetry available for this hive yet. Live sensor readings will appear here once the hive device starts publishing.',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 color: context.textSecondaryColor,
@@ -663,6 +695,118 @@ class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Latest real sensor values
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _TelemetryStat(label: 'Temp', value: _fmt(telemetry.temperature, '°C')),
+              _TelemetryStat(label: 'Humidity', value: _fmt(telemetry.humidity, '%')),
+              _TelemetryStat(label: 'Weight', value: _fmt(telemetry.weightKg, ' kg', digits: 2)),
+              _TelemetryStat(label: 'Acoustic', value: _fmt(telemetry.acousticsHz, ' Hz', digits: 0)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Device diagnostics (real values when published)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _TelemetryStat(label: 'Battery', value: _fmt(telemetry.batteryLevel, ' V', digits: 2)),
+              _TelemetryStat(label: 'Wi-Fi', value: _fmt(telemetry.signalStrength, ' dBm', digits: 0)),
+              _TelemetryStat(
+                label: 'Updated',
+                value: telemetry.recordedAt != null
+                    ? _formatTime(telemetry.recordedAt!.toIso8601String())
+                    : '--',
+              ),
+            ],
+          ),
+
+          const Divider(height: 24),
+
+          // AI STATUS SECTION (from the existing AI/ML pipeline via the backend)
+          if (ai != null) ...[
+            Row(
+              children: [
+                Icon(Icons.psychology_alt_rounded, size: 16, color: _statusColor(ai.status)),
+                const SizedBox(width: 6),
+                Text(
+                  'AI Analysis',
+                  style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w700, color: context.textPrimaryColor),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _statusColor(ai.status).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${ai.status ?? '--'} · Risk: ${ai.riskLevel ?? '--'}',
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _statusColor(ai.status),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Anomaly: ${ai.anomalyDetected == true ? 'detected' : 'none'} · Score: ${ai.anomalyScore?.toStringAsFixed(4) ?? '--'}',
+              style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
+            ),
+            for (final alert in ai.alerts.take(3)) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.notification_important_rounded, size: 13, color: context.warningColor),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      alert['message']?.toString() ?? 'Hive alert.',
+                      style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ] else if (readiness != null && !readiness.ready) ...[
+            // The AI feature builder needs ~145 readings (24h at 10-minute
+            // sampling). Show honest collection progress — never a fake result.
+            Row(
+              children: [
+                Icon(Icons.hourglass_top_rounded, size: 16, color: context.textMutedColor),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Collecting telemetry history... (${readiness.currentReadings}/${readiness.requiredReadings} readings)',
+                    style: GoogleFonts.inter(fontSize: 12, color: context.textSecondaryColor),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: readiness.progress,
+                minHeight: 4,
+                backgroundColor: context.borderColor.withValues(alpha: 0.5),
+                valueColor: AlwaysStoppedAnimation<Color>(context.colors.primary),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'AI analysis will become available after sufficient history is collected.',
+              style: GoogleFonts.inter(fontSize: 11, color: context.textMutedColor),
+            ),
+          ],
+
+          const Divider(height: 24),
+
+          // Actual historical telemetry
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -679,16 +823,46 @@ class _TelemetryHistorySectionState extends State<_TelemetryHistorySection> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(flex: 3, child: Text(_formatTime(entry['recordedAt']), style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor))),
-                  Expanded(flex: 2, child: Text('${entry['temperature']}°C', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textPrimaryColor), textAlign: TextAlign.center)),
-                  Expanded(flex: 2, child: Text('${entry['humidity']}%', style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor), textAlign: TextAlign.center)),
-                  Expanded(flex: 2, child: Text('${entry['weightKg']}kg', style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor), textAlign: TextAlign.right)),
+                  Expanded(flex: 3, child: Text(_formatTime(entry['recordedAt']?.toString() ?? ''), style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor))),
+                  Expanded(flex: 2, child: Text('${entry['temperature'] ?? '--'}°C', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.textPrimaryColor), textAlign: TextAlign.center)),
+                  Expanded(flex: 2, child: Text('${entry['humidity'] ?? '--'}%', style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor), textAlign: TextAlign.center)),
+                  Expanded(flex: 2, child: Text('${entry['weightKg'] ?? '--'}kg', style: GoogleFonts.inter(fontSize: 12, color: context.textPrimaryColor), textAlign: TextAlign.right)),
                 ],
               ),
             );
           }),
         ],
       ),
+    );
+  }
+}
+
+class _TelemetryStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _TelemetryStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: context.textPrimaryColor,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: context.textSecondaryColor,
+          ),
+        ),
+      ],
     );
   }
 }

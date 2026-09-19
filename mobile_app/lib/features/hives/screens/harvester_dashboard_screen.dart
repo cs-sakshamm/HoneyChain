@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/controllers/telemetry_alert_controller.dart';
+import '../../../core/models/hive_telemetry_models.dart';
 import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/models/workflow_request.dart';
@@ -703,7 +704,7 @@ class _HiveInfoCard extends StatefulWidget {
 }
 
 class _HiveInfoCardState extends State<_HiveInfoCard> {
-  List<Map<String, dynamic>> _telemetryHistory = [];
+  HiveSnapshot? _snapshot;
   bool _isLoading = true;
 
   @override
@@ -715,10 +716,10 @@ class _HiveInfoCardState extends State<_HiveInfoCard> {
   Future<void> _loadTelemetry() async {
     if (!mounted) return;
     final ctrl = context.read<TelemetryAlertController>();
-    final history = await ctrl.fetchHiveTelemetry(widget.hive.id);
+    final snapshot = await ctrl.fetchHiveSnapshot(widget.hive.id);
     if (mounted) {
       setState(() {
-        _telemetryHistory = history;
+        _snapshot = snapshot;
         _isLoading = false;
       });
     }
@@ -801,7 +802,11 @@ class _HiveInfoCardState extends State<_HiveInfoCard> {
                     ),
                   ],
                 ),
-                if (!_isLoading && _telemetryHistory.isNotEmpty) ...[
+                if (_isLoading) ...[
+                  const SizedBox(height: 16),
+                  const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))),
+                ] else if (_snapshot != null && _snapshot!.hasTelemetry && _snapshot!.telemetry != null) ...[
+                  // Real latest sensor values from ESP32 -> MQTT -> AI -> backend.
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -814,21 +819,71 @@ class _HiveInfoCardState extends State<_HiveInfoCard> {
                       children: [
                         _TelemetryStat(
                           label: 'Temp',
-                          value: '${_telemetryHistory.first['temperature'] ?? '--'}°C',
+                          value: '${_snapshot!.telemetry!.temperature?.toStringAsFixed(1) ?? '--'}°C',
                           icon: Icons.thermostat_rounded,
                         ),
                         _TelemetryStat(
                           label: 'Humidity',
-                          value: '${_telemetryHistory.first['humidity'] ?? '--'}%',
+                          value: '${_snapshot!.telemetry!.humidity?.toStringAsFixed(1) ?? '--'}%',
                           icon: Icons.water_drop_rounded,
                         ),
                         _TelemetryStat(
                           label: 'Weight',
-                          value: '${_telemetryHistory.first['weightKg'] ?? '--'} kg',
+                          value: '${_snapshot!.telemetry!.weightKg?.toStringAsFixed(2) ?? '--'} kg',
                           icon: Icons.scale_rounded,
                         ),
                       ],
                     ),
+                  ),
+                  if (_snapshot!.aiStatus != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          _snapshot!.aiStatus!.status == 'HEALTHY'
+                              ? Icons.verified_rounded
+                              : Icons.warning_amber_rounded,
+                          size: 13,
+                          color: _snapshot!.aiStatus!.status == 'HEALTHY'
+                              ? context.successColor
+                              : context.warningColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'AI: ${_snapshot!.aiStatus!.status ?? '--'} · Risk ${_snapshot!.aiStatus!.riskLevel ?? '--'}',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: context.textSecondaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (_snapshot!.aiReadiness != null && !_snapshot!.aiReadiness!.ready) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Collecting telemetry history... (${_snapshot!.aiReadiness!.currentReadings}/${_snapshot!.aiReadiness!.requiredReadings})',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: context.textMutedColor,
+                      ),
+                    ),
+                  ],
+                ] else ...[
+                  // Honest empty state — no telemetry has arrived yet.
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.sensors_off_rounded, size: 14, color: context.textMutedColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Waiting for telemetry...',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: context.textMutedColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],

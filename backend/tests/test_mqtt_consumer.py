@@ -59,6 +59,9 @@ def test_canonical_and_legacy_packets_are_idempotent() -> None:
         mqtt_consumer.process_processed_payload(alert_payload)
         assert db.query(HiveAlert).filter_by(hive_id=hive.id, device_id=device_id).count() == 1
 
+        # Legacy flat packets (no nested sensors object) are rejected under the
+        # strict ESP32 telemetry contract: real telemetry only, no fabricated
+        # defaults for missing sensor channels (spec §18).
         legacy_timestamp = timestamp + 600
         mqtt_consumer.process_raw_telemetry_payload({
             "deviceId": device_id,
@@ -68,8 +71,7 @@ def test_canonical_and_legacy_packets_are_idempotent() -> None:
             "weight": 3.4,
             "acoustics": 240,
         })
-        legacy = db.query(HiveTelemetry).filter_by(hive_id=hive.id, timestamp=legacy_timestamp).one()
-        assert (legacy.temperature_c, legacy.humidity_pct, legacy.weight_kg, legacy.acoustics_hz) == (35.0, 60.0, 3.4, 240.0)
+        assert db.query(HiveTelemetry).filter_by(hive_id=hive.id, timestamp=legacy_timestamp).count() == 0
     finally:
         db.close()
 

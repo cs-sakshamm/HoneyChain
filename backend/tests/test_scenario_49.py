@@ -136,7 +136,12 @@ def test_section_49_scenario():
     mqtt_consumer.process_processed_payload(processed_json)
 
     # 5. Verify Telemetry Display for Harvester Mobile Screen
-    telemetry_res = client.get(f"/api/telemetry/live/{hive.id}")
+    # (telemetry endpoints are authentication-scoped, so the harvester JWT
+    # is required — exactly like the Flutter app does)
+    from backend.main import create_access_token
+    harvester_token = create_access_token({"sub": harvester.id, "email": harvester.email, "role": "HARVESTER"})
+    harvester_headers = {"Authorization": f"Bearer {harvester_token}"}
+    telemetry_res = client.get(f"/api/telemetry/live/{hive.id}", headers=harvester_headers)
     assert telemetry_res.status_code == 200
     telemetries = telemetry_res.json().get("telemetry", [])
     assert len(telemetries) > 0
@@ -144,10 +149,6 @@ def test_section_49_scenario():
     print(f"[4] Backend PostgreSQL Telemetry: Temp={latest_tel['temperature']}C, Hum={latest_tel['humidity']}%, Weight={latest_tel['weightKg']}kg")
 
     # 6. Harvester sends Collection Request
-    from backend.main import create_access_token
-    harvester_token = create_access_token({"sub": harvester.id, "email": harvester.email, "role": "HARVESTER"})
-    harvester_headers = {"Authorization": f"Bearer {harvester_token}"}
-
     harvest_res = client.post("/api/harvests", json={
         "hiveId": hive.id,
         "quantity": 30.0,

@@ -31,6 +31,59 @@ MQTT_PASSWORD = os.getenv("MQTT_PASSWORD") or None
 PROCESSED_TOPIC = os.getenv("MQTT_OUTPUT_TOPIC", "honeychain/hive/processed")
 TELEMETRY_TOPIC = os.getenv("MQTT_INPUT_TOPIC", "honeychain/hive/telemetry")
 
+# Required sensor channels for the HoneyChain ESP32 telemetry contract.
+# A message missing any of these is rejected rather than stored with
+# fabricated defaults (real telemetry only — no dummy fallback values).
+REQUIRED_SENSOR_FIELDS = ("temperature_c", "humidity_pct", "weight_kg", "acoustics_hz")
+
+
+def _extract_required_sensors(payload: Dict[str, Any], context: str) -> Dict[str, float]:
+    """Validate and coerce the four required sensor channels to floats.
+
+    Returns {} when the payload is malformed. Numeric strings produced by some
+    gateways are accepted; nulls, missing keys and non-numeric values are not.
+    """
+    raw = payload.get("sensors")
+    if not isinstance(raw, dict):
+        logger.warning(f"[VALIDATION] {context} payload has no sensors object")
+        return {}
+    sensors: Dict[str, float] = {}
+    for field in REQUIRED_SENSOR_FIELDS:
+        value = raw.get(field)
+        if value is None:
+            logger.warning(f"[VALIDATION] {context} payload missing/null sensor field: {field}")
+            return {}
+        try:
+            coerced = float(value)
+        except (TypeError, ValueError):
+            logger.warning(f"[VALIDATION] {context} payload has non-numeric {field}: {value!r}")
+            return {}
+        sensors[field] = coerced
+    return sensors
+
+
+def _safe_timestamp(payload: Dict[str, Any], context: str) -> Optional[int]:
+    """Validate the epoch timestamp; None when absent/invalid (never guessed)."""
+    ts = payload.get("timestamp")
+    if ts is None:
+        logger.warning(f"[VALIDATION] {context} payload missing timestamp")
+        return None
+    try:
+        timestamp = int(ts)
+    except (TypeError, ValueError):
+        logger.warning(f"[VALIDATION] {context} payload has invalid timestamp: {ts!r}")
+        return None
+    return timestamp
+
+
+def _coerce_optional_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
 
 class MQTTConsumer:
     def __init__(self):
@@ -118,17 +171,24 @@ class MQTTConsumer:
 
     def process_processed_payload(self, payload: Dict[str, Any]):
         device_id = payload.get("device_id")
-        if not device_id:
+        if not device_id or not isinstance(device_id, str) or not device_id.strip():
             logger.warning("Rejected MQTT payload: missing device_id")
             return
+        device_id = device_id.strip()
 
-        sensors = payload.get("sensors", {})
+        # Spec: reject malformed messages instead of storing fabricated zeros.
+        sensors = _extract_required_sensors(payload, "processed")
+        if not sensors:
+            return
+        timestamp = _safe_timestamp(payload, "processed")
+        if timestamp is None:
+            return
+
         hive_status = payload.get("hive_status", {})
         diagnostics = payload.get("diagnostics", {})
         analysis = payload.get("analysis", {})
         alerts = payload.get("alerts", [])
         summary = payload.get("analysis_summary", {})
-        ts = payload.get("timestamp", int(datetime.utcnow().timestamp()))
 
         db = SessionLocal()
         try:
@@ -138,10 +198,6 @@ class MQTTConsumer:
                 logger.warning(f"Telemetry received for unmapped device/hive: {device_id}. Skipping processing.")
                 return
 
-            try:
-                timestamp = int(ts)
-            except (TypeError, ValueError):
-                timestamp = int(datetime.utcnow().timestamp())
             recorded_dt = datetime.utcfromtimestamp(timestamp)
 
             # 2. The raw packet normally reaches this consumer before AI output.
@@ -164,12 +220,12 @@ class MQTTConsumer:
                 )
                 db.add(telemetry)
 
-            telemetry.temperature_c = float(sensors.get("temperature_c", 0.0))
-            telemetry.humidity_pct = float(sensors.get("humidity_pct", 0.0))
-            telemetry.weight_kg = float(sensors.get("weight_kg", 0.0))
-            telemetry.acoustics_hz = float(sensors.get("acoustics_hz", 0.0))
-            telemetry.battery_v = float(diagnostics["battery_v"]) if diagnostics.get("battery_v") is not None else None
-            telemetry.wifi_rssi_dbm = float(diagnostics["wifi_rssi_dbm"]) if diagnostics.get("wifi_rssi_dbm") is not None else None
+            telemetry.temperature_c = sensors["temperature_c"]
+            telemetry.humidity_pct = sensors["humidity_pct"]
+            telemetry.weight_kg = sensors["weight_kg"]
+            telemetry.acoustics_hz = sensors["acoustics_hz"]
+            telemetry.battery_v = _coerce_optional_float(diagnostics.get("battery_v"))
+            telemetry.wifi_rssi_dbm = _coerce_optional_float(diagnostics.get("wifi_rssi_dbm"))
             db.flush()
 
             # 3. QoS 1 can redeliver a processed message.  Keep its analysis
@@ -234,7 +290,22 @@ class MQTTConsumer:
             db.commit()
 
             # 5. Broadcast to live WebSockets
+            # Include the AI analysis detail so Flutter can render the full
+            # dashboard state directly from one real-time message.
             broadcast_payload = {
+                "analysis": {
+                    "temperature": analysis.get("temperature"),
+                    "humidity": analysis.get("humidity"),
+                    "weight": analysis.get("weight"),
+                    "acoustics": analysis.get("acoustics"),
+                },
+                "alerts": alerts,
+                "anomaly_score": hive_status.get("anomaly_score"),
+                "diagnostics": {
+                    "battery_v": diagnostics.get("battery_v"),
+                    "wifi_rssi_dbm": diagnostics.get("wifi_rssi_dbm"),
+                },
+                "reasons": summary.get("reasons", []),
                 "event": "TELEMETRY_UPDATE",
                 "hive_id": hive.id,
                 "hive_code": hive.hive_code,
@@ -256,8 +327,15 @@ class MQTTConsumer:
 
     def process_raw_telemetry_payload(self, payload: Dict[str, Any]):
         device_id = payload.get("device_id") or payload.get("deviceId")
-        if not device_id:
+        if not device_id or not isinstance(device_id, str) or not str(device_id).strip():
             logger.warning("Rejected raw MQTT telemetry payload: missing device_id")
+            return
+        device_id = str(device_id).strip()
+
+        # Validation first (spec §18): reject rather than fabricate.
+        sensors = _extract_required_sensors(payload, "raw telemetry")
+        timestamp = _safe_timestamp(payload, "raw telemetry")
+        if not sensors or timestamp is None:
             return
 
         db = SessionLocal()
@@ -267,22 +345,17 @@ class MQTTConsumer:
                 logger.debug(f"Raw telemetry for unmapped device {device_id}; skipping direct persistence.")
                 return
 
-            try:
-                timestamp = int(payload.get("timestamp", int(datetime.utcnow().timestamp())))
-            except (TypeError, ValueError):
-                timestamp = int(datetime.utcnow().timestamp())
             rec_time = datetime.utcfromtimestamp(timestamp)
 
-            # Canonical ESP32 packets keep measurements under sensors and
-            # diagnostics. The flat aliases preserve existing deployed devices.
-            sensors = payload.get("sensors") if isinstance(payload.get("sensors"), dict) else {}
+            # Flat legacy aliases for diagnostics only. Sensor values are
+            # never defaulted: a missing channel means a malformed packet.
             diagnostics = payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else {}
-            temp = sensors.get("temperature_c", payload.get("temperature_c", payload.get("temperature", 34.5)))
-            humidity = sensors.get("humidity_pct", payload.get("humidity_pct", payload.get("humidity", 55.0)))
-            weight = sensors.get("weight_kg", payload.get("weight_kg", payload.get("weightKg", payload.get("weight", 22.0))))
-            acoustics = sensors.get("acoustics_hz", payload.get("acoustics_hz", payload.get("sound_frequency", payload.get("acoustics", 240.0))))
-            battery = diagnostics.get("battery_v", payload.get("battery_v", payload.get("batteryLevel", payload.get("battery", 4.1))))
-            rssi = diagnostics.get("wifi_rssi_dbm", payload.get("wifi_rssi_dbm", payload.get("signalStrength", payload.get("signal_strength", payload.get("wifi_rssi", -65.0)))))
+            temp = sensors["temperature_c"]
+            humidity = sensors["humidity_pct"]
+            weight = sensors["weight_kg"]
+            acoustics = sensors["acoustics_hz"]
+            battery = diagnostics.get("battery_v", payload.get("battery_v"))
+            rssi = diagnostics.get("wifi_rssi_dbm", payload.get("wifi_rssi_dbm"))
 
             # A processed insight can arrive before this lower-priority raw
             # queue item. Reuse that row to keep the reading idempotent.
@@ -303,12 +376,12 @@ class MQTTConsumer:
                     recorded_at=rec_time,
                 )
                 db.add(telemetry)
-            telemetry.temperature_c = float(temp)
-            telemetry.humidity_pct = float(humidity)
-            telemetry.weight_kg = float(weight)
-            telemetry.acoustics_hz = float(acoustics)
-            telemetry.battery_v = float(battery)
-            telemetry.wifi_rssi_dbm = float(rssi)
+            telemetry.temperature_c = temp
+            telemetry.humidity_pct = humidity
+            telemetry.weight_kg = weight
+            telemetry.acoustics_hz = acoustics
+            telemetry.battery_v = _coerce_optional_float(battery)
+            telemetry.wifi_rssi_dbm = _coerce_optional_float(rssi)
             db.commit()
             logger.info(f"Persisted raw telemetry for hive {hive.hive_code} (device: {device_id})")
 
@@ -333,28 +406,42 @@ class MQTTConsumer:
         finally:
             db.close()
 
+    def on_disconnect(self, client, userdata, disconnect_flags, rc, properties=None):
+        # loop_forever(retry_first_connection=True) reconnects automatically;
+        # this handler only records the event and keeps the client reference
+        # current so stop() can always disconnect cleanly.
+        logger.warning(f"[MQTT] Disconnected (rc={rc}); auto-reconnect pending.")
+        self.client = client
+
     def start(self):
         if self.is_running:
             return
 
         self.is_running = True
+        self.client = None
         self._stop_event.clear()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="mqtt-db-worker")
         self._worker.start()
 
         def _runner():
+            # Reconnect loop: retries until stop() is requested, so a broker
+            # outage never crashes FastAPI and never leaves the consumer dead.
             while not self._stop_event.is_set():
                 try:
                     self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2 if hasattr(mqtt, "CallbackAPIVersion") else None)
                     self.client.on_connect = self.on_connect
+                    self.client.on_disconnect = self.on_disconnect
                     self.client.on_message = self.on_message
                     if MQTT_USERNAME and MQTT_PASSWORD:
                         self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-                    logger.info(f"Connecting to MQTT Broker at {self.host}:{self.port}...")
+                    logger.info(f"[MQTT] Connecting to broker at {self.host}:{self.port}...")
                     self.client.connect(self.host, self.port, 60)
+                    logger.info("[MQTT] Connected")
+                    # loop_forever(retry_first_connection=True) also covers a
+                    # broker that drops mid-session (auto-reconnect).
                     self.client.loop_forever(retry_first_connection=True)
                 except Exception as e:
-                    logger.warning(f"MQTT Consumer could not connect to {self.host}:{self.port} ({e}). Retrying in 5 seconds.")
+                    logger.warning(f"[MQTT] Connection failed to {self.host}:{self.port} ({e}). Reconnecting in 5 seconds.")
                     self._stop_event.wait(5)
 
         self._thread = threading.Thread(target=_runner, daemon=True)

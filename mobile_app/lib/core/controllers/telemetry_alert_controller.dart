@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 import '../models/hive_alert_model.dart';
+import '../models/hive_telemetry_models.dart';
 import '../services/audio_alert_service.dart';
+import '../services/auth_token_store.dart';
 
 /// Real-Time Telemetry & Critical Sudden Change Alert Controller for Harvesters
 class TelemetryAlertController extends ChangeNotifier {
@@ -35,6 +37,12 @@ class TelemetryAlertController extends ChangeNotifier {
     return '${AppConstants.backendBaseUrl}/api';
   }
 
+  /// Backend requests carry the signed JWT issued at login.
+  Map<String, String> _authHeaders() => {
+        'Accept': 'application/json',
+        ...AuthTokenStore.authHeader(),
+      };
+
   /// Starts real-time monitoring of live hive telemetry alerts
   void startMonitoring({String? userId, Duration interval = const Duration(seconds: 4)}) {
     _isMonitoring = true;
@@ -64,7 +72,7 @@ class TelemetryAlertController extends ChangeNotifier {
 
       final response = await _client.get(
         uri,
-        headers: {'Accept': 'application/json'},
+        headers: _authHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -107,15 +115,73 @@ class TelemetryAlertController extends ChangeNotifier {
     }
   }
 
-  /// Fetch recent 7-day telemetry history for a specific hive
+  /// Fetch recent live telemetry history for a specific hive
   Future<List<Map<String, dynamic>>> fetchHiveTelemetry(String hiveId) async {
     try {
       final uri = Uri.parse('$_baseUrl/telemetry/live/$hiveId');
-      final response = await _client.get(uri, headers: {'Accept': 'application/json'});
+      final response = await _client.get(uri, headers: _authHeaders());
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['telemetry'] is List) {
           return List<Map<String, dynamic>>.from(data['telemetry']);
+        }
+      }
+    } catch (e) {
+      debugPrint('[TelemetryAlertController] Telemetry history fetch error: $e');
+    }
+    return [];
+  }
+
+  /// Latest real telemetry + stored AI status for one hive.
+  /// Returns null only when the backend is unreachable or rejects the token —
+  /// callers distinguish "no telemetry yet" via HiveSnapshot.hasTelemetry.
+  Future<HiveSnapshot?> fetchHiveSnapshot(String hiveId) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/hives/$hiveId/telemetry/latest');
+      final response = await _client.get(uri, headers: _authHeaders());
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data['success'] == true) {
+          return HiveSnapshot.fromJson(data);
+        }
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        debugPrint('[TelemetryAlertController] Snapshot unauthorized (${response.statusCode})');
+      }
+    } catch (e) {
+      debugPrint('[TelemetryAlertController] Snapshot fetch error: $e');
+    }
+    return null;
+  }
+
+  /// Stored AI/ML status for one hive (risk, anomaly, readiness toward the
+  /// ~145-reading history the AI feature builder requires).
+  Future<HiveAiStatusBundle?> fetchHiveStatus(String hiveId) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/hives/$hiveId/status');
+      final response = await _client.get(uri, headers: _authHeaders());
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data['success'] == true) {
+          return HiveAiStatusBundle.fromJson(data);
+        }
+      }
+    } catch (e) {
+      debugPrint('[TelemetryAlertController] Status fetch error: $e');
+    }
+    return null;
+  }
+
+  /// Historical telemetry (newest first) from the backend.
+  Future<List<Map<String, dynamic>>> fetchHiveTelemetryHistory(String hiveId, {int limit = 144}) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/hives/$hiveId/telemetry').replace(
+        queryParameters: {'limit': '$limit'},
+      );
+      final response = await _client.get(uri, headers: _authHeaders());
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data['success'] == true && data['telemetry'] is List) {
+          return List<Map<String, dynamic>>.from(data['telemetry'] as List);
         }
       }
     } catch (e) {
