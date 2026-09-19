@@ -171,9 +171,9 @@ class RoleImages {
   // 4. PACKAGING: Honey Bottling & Sealed Packaging Line (Exactly 1 Hero Image)
   static const List<RoleImageItem> packagingImages = [
     RoleImageItem(
-      url: 'assets/images/packaging_hero.jpg',
+      url: 'assets/packaging_hero.jpg',
       label: 'Automated honey bottling line and sealed batch packaging',
-      localAssetFallback: 'assets/images/packaging_hero.jpg',
+      localAssetFallback: 'assets/packaging_hero.jpg',
     ),
   ];
 

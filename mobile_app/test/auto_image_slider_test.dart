@@ -46,7 +46,7 @@ void main() {
       expect(images.length, equals(1));
       expect(images[0].url.isNotEmpty, isTrue);
       expect(images[0].label.isNotEmpty, isTrue);
-      expect(images[0].localAssetFallback, equals('assets/images/packaging_hero.jpg'));
+      expect(images[0].localAssetFallback, equals('assets/packaging_hero.jpg'));
     });
 
     test('All 4 role images across all 4 roles are completely unique (no duplicates)', () {
