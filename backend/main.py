@@ -36,7 +36,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_
 from sqlalchemy.exc import IntegrityError
 
 try:
@@ -1333,10 +1333,18 @@ def create_hive(
     current_user: User = Depends(require_verified_harvester),
     db: Session = Depends(get_db)
 ):
+    auto_generated = not payload.hiveCode
     code = payload.hiveCode or f"HIVE-{uuid.uuid4().hex[:6].upper()}"
     code = code.strip()
     existing_code = db.query(Hive).filter(Hive.hive_code == code).first()
     if existing_code:
+        if not auto_generated:
+            # A user-supplied duplicate Hive ID is rejected; the client surfaces the error.
+            raise HTTPException(
+                status_code=409,
+                detail={"success": False, "code": "HIVE_CODE_EXISTS", "message": "Hive code is already in use. Please use a different Hive ID."},
+            )
+        # Auto-generated codes resolve rare races by self-uniquifying.
         code = f"{code}-{uuid.uuid4().hex[:4].upper()}"
 
     dev_id = (payload.deviceId or f"SIH_HIVE_{code[-4:]}").strip()
@@ -1950,6 +1958,7 @@ def get_nearest_centers(
     batchId: Optional[str] = Query(None),
     userId: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     actual_lon = lon if lon is not None else lng
     target = (targetRole or role or "COLLECTOR_PROCESSOR").upper().strip()
@@ -3643,10 +3652,21 @@ def verify_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
 
 
 @app.get("/api/verification/{role}/status/{user_id}")
-def get_verification_status(role: str, user_id: str, db: Session = Depends(get_db)):
+def get_verification_status(
+    role: str,
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     user = db.query(User).filter((User.id == user_id) | (User.email == user_id)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # IDOR guard: users may read only their own verification status (admins excepted).
+    if user.id != current_user.id and "ADMIN" not in (current_user.role or ""):
+        raise HTTPException(
+            status_code=403,
+            detail={"success": False, "code": "FORBIDDEN", "message": "You can only view your own verification status."},
+        )
 
     profile = db.query(Profile).filter(Profile.user_id == user.id).first()
     if not profile:

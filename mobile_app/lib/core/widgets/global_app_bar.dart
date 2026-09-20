@@ -125,7 +125,9 @@ final canPop = ModalRoute.of(context)?.canPop ?? false;
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (extraActions != null) ...extraActions!,
-                  if (showActions && showHomeButton)
+                  // Home is only useful away from the dashboard; on the root
+                  // screen it duplicates the bottom-navigation Home pill.
+                  if (showActions && showHomeButton && canPop)
                     _TopNavActionButton(
                       icon: Icons.home_outlined,
                       tooltip: 'Home',
