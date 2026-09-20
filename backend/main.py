@@ -1446,7 +1446,11 @@ def _hive_ai_readiness(db: Session, hive: Hive, latest_analysis: Optional[HiveAI
 
 
 @app.post("/api/telemetry/ingest")
-def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_db)):
+def ingest_telemetry(
+    payload: TelemetryIngestRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     # 1. Resolve hive
     hive = None
     target_id = payload.hiveId or payload.hiveCode or payload.deviceId
@@ -1457,6 +1461,12 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
         raise HTTPException(
             status_code=404,
             detail={"error": "Target hive not found for telemetry ingestion. Please provide a registered hiveId, hiveCode, or deviceId.", "code": "HIVE_NOT_FOUND"},
+        )
+    # Ownership: only the hive owner (or an admin) may push telemetry into it.
+    if hive.user_id != current_user.id and "ADMIN" not in (current_user.role or ""):
+        raise HTTPException(
+            status_code=403,
+            detail={"success": False, "code": "FORBIDDEN", "message": "You can only ingest telemetry for your own hives."},
         )
 
     # 2. Record telemetry — real measured values only. Pydantic enforces
@@ -1478,32 +1488,103 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
     )
     db.add(telemetry)
 
-    # 3. Check sudden parameter change & create alert if needed
+    # 3. Sudden temperature change detection. The previous REAL reading is
+    # the baseline — never a hardcoded "34.0°C". Detection is change-driven
+    # (spec: "sudden or dangerous change"): a jump of >= 3.0°C between
+    # consecutive readings. A fresh hive (no history) has no previous value,
+    # so no sudden-change alert can be justified yet; sustained abnormality
+    # is the AI/ML path's job (it alerts on risk/anomaly independent of delta).
     created_alerts = []
-    if payload.temperature > 37.0 or payload.temperature < 30.0:
-        alert = HiveAlert(
-            hive_id=hive.id,
-            hive_code=hive.hive_code,
-            device_id=hive.device_id,
-            parameter="Temperature",
-            previous_value="34.0°C",
-            current_value=f"{payload.temperature}°C",
-            change_value=f"{payload.temperature - 34.0:+.1f}°C",
-            unit="°C",
-            severity="CRITICAL",
-            message=f"Unusual temperature detected: {payload.temperature}°C",
-            status="ACTIVE",
+    emergency_payload = None
+    previous = (
+        db.query(HiveTelemetry)
+        .filter(
+            HiveTelemetry.hive_id == hive.id,
+            HiveTelemetry.id != telemetry.id,
         )
-        db.add(alert)
-        created_alerts.append({"id": alert.id, "parameter": alert.parameter, "message": alert.message, "severity": alert.severity})
+        .order_by(desc(HiveTelemetry.timestamp), desc(HiveTelemetry.recorded_at))
+        .first()
+    )
+    SUDDEN_DELTA_C = 3.0
+    is_sudden = (
+        previous is not None
+        and abs(payload.temperature - previous.temperature_c) >= SUDDEN_DELTA_C
+    )
+    if is_sudden:
+        # Dedup: the same telemetry event must not stack duplicate ACTIVE
+        # alerts (QoS 1 redelivery / replayed ingest calls).
+        dup = (
+            db.query(HiveAlert)
+            .filter(
+                HiveAlert.hive_id == hive.id,
+                HiveAlert.parameter == "Temperature",
+                HiveAlert.status == "ACTIVE",
+                HiveAlert.current_value == f"{payload.temperature:.1f}°C",
+                HiveAlert.previous_value == f"{previous.temperature_c:.1f}°C",
+            )
+            .first()
+        )
+        if not dup:
+            alert = HiveAlert(
+                hive_id=hive.id,
+                hive_code=hive.hive_code,
+                device_id=hive.device_id,
+                parameter="Temperature",
+                previous_value=f"{previous.temperature_c:.1f}°C",
+                current_value=f"{payload.temperature:.1f}°C",
+                change_value=f"{payload.temperature - previous.temperature_c:+.1f}°C",
+                unit="°C",
+                severity="CRITICAL",
+                message=f"Sudden abnormal temperature change detected: {previous.temperature_c:.1f}°C → {payload.temperature:.1f}°C",
+                status="ACTIVE",
+            )
+            db.add(alert)
+            db.flush()
+            created_alerts.append(
+                {
+                    "id": alert.id,
+                    "hiveId": alert.hive_id,
+                    "hiveCode": alert.hive_code,
+                    "parameter": alert.parameter,
+                    "previousValue": alert.previous_value,
+                    "currentValue": alert.current_value,
+                    "changeValue": alert.change_value,
+                    "unit": alert.unit,
+                    "severity": alert.severity,
+                    "message": alert.message,
+                    "status": alert.status,
+                    "detectedAt": alert.detected_at.isoformat() if alert.detected_at else None,
+                }
+            )
+            emergency_payload = {
+                "alertIds": [alert.id],
+                "hiveId": hive.id,
+                "hiveCode": hive.hive_code,
+                "severity": "CRITICAL",
+                "message": alert.message,
+                "detectedAt": alert.detected_at.isoformat() if alert.detected_at else None,
+            }
 
     db.commit()
+
+    # Push a real-time emergency event for newly created critical alerts.
+    if emergency_payload:
+        try:
+            import asyncio as _asyncio
+
+            loop = _asyncio.get_running_loop()
+            _asyncio.run_coroutine_threadsafe(manager.broadcast({"event": "CRITICAL_ALERT", **emergency_payload}), loop)
+        except RuntimeError:
+            pass
 
     return {
         "success": True,
         "message": "Telemetry ingested successfully.",
         "telemetryId": telemetry.id,
+        "hiveId": hive.id,
+        "hiveCode": hive.hive_code,
         "alerts": created_alerts,
+        "emergency": emergency_payload,
     }
 
 
@@ -1677,6 +1758,8 @@ def get_alerts(
             "message": a.message,
             "status": a.status,
             "detectedAt": a.detected_at.isoformat() if a.detected_at else None,
+            "acknowledgedAt": a.acknowledged_at.isoformat() if a.acknowledged_at else None,
+            "acknowledgedBy": a.acknowledged_by,
         }
         for a in alerts
     ]
@@ -1691,17 +1774,38 @@ def acknowledge_alert(
 ):
     alert = db.query(HiveAlert).filter(HiveAlert.id == alert_id).first()
     if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
+        raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Alert not found."})
     # Ownership: only the hive owner (or an admin) may acknowledge its alerts.
     hive = db.query(Hive).filter(Hive.id == alert.hive_id).first()
     if not hive or (hive.user_id != current_user.id and "ADMIN" not in (current_user.role or "")):
         raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only manage alerts for your own hives."})
-    alert.status = "ACKNOWLEDGED"
-    alert.acknowledged_at = _utcnow()
-    if not alert.acknowledged_by:
+    # Idempotent: re-acknowledging keeps the FIRST acknowledgment (state +
+    # timestamp + identity). The original alert record is never overwritten.
+    if (alert.status or "").upper() != "ACKNOWLEDGED":
+        alert.status = "ACKNOWLEDGED"
+        alert.acknowledged_at = _utcnow()
         alert.acknowledged_by = current_user.id
     db.commit()
-    return {"success": True, "message": "Alert acknowledged."}
+    return {
+        "success": True,
+        "message": "Alert acknowledged.",
+        "alert": {
+            "id": alert.id,
+            "hiveId": alert.hive_id,
+            "hiveCode": alert.hive_code,
+            "parameter": alert.parameter,
+            "previousValue": alert.previous_value,
+            "currentValue": alert.current_value,
+            "changeValue": alert.change_value,
+            "unit": alert.unit,
+            "severity": alert.severity,
+            "message": alert.message,
+            "status": alert.status,
+            "detectedAt": alert.detected_at.isoformat() if alert.detected_at else None,
+            "acknowledgedAt": alert.acknowledged_at.isoformat() if alert.acknowledged_at else None,
+            "acknowledgedBy": alert.acknowledged_by,
+        },
+    }
 
 
 # ============================================================

@@ -271,29 +271,62 @@ class MQTTConsumer:
 
             # 4. Generate alerts once per physical reading. QoS 1 redelivery
             # must not stack duplicate ACTIVE rows for the same timestamp.
+            created_alert_rows = []
             if is_new_analysis and (
                 hive_status.get("anomaly_detected")
                 or hive_status.get("risk_level") in ("MEDIUM", "HIGH")
                 or len(alerts) > 0
             ):
+                # Real previous reading: the last telemetry row before this one.
+                previous = (
+                    db.query(HiveTelemetry)
+                    .filter(
+                        HiveTelemetry.hive_id == hive.id,
+                        HiveTelemetry.timestamp < timestamp,
+                    )
+                    .order_by(HiveTelemetry.timestamp.desc())
+                    .first()
+                )
                 for alert_item in alerts:
-                    msg_text = alert_item.get("message", "Unusual hive telemetry detected.")
-                    param = alert_item.get("type", "ANOMALY").capitalize()
-                    sev = alert_item.get("severity", "CRITICAL")
+                    if not isinstance(alert_item, dict):
+                        continue
+                    msg_text = alert_item.get("message") or "Unusual hive telemetry detected."
+                    raw_type = str(alert_item.get("type") or alert_item.get("parameter") or "ANOMALY")
+                    param, field, unit = _classify_alert_parameter(raw_type)
+                    if field:
+                        current = sensors.get(field)
+                        prev_val = getattr(previous, field, None) if previous is not None else None
+                        previous_value = _format_sensor_value(prev_val, unit)
+                        current_value = _format_sensor_value(current, unit)
+                        try:
+                            change_value = (
+                                _format_sensor_value(float(current) - float(prev_val), unit, signed=True)
+                                if current is not None and prev_val is not None
+                                else None
+                            )
+                        except (TypeError, ValueError):
+                            change_value = None
+                    else:
+                        # Multivariate/anomaly alerts have no single sensor channel;
+                        # the AI message itself is the reason (never fabricate a delta).
+                        previous_value = None
+                        current_value = _format_sensor_value(sensors.get("temperature_c"), "°C")
+                        change_value = None
                     db_alert = HiveAlert(
                         hive_id=hive.id,
                         hive_code=hive.hive_code,
                         device_id=device_id,
                         parameter=param,
-                        previous_value="Baseline",
-                        current_value=str(sensors.get("temperature_c" if param == "Temperature" else "humidity_pct", "")),
-                        change_value="Shift",
-                        unit="°C" if param == "Temperature" else "%",
-                        severity=sev,
+                        previous_value=previous_value,
+                        current_value=current_value,
+                        change_value=change_value,
+                        unit=unit,
+                        severity=alert_item.get("severity") or "CRITICAL",
                         message=msg_text,
                         status="ACTIVE",
                     )
                     db.add(db_alert)
+                    created_alert_rows.append(db_alert)
 
             # Update hive overall health
             hive.overall_health = hive_status.get("status", "Healthy").capitalize()
@@ -302,6 +335,19 @@ class MQTTConsumer:
             # 5. Broadcast to live WebSockets
             # Include the AI analysis detail so Flutter can render the full
             # dashboard state directly from one real-time message.
+            alert_ids = [a.id for a in created_alert_rows]
+            critical_rows = [a for a in created_alert_rows if (a.severity or "").upper() == "CRITICAL"]
+            emergency = None
+            if critical_rows:
+                first = critical_rows[0]
+                emergency = {
+                    "alertIds": [a.id for a in critical_rows],
+                    "hiveId": hive.id,
+                    "hiveCode": hive.hive_code,
+                    "severity": "CRITICAL",
+                    "message": first.message,
+                    "detectedAt": first.detected_at.isoformat() if first.detected_at else None,
+                }
             broadcast_payload = {
                 "analysis": {
                     "temperature": analysis.get("temperature"),
@@ -310,6 +356,8 @@ class MQTTConsumer:
                     "acoustics": analysis.get("acoustics"),
                 },
                 "alerts": alerts,
+                "alertIds": alert_ids,
+                "emergency": emergency,
                 "anomaly_score": hive_status.get("anomaly_score"),
                 "diagnostics": {
                     "battery_v": diagnostics.get("battery_v"),
@@ -473,3 +521,36 @@ class MQTTConsumer:
 
 
 mqtt_consumer = MQTTConsumer()
+
+
+def _classify_alert_parameter(raw_type: str) -> tuple:
+    """Map an AI alert 'type' to (parameter label, telemetry field, unit).
+    Unknown/multivariate types return field=None — the AI message is the
+    reason and no sensor channel is invented for it.
+    """
+    t = str(raw_type or "").strip().upper()
+    if "TEMP" in t:
+        return ("Temperature", "temperature_c", "°C")
+    if "HUMID" in t:
+        return ("Humidity", "humidity_pct", "%")
+    if "WEIGHT" in t:
+        return ("Weight", "weight_kg", "kg")
+    if "ACOUST" in t or "SOUND" in t:
+        return ("Acoustics", "acoustics_hz", "Hz")
+    if "BATTERY" in t or "POWER" in t:
+        return ("Battery", "battery_v", "V")
+    if "WIFI" in t or "SIGNAL" in t or "RSSI" in t:
+        return ("Wi-Fi", "wifi_rssi_dbm", "dBm")
+    return ("Anomaly", None, "")
+
+
+def _format_sensor_value(value, unit: str, signed: bool = False):
+    """Human-readable "34.2°C"-style sensor value; None passes through as None."""
+    if value is None:
+        return None
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return None
+    text = f"{num:+.1f}" if signed else f"{num:.1f}"
+    return f"{text}{unit}" if unit else text

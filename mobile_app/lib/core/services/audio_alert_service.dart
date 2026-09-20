@@ -12,7 +12,14 @@ class AudioAlertService {
   bool _isPlaying = false;
   int _beepsPlayed = 0;
 
+  /// Test seam: when set, each beep invokes this probe instead of the
+  /// system sound/haptics so tests can count beeps without platform channels.
+  @visibleForTesting
+  static void Function()? beepProbe;
+
   bool get isPlaying => _isPlaying;
+  @visibleForTesting
+  int get beepsPlayed => _beepsPlayed;
 
   /// Plays 3-4 distinct consecutive alert beeps
   Future<void> playCriticalAlertBeeps({int count = 4}) async {
@@ -35,6 +42,11 @@ class AudioAlertService {
   }
 
   void _emitSingleBeep() {
+    final probe = beepProbe;
+    if (probe != null) {
+      probe();
+      return;
+    }
     try {
       // System Alert Sound & Haptic Pulse
       SystemSound.play(SystemSoundType.alert);

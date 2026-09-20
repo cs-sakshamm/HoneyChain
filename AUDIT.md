@@ -187,3 +187,28 @@ Two contract behaviors documented during verification (not bugs — explicitly i
 Both new §13 guards (re-harvest rewind block, duplicate-report block) were added earlier this session and are exercised by this matrix for the first time.
 
 Result: matrix **26/26 PASS**, full backend suite **68/68 PASS**, `ai_ml/` untouched.
+
+## 12. Persistent Emergency Alert System (backend-driven)
+
+End-to-end audit of the existing alert surface found the full skeleton already present (HiveAlert model, MQTT-consumer alert creation, alerts/acknowledge REST APIs, mobile controller + tested CriticalAlertDialog + audio beeper). The audit found these broken connections and fixed them:
+
+### Bugs fixed
+1. **Mobile crash on every critical alert** — the global modal wrapper read `alert.title`, a field `HiveAlertModel` does not have; the first real CRITICAL alert would crash the app. The wrapper now hosts the existing (already widget-tested) `CriticalAlertDialog` with a subtle scale-in animation.
+2. **Acknowledgment never persisted** — `acknowledgeAlert()` posted **without the JWT header** → backend 401 → the modal disappeared locally while the alert stayed ACTIVE forever server-side. Acknowledgment now sends the authenticated request and treats the backend as authoritative (local memory only prevents re-beeping; popup state always re-derives from backend state on the next poll/restart).
+3. **Placeholder alert values** — MQTT-consumer alerts stored `"Baseline"/"Shift"` and mapped *every* parameter to temperature. Alerts now carry the real previous reading (queried from `hive_telemetry`), real current value, and real signed delta ("34.2°C → 41.8°C"); Humidity/Weight/Acoustics map to their own channels; multivariate anomalies store the AI reason and never invent a delta.
+4. **Ingest endpoint hardcoded "34.0°C" baseline** and accepted unauthenticated writes. Now: authentication required, ownership enforced (403 for other users' hives), baseline = the hive's real previous reading, a fresh hive (no history) cannot claim a sudden change, and detection is change-driven (≥3.0°C between consecutive readings, spec §2).
+5. **Beep restart loop** — the poller restarted the 4-beep sequence on every 4-second poll for the same alert. Sound now plays exactly once per genuinely NEW alert; OK stops it immediately; re-beep only for a new alert ID.
+
+### Reused (not duplicated)
+- `HiveAlert` model (all spec §3 fields already present: alert id, hive, device, parameter, previous/current/change values, severity, message, status, detected_at, acknowledged_at, acknowledged_by; harvester identity via `hive_id → Hive.user_id` FK — ownership enforced in the API, no denormalized column added).
+- AI/ML output as the only anomaly authority (consumer alerts from `hive_status`/`alerts` of the processed payload; no second detection algorithm).
+- Existing WS infrastructure: consumer broadcasts now include `alertIds` + an `emergency` object (CRITICAL severity) so WS clients can drive the emergency UI; broadcast fields pinned by tests.
+- Existing `CriticalAlertDialog`, `AudioAlertService` (SystemSound-based beeper, no new dependency), 4s authenticated polling (the app's existing real-time mechanism; reconnect/restart-safe by design — every poll re-fetches ACTIVE alerts, so an unacknowledged alert can never be lost to a restart).
+- Blockchain: supply-chain provenance events were **not** overloaded with alert records (would change the meaning of on-chain events); alert immutability is guaranteed at the DB layer (ACTIVE→ACKNOWLEDGED only, no delete path, first ack wins).
+
+### Tests added
+- `backend/tests/test_emergency_alerts.py` (18): AI-path alerts with real values, no fabricated multivariate delta, QoS-redelivery dedup, WS emergency broadcast fields, ingest normal/first-reading/sudden/dedup/auth/403, acknowledgment (returns updated alert, idempotent first-ack-wins, 403 intruder, 401 unauth, 404 unknown, permanent history, multi-hive isolation).
+- `mobile_app/test/emergency_alert_flow_test.dart` (6): beep-once-per-new-alert across polls, authenticated authoritative acknowledgment + immediate sound stop, ack-failure honesty, persistent modal render + OK flow, 4-beep/stop semantics.
+
+### Results
+Backend 86/86 (60 + 26 matrix) · Flutter 53/53 · `ai_ml/` untouched · no new dependencies · no schema changes.

@@ -86,21 +86,26 @@ class TelemetryAlertController extends ChangeNotifier {
 
             _alerts = incoming;
 
-            // Find the newest unacknowledged critical alert not yet dismissed in current session
+            // Newest unacknowledged critical alert. A local "seen" memory
+            // only prevents re-beeping for an alert the user already saw
+            // this session while the backend still lists it as ACTIVE —
+            // the modal itself always reflects authoritative backend state.
             final unhandled = incoming.where(
               (a) => a.isCritical && a.isActive && !_acknowledgedAlertIds.contains(a.id),
             ).toList();
 
             if (unhandled.isNotEmpty) {
               final nextAlert = unhandled.first;
-              if (_activeUnacknowledgedAlert?.id != nextAlert.id) {
-                _activeUnacknowledgedAlert = nextAlert;
-                _isAlertPopupOpen = true;
+              final isNewAlert = _activeUnacknowledgedAlert?.id != nextAlert.id;
+              _activeUnacknowledgedAlert = nextAlert;
+              _isAlertPopupOpen = true;
 
-                // Trigger loud 3-4 consecutive alert beeps
+              // Beep only when a genuinely NEW alert takes the stage;
+              // polling must never restart sound for the same alert.
+              if (isNewAlert) {
                 AudioAlertService.instance.playCriticalAlertBeeps(count: 4);
-                notifyListeners();
               }
+              notifyListeners();
             } else {
               if (_activeUnacknowledgedAlert != null && !_isAlertPopupOpen) {
                 _activeUnacknowledgedAlert = null;
@@ -203,7 +208,7 @@ class TelemetryAlertController extends ChangeNotifier {
       final uri = Uri.parse('$_baseUrl/telemetry/ingest');
       final response = await _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders(),
         body: json.encode({
           'hiveId': hiveId,
           'temperature': temperature,
@@ -233,8 +238,14 @@ class TelemetryAlertController extends ChangeNotifier {
     return null;
   }
 
-  /// Acknowledge the critical alert when the Harvester clicks OK
-  Future<void> acknowledgeAlert(String alertId, {String? userId, String? userName}) async {
+  /// Acknowledge the critical alert when the Harvester taps OK.
+  ///
+  /// Order of operations (spec §6): stop the sound immediately, close the
+  /// modal optimistically, then let the BACKEND authorize and persist the
+  /// acknowledgment. Local memory only prevents the poller from re-beeping
+  /// if the backend is briefly unreachable — the backend remains the single
+  /// source of truth for alert state.
+  Future<bool> acknowledgeAlert(String alertId, {String? userId, String? userName}) async {
     // 1. Immediately stop any active beeps
     AudioAlertService.instance.stopAlert();
 
@@ -243,19 +254,29 @@ class TelemetryAlertController extends ChangeNotifier {
     _activeUnacknowledgedAlert = null;
     notifyListeners();
 
-    // 2. Transmit acknowledgement to backend
+    // 2. Backend acknowledgment is authoritative (authenticated owner only).
     try {
       final uri = Uri.parse('$_baseUrl/telemetry/alerts/$alertId/acknowledge');
-      await _client.post(
+      final response = await _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          ..._authHeaders(),
+        },
         body: json.encode({
           'userId': userId,
           'userName': userName,
         }),
       );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      debugPrint('[TelemetryAlertController] Acknowledge rejected: ${response.statusCode}');
+      return false;
     } catch (e) {
       debugPrint('[TelemetryAlertController] Acknowledge sync error: $e');
+      return false;
     }
   }
 
