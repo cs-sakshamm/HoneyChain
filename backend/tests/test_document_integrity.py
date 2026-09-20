@@ -124,6 +124,12 @@ def certified_batch():
     assert report.status_code == 200, report.text
     assert report.json()["overallResult"] == "PASS"
 
+    # Complete the chain through packaging so the final QR record exists.
+    pkg = client.post("/api/packaging", json={
+        "batchId": batch_id, "finalQuantity": 11.0, "numberOfPackages": 22,
+    }, headers=h(users["packager"]))
+    assert pkg.status_code == 200, pkg.text
+
     return batch_id
 
 
@@ -166,6 +172,46 @@ def test_tampered_report_row_fails_integrity(client, certified_batch, db_fixture
             db.commit()
         finally:
             db.close()
+
+
+def test_final_qr_uses_real_batch_id_and_public_verify_route(client, certified_batch):
+    """Spec §20: the final QR must encode the REAL batch ID pointing at the
+    public /verify route, and the stored image must be a genuine PNG that
+    decodes back to exactly that URL."""
+    import base64
+    import io
+    import os
+
+    import zxingcpp
+    from PIL import Image
+
+    from backend.models import QRCode
+
+    batch_id = certified_batch
+    db = SessionLocal()
+    try:
+        qr = db.query(QRCode).filter(QRCode.batch_id == batch_id).first()
+        assert qr is not None, "packaging must persist a QR record"
+        expected_base = os.getenv("PUBLIC_APP_URL", "http://127.0.0.1:8000").rstrip("/")
+        expected_url = f"{expected_base}/verify/{batch_id}"
+        assert qr.verification_url == expected_url
+        assert qr.qr_image_data_uri, "QR image data must be stored"
+        assert qr.qr_image_data_uri.startswith("data:image/png;base64,")
+        png_bytes = base64.b64decode(qr.qr_image_data_uri.split(",", 1)[1])
+        assert png_bytes[:8] == b"\x89PNG\r\n\x1a\n", "stored QR must decode to a real PNG"
+    finally:
+        db.close()
+
+    # The stored image must actually be a scannable QRCode encoding exactly
+    # the public verification URL — not a placeholder or a different payload.
+    decoded = zxingcpp.read_barcodes(Image.open(io.BytesIO(png_bytes)))
+    assert decoded, "stored PNG must be a readable QR code"
+    assert [r.text for r in decoded] == [expected_url]
+    assert all(r.format == zxingcpp.BarcodeFormat.QRCode for r in decoded)
+
+    # The encoded URL must resolve publicly (fresh, unauthenticated).
+    res = client.get(f"/verify/{batch_id}")
+    assert res.status_code == 200
 
 
 def test_no_anchored_hash_never_claims_integrity(client):

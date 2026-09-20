@@ -22,6 +22,9 @@ web3>=6.15.0
 # QR codes
 qrcode[pil]>=7.4.2
 pillow>=10.2.0
+# QR decode verification (tests pin that the stored QR image encodes the
+# exact public verification URL)
+zxing-cpp>=2.2.0
 
 # Google/requests helpers & tests
 requests>=2.31.0
