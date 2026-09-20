@@ -230,3 +230,20 @@ Re-verification pass against the full HoneyChain specification. Previously fixed
 
 ### Results
 Backend **89/89** (63 + 26 matrix) · `ai_ml/` untouched · no mobile/web changes this pass.
+
+## 14. Specification Re-Audit II (§11 document integrity, §15E/§15F token security)
+
+Third verification pass. Previously verified areas (§8–§13) unchanged; this pass targeted acceptance criteria never yet exercised:
+
+| Area | Status | Evidence |
+|---|---|---|
+| §15C/§15D identity | PASS (pre-existing) | `get_current_user` derives identity from the token's `sub` → **database lookup** (401 `USER_NOT_FOUND` for deleted accounts); role claims in the JWT are never trusted for authorization — every route checks `user.role` from the DB row |
+| §11 Document integrity | **FIXED** | `documentIntegrityStatus` was a static "DOCUMENT HASH ANCHORED" string — no comparison ever ran. The public verifier now recomputes the certification hash (two layers: SHA-256 over the canonical report fields, then over the exact LAB_CERTIFICATION event payload) and compares with the anchored `data_hash`: equal → `DOCUMENT INTEGRITY VERIFIED`, different → `REPORT INTEGRITY FAILED` (report altered after certification), no anchor → `NOT ANCHORED`. Also fixed: verifier parameter verdicts were hardcoded "PASS" — now computed from the real Codex/FSSAI thresholds |
+| §15E/§15F token security | PASS (verified by new tests) | expired → 401 `TOKEN_EXPIRED`; tampered payload / wrong-secret / garbage / empty → 401 `INVALID_TOKEN`; duplicate signup → 409 `ROLE_ACCOUNT_EXISTS`; wrong password → 401 with safe generic error (no user-enumeration) |
+
+### Tests added
+- `backend/tests/test_document_integrity.py` (3): intact chain → VERIFIED; **tampered report row → REPORT INTEGRITY FAILED** (tamper-evidence proven, then row restored); report without an anchored hash never claims integrity.
+- `backend/tests/test_token_security.py` (7): expired/tampered/wrong-secret/garbage/empty tokens rejected with precise codes; valid token accepted; duplicate signup 409; safe wrong-password error.
+
+### Results
+Backend **99/99** (64 + 9 + 26 matrix; run in chunks — full suite now ~19 min under local process contention) · `ai_ml/` untouched · no mobile/web changes.

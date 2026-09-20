@@ -3123,6 +3123,49 @@ def generate_verification_html(data: Dict[str, Any]) -> str:
 </html>"""
 
 
+def _lab_document_integrity(lab_report, anchored_hash: Optional[str]):
+    """Spec §11: recompute the lab certification hash and compare it with the
+    hash anchored on-chain at certification time.
+
+    The anchored hash is blockchain_service.compute_hash over the exact
+    LAB_CERTIFICATION event payload; that payload embeds an inner document
+    hash over the report's canonical fields. Both layers are rebuilt from the
+    current report row and compared — Equal → DOCUMENT INTEGRITY VERIFIED,
+    Different → REPORT INTEGRITY FAILED (the report was altered after
+    certification — tamper-evident, exactly as designed), no anchor →
+    NOT ANCHORED. The comparison is cryptographic (SHA-256), never
+    filename/timestamp based, and proves integrity only — not the factual
+    truth of the original lab entry.
+    """
+    if lab_report is None:
+        return (None, None)
+    if not anchored_hash:
+        return ("NOT ANCHORED", None)
+    inner_document_hash = hashlib.sha256(json.dumps({
+        "report_id": lab_report.report_id,
+        "batch_id": lab_report.batch_id,
+        "lab_id": lab_report.lab_id,
+        "moisture": lab_report.moisture_content,
+        "hmf": lab_report.hmf_value,
+        "diastase": lab_report.diastase_value,
+        "overall_result": lab_report.overall_result,
+    }, sort_keys=True).encode("utf-8")).hexdigest()
+    event_payload = {
+        "report_id": lab_report.report_id,
+        "document_id": lab_report.report_id,
+        "document_hash": inner_document_hash,
+        "quality_score": lab_report.quality_score,
+        "moisture": lab_report.moisture_content,
+        "hmf": lab_report.hmf_value,
+        "diastase": lab_report.diastase_value,
+        "result": lab_report.overall_result,
+    }
+    recomputed = hashlib.sha256(json.dumps(event_payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    if recomputed == anchored_hash:
+        return ("DOCUMENT INTEGRITY VERIFIED", recomputed)
+    return ("REPORT INTEGRITY FAILED", recomputed)
+
+
 @app.get("/api/verify")
 @app.get("/api/verify/{batch_id}")
 @app.get("/verify/{batch_id}")
@@ -3240,12 +3283,18 @@ def verify_batch(
             "status": "CERTIFIED APPROVED (PASS)" if lab_report and lab_report.overall_result == "PASS" else "No data available yet.",
             "documentId": lab_report.report_id if lab_report else "No data available yet.",
             "documentHash": next((b.data_hash for b in bc_records if "LAB_CERTIFICATION" in b.event_type), None) if lab_report else None,
-            "documentIntegrityStatus": "DOCUMENT HASH ANCHORED" if lab_report else "No lab document available",
+            "documentIntegrityStatus": (
+                _lab_document_integrity(
+                    lab_report,
+                    next((b.data_hash for b in bc_records if "LAB_CERTIFICATION" in b.event_type), None),
+                )[0]
+                or "No lab document available"
+            ),
             "parameters": [
-                {"name": "Moisture Content", "value": f"{lab_report.moisture_content}%", "standard": "<= 20.0%", "status": "PASS"},
-                {"name": "Hydroxymethylfurfural (HMF)", "value": f"{lab_report.hmf_value} mg/kg", "standard": "<= 40.0 mg/kg", "status": "PASS"},
-                {"name": "Diastase Enzyme Activity", "value": f"{lab_report.diastase_value} Schade Units", "standard": ">= 8.0 Schade Units", "status": "PASS"},
-                {"name": "F/G Ratio (Fructose/Glucose)", "value": f"{lab_report.f_g_ratio}", "standard": ">= 0.95 Ratio", "status": "PASS"},
+                {"name": "Moisture Content", "value": f"{lab_report.moisture_content}%", "standard": "<= 20.0%", "status": "PASS" if (lab_report.moisture_content or 0) <= 20.0 else "FAIL"},
+                {"name": "Hydroxymethylfurfural (HMF)", "value": f"{lab_report.hmf_value} mg/kg", "standard": "<= 40.0 mg/kg", "status": "PASS" if (lab_report.hmf_value or 0) <= 40.0 else "FAIL"},
+                {"name": "Diastase Enzyme Activity", "value": f"{lab_report.diastase_value} Schade Units", "standard": ">= 8.0 Schade Units", "status": "PASS" if (lab_report.diastase_value or 0) >= 8.0 else "FAIL"},
+                {"name": "F/G Ratio (Fructose/Glucose)", "value": f"{lab_report.f_g_ratio}", "standard": ">= 0.95 Ratio", "status": "PASS" if (lab_report.f_g_ratio or 0) >= 0.95 else "FAIL"},
                 {"name": "Antibiotic & Chemical Residues", "value": "None Detected (< 0.01 ppm)", "standard": "Zero Tolerance", "status": "PASS"},
                 {"name": "Microscopic Pollen Origin", "value": lab_report.pollen_origin or "Authentic Flora (Apis mellifera)", "standard": "Botanical Identity Match", "status": "PASS"},
             ] if lab_report else [],
