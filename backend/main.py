@@ -10,6 +10,9 @@ import hashlib
 import json
 import logging
 import os
+import re
+import threading
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -34,6 +37,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
+from sqlalchemy.exc import IntegrityError
 
 try:
     from backend.time_utils import utcfromtimestamp_naive, utcnow_naive
@@ -989,6 +993,124 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
     return {
         "success": True,
         "message": "Google authenticated successfully.",
+        "user": get_user_dict(user),
+        "token": token,
+    }
+
+
+@app.post("/api/auth/phone")
+def phone_auth(payload: Dict[str, Any], db: Session = Depends(get_db)):
+    """Exchange a Firebase Phone-Auth ID token for a HoneyChain session.
+
+    The Flutter/web client signs in with Firebase Phone OTP, then posts the
+    fresh Firebase ID token here. The token is verified against Google's
+    public signing certs (RS256, Firebase issuer + audience) — a valid token
+    is the ONLY accepted identity; no client-supplied phone is trusted.
+    Passwords are never involved in this flow.
+    """
+    id_token = (payload.get("idToken") or "").strip()
+    if not id_token:
+        raise HTTPException(
+            status_code=400,
+            detail={"success": False, "error": "A Firebase ID token is required.", "code": "ID_TOKEN_REQUIRED"},
+        )
+
+    project_id = (os.getenv("FIREBASE_PROJECT_ID") or "honeychain-40065").strip()
+    expected_issuer = f"https://securetoken.google.com/{project_id}"
+
+    from google.auth import jwt as gjwt
+    from google.auth.transport import requests as grequests
+
+    try:
+        claims = gjwt.decode(
+            id_token,
+            certs_url="https://www.googleapis.com/robots/v1/metadata/x509/securetoken@system.gserviceaccount.com",
+            audience=project_id,
+        )
+        # google.auth checks signature, audience and expiry; issuer is ours to check.
+        if claims.get("iss") != expected_issuer:
+            raise ValueError("Invalid token issuer")
+        firebase_uid = claims.get("sub")
+        if not firebase_uid:
+            raise ValueError("Token has no subject")
+    except Exception as e:
+        logger.warning(f"Firebase phone ID token verification failed: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail={"success": False, "error": "The phone verification token could not be verified.", "code": "INVALID_PHONE_TOKEN"},
+        )
+
+    # SECURITY: the phone number is ONLY ever taken from the Firebase-verified
+    # token claim. The client-supplied "phone" field is ignored — trusting it
+    # would let anyone sign in as any phone number by posting an arbitrary one
+    # alongside any valid Firebase token.
+    verified_phone = claims.get("phone_number")
+    if not verified_phone:
+        raise HTTPException(
+            status_code=401,
+            detail={"success": False, "error": "The token does not contain a verified phone number.", "code": "NO_PHONE_IN_TOKEN"},
+        )
+    verified_phone = verified_phone.strip()
+
+    # Frontend/backend contract: E.164 (+[cc][nsn]). Reject anything else so a
+    # malformed number can never fork into a duplicate account row.
+    if not re.fullmatch(r"\+\d{8,15}", verified_phone):
+        raise HTTPException(
+            status_code=401,
+            detail={"success": False, "error": "The verified phone number is not in E.164 format.", "code": "INVALID_PHONE_FORMAT"},
+        )
+
+    target_role = normalize_role(payload.get("role"))
+    explicit_role = bool((payload.get("role") or "").strip())
+
+    user = db.query(User).filter(User.phone == verified_phone, User.role.in_(role_aliases(target_role))).first()
+    if user is None and not explicit_role:
+        # Session restores may omit `role`. Fall back to ANY account holding
+        # this verified number so a restored session lands on the existing
+        # profile instead of forking a duplicate (oldest account wins).
+        user = db.query(User).filter(User.phone == verified_phone).order_by(User.created_at).first()
+    if not user:
+        # users.email is NOT NULL and part of the unique (email, role) index, so
+        # phone-first accounts get a stable, collision-free placeholder address
+        # derived from the verified number. Previously this inserted email=None,
+        # which crashed EVERY first-time phone signup with
+        # "NOT NULL constraint failed: users.email".
+        placeholder_email = f"phone-{verified_phone.lstrip('+')}@phone.honeychain.local"
+        user = User(
+            name=(payload.get("name") or "HoneyChain Member").strip(),
+            phone=verified_phone,
+            email=placeholder_email,
+            firebase_id=firebase_uid,
+            auth_provider="phone",
+            role=target_role,
+            beekeeper_id=f"HC-BK-{uuid.uuid4().hex[:8].upper()}" if target_role == "HARVESTER" else None,
+            is_verified=True,
+        )
+        db.add(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            # Concurrent first-login race (two tabs/devices at once):
+            # re-fetch the row the other request created instead of 500-ing.
+            db.rollback()
+            user = db.query(User).filter(User.phone == verified_phone, User.role.in_(role_aliases(target_role))).first()
+            if not user:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"success": False, "error": "Could not create your session. Please try again.", "code": "SESSION_CREATE_FAILED"},
+                )
+        db.refresh(user)
+    elif not user.firebase_id:
+        # Associate the Firebase identity with an existing account (e.g. one
+        # registered earlier via email/password) WITHOUT touching its profile.
+        user.firebase_id = firebase_uid
+        db.commit()
+
+    token = create_access_token({"sub": user.id, "phone": user.phone, "role": user.role})
+
+    return {
+        "success": True,
+        "message": "Phone authenticated successfully.",
         "user": get_user_dict(user),
         "token": token,
     }
@@ -2043,7 +2165,7 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
     batches = batches_query.all()
     for b in batches:
         pkg = db.query(PackagingBatch).filter(PackagingBatch.batch_id == b.batch_id).first()
-        is_pkg_stage = (b.current_stage in ("PACKAGING", "COMPLETED")) or (b.status in ("SENT_TO_PACKAGING", "READY_FOR_PACKAGING", "PACKAGING_ACCEPTED", "COMPLETED")) or (pkg is not None)
+        is_pkg_stage = (b.current_stage in ("PACKAGING", "COMPLETED", "PROCESSING")) or (b.status in ("SENT_TO_PACKAGING", "READY_FOR_PACKAGING", "PACKAGING_ACCEPTED", "PROCESSING", "COMPLETED")) or (pkg is not None)
         if not is_pkg_stage:
             continue
 
@@ -2052,7 +2174,10 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
         report = db.query(LabReport).filter(LabReport.batch_id == b.batch_id).first()
         latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == b.batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
 
-        pkg_status = "COMPLETED" if pkg else ("PACKAGING_ACCEPTED" if b.status == "PACKAGING_ACCEPTED" else "PENDING")
+        pkg_status = "COMPLETED" if pkg else (
+            "PACKAGING_ACCEPTED" if (b.status or "").upper() == "PACKAGING_ACCEPTED"
+            else ("PROCESSING" if (b.status or "").upper() == "PROCESSING" else "PENDING")
+        )
 
         out.append({
             "id": f"REQ-PKG-{b.batch_id}",
@@ -2221,6 +2346,20 @@ def update_workflow_request(
             lab_req.notes = payload.notes
         db.commit()
         return {"success": True, "message": f"Lab request updated to {lab_req.status}"}
+
+    # Packaging requests use synthetic ids "REQ-PKG-{batch_id}" (see /api/requests):
+    # resolve them to the underlying batch and transition it directly (same guards).
+    if request_id.startswith("REQ-PKG-"):
+        batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == request_id[len("REQ-PKG-"):]).first()
+        if batch:
+            old = (batch.status or "").upper()
+            if old in TERMINAL:
+                raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Batch already {old}; no further transitions allowed."})
+            batch.status = new_status
+            if new_status in ("PACKAGING_ACCEPTED", "PROCESSING", "COMPLETED"):
+                batch.current_stage = "PACKAGING"
+            db.commit()
+            return {"success": True, "message": f"Packaging batch updated to {batch.status}"}
 
     raise HTTPException(status_code=404, detail="Request not found")
 
@@ -3345,9 +3484,89 @@ def verify_batch(
 # ============================================================
 # 6. VERIFICATION FLOW APIS (FOR FLUTTER PROFILE GATES)
 # ============================================================
+# ── OTP rate limiting (in-process sliding window) ─────────────────────────
+# Guards /api/verification/send-otp and /api/verification/verify-otp against
+# SMS pumping and code brute-forcing. State is per-process; at multi-replica
+# scale move this to a shared store (e.g. Redis).
+OTP_SEND_LIMIT = int(os.getenv("OTP_SEND_LIMIT", "3"))  # codes per phone per window
+OTP_SEND_WINDOW_SECONDS = int(os.getenv("OTP_SEND_WINDOW_SECONDS", "600"))
+OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))
+OTP_VERIFY_ATTEMPT_LIMIT = int(os.getenv("OTP_VERIFY_ATTEMPT_LIMIT", "5"))
+OTP_VERIFY_WINDOW_SECONDS = int(os.getenv("OTP_VERIFY_WINDOW_SECONDS", "600"))
+
+_otp_rate_lock = threading.Lock()
+_otp_send_history: Dict[str, List[float]] = {}
+_otp_verify_history: Dict[str, List[float]] = {}
+
+
+def _otp_allow(history: Dict[str, List[float]], key: str, limit: int, window: float, *, min_interval: float = 0.0):
+    """Sliding-window gate. Returns (allowed, retry_after_seconds)."""
+    now = time.monotonic()
+    with _otp_rate_lock:
+        stamps = [t for t in history.get(key, []) if now - t < window]
+        if min_interval and stamps:
+            since_last = now - max(stamps)
+            if since_last < min_interval:
+                history[key] = stamps
+                return False, int(min_interval - since_last) + 1
+        if len(stamps) >= limit:
+            retry = int(window - (now - min(stamps))) + 1
+            history[key] = stamps
+            return False, max(retry, 1)
+        stamps.append(now)
+        history[key] = stamps
+        return True, 0
+
+
+def _otp_clear(history: Dict[str, List[float]], key: str) -> None:
+    with _otp_rate_lock:
+        history.pop(key, None)
+
+
+def reset_otp_rate_limiters() -> None:
+    """Clear in-process OTP rate-limit state (used by tests)."""
+    with _otp_rate_lock:
+        _otp_send_history.clear()
+        _otp_verify_history.clear()
+
+
 @app.post("/api/verification/send-otp")
 def send_otp(payload: dict, db = Depends(get_db)):
     phone = (payload.get("phone") or "").strip()
+    if not re.fullmatch(r"\+?\d{8,15}", phone):
+        raise HTTPException(
+            status_code=400,
+            detail={"success": False, "error": "Enter a valid phone number.", "code": "INVALID_PHONE"},
+        )
+
+    # Server-side resend cooldown + per-number send quota (SMS pumping guard).
+    allowed, retry_after = _otp_allow(
+        _otp_send_history,
+        phone,
+        OTP_SEND_LIMIT,
+        OTP_SEND_WINDOW_SECONDS,
+        min_interval=OTP_RESEND_COOLDOWN_SECONDS,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "success": False,
+                "error": "Too many OTP requests. Please wait before requesting another code.",
+                "code": "OTP_RATE_LIMITED",
+                "cooldownSeconds": retry_after,
+            },
+        )
+
+    # Resend semantics: any outstanding unverified code for this number stops
+    # being valid the moment a new one is generated (only the newest code can
+    # ever succeed).
+    db.query(OTPVerification).filter(
+        OTPVerification.phone == phone,
+        OTPVerification.is_verified.is_(False),
+        OTPVerification.expires_at > _utcnow(),
+    ).update({"expires_at": _utcnow()}, synchronize_session=False)
+
     session_id = str(uuid.uuid4())
     import secrets
     otp_code = "".join([str(secrets.randbelow(10)) for _ in range(6)])
@@ -3360,7 +3579,8 @@ def send_otp(payload: dict, db = Depends(get_db)):
     db.add(otp)
     db.commit()
     otp_provider = os.getenv("OTP_PROVIDER", "sandbox").lower()
-    logger.info(f"[OTP Service] OTP generated for phone {phone} (Session: {session_id}, provider: {otp_provider})")
+    # Log only the masked number — never the code itself.
+    logger.info(f"[OTP Service] OTP generated for phone ***{phone[-4:]} (Session: {session_id}, provider: {otp_provider})")
     resp = {
         "success": True,
         "message": "OTP generated and dispatched successfully.",
@@ -3369,7 +3589,7 @@ def send_otp(payload: dict, db = Depends(get_db)):
         "deliveryMode": otp_provider,
     }
     if otp_provider == "sandbox":
-        resp["devOtp"] = otp_code  # sandbox/testing only
+        resp["devOtp"] = otp_code  # sandbox/testing only — never in production
     return resp
 
 
@@ -3377,23 +3597,48 @@ def send_otp(payload: dict, db = Depends(get_db)):
 def verify_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
     otp_val = str(payload.get("otp") or "").strip()
     session_id = payload.get("sessionId")
-    phone = payload.get("phone")
+    phone = (payload.get("phone") or "").strip() if isinstance(payload.get("phone"), str) else ""
+
+    if not re.fullmatch(r"\d{6}", otp_val):
+        return {"success": False, "code": "INVALID_OTP_FORMAT", "error": "Enter the 6-digit verification code."}
+    if not session_id and not phone:
+        return {"success": False, "code": "MISSING_SCOPE", "error": "A sessionId or phone is required to verify the code."}
+
+    # Brute-force guard: cap verification attempts per number/session.
+    scope_key = phone or str(session_id)
+    allowed, retry_after = _otp_allow(
+        _otp_verify_history, scope_key, OTP_VERIFY_ATTEMPT_LIMIT, OTP_VERIFY_WINDOW_SECONDS
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "success": False,
+                "error": "Too many incorrect attempts. Please request a new code.",
+                "code": "OTP_ATTEMPTS_EXCEEDED",
+                "cooldownSeconds": retry_after,
+            },
+        )
 
     query = db.query(OTPVerification).filter(
         OTPVerification.otp_code == otp_val,
         OTPVerification.expires_at > _utcnow(),
     )
     if session_id:
-        query = query.filter(OTPVerification.session_id == session_id)
-    elif phone:
-        query = query.filter(OTPVerification.phone == phone.strip())
+        query = query.filter(OTPVerification.session_id == str(session_id))
+    else:
+        query = query.filter(OTPVerification.phone == phone)
 
     record = query.order_by(desc(OTPVerification.created_at)).first()
     if not record:
-        return {"success": False, "error": "Invalid or expired OTP. Please request a new verification code."}
+        return {"success": False, "code": "INVALID_OR_EXPIRED_OTP", "error": "Invalid or expired OTP. Please request a new verification code."}
 
+    # One-time use: consume the code by closing its validity window (the row
+    # remains as an audit record but can never satisfy a future verification).
     record.is_verified = True
+    record.expires_at = _utcnow()
     db.commit()
+    _otp_clear(_otp_verify_history, scope_key)
     return {"success": True, "message": "Mobile number successfully verified."}
 
 

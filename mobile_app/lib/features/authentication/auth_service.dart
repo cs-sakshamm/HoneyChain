@@ -45,6 +45,64 @@ class AuthService {
   /// Currently logged in user
   User? get currentUser => _firebaseAuth?.currentUser;
 
+  /// Trigger the Firebase Phone-OTP flow.
+  ///
+  /// - verificationCompleted: Android auto-retrieval / instant verification —
+  ///   the credential signs the user in without manual OTP entry.
+  /// - codeSent: store the verificationId and show the OTP entry UI.
+  /// - codeAutoRetrievalTimeout: keep the verificationId for manual entry.
+  /// - forceResendingToken: pass the token from a previous [codeSent] callback
+  ///   to reuse the same verification session (reduces SMS quota usage on resend).
+  Future<void> verifyPhoneNumber({
+    required String phoneNumber,
+    required void Function(PhoneAuthCredential credential) verificationCompleted,
+    required void Function(FirebaseAuthException error) verificationFailed,
+    required void Function(String verificationId, int? resendToken) codeSent,
+    required void Function(String verificationId) codeAutoRetrievalTimeout,
+    int? forceResendingToken,
+    Duration timeout = const Duration(seconds: 60),
+  }) async {
+    final auth = _firebaseAuth;
+    if (auth == null) {
+      verificationFailed(
+        FirebaseAuthException(code: 'firebase-not-initialized', message: 'Firebase is not available on this device.'),
+      );
+      return;
+    }
+    await auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      timeout: timeout,
+      forceResendingToken: forceResendingToken,
+      verificationCompleted: verificationCompleted,
+      verificationFailed: verificationFailed,
+      codeSent: codeSent,
+      codeAutoRetrievalTimeout: codeAutoRetrievalTimeout,
+    );
+  }
+
+  /// Complete phone authentication with the SMS code.
+  Future<UserCredential?> signInWithSmsCode({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    final auth = _firebaseAuth;
+    if (auth == null) return null;
+    final credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+    return auth.signInWithCredential(credential);
+  }
+
+  /// Fresh Firebase ID token for backend session exchange.
+  Future<String?> getIdToken() async {
+    try {
+      return await _firebaseAuth?.currentUser?.getIdToken(true);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Trigger native Google Account Sign-In flow
   Future<UserCredential?> signInWithGoogle() async {
     final auth = _firebaseAuth;

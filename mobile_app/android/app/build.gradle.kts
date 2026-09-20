@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Google Services plugin — processes google-services.json for Firebase
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -46,4 +48,16 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Firebase BoM — manages all Firebase library versions automatically.
+    // When using the BoM, do NOT specify versions on individual Firebase deps.
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+
+    // Firebase Authentication — required for Phone OTP sign-in
+    implementation("com.google.firebase:firebase-auth")
+
+    // Firebase Analytics (included by default; remove if not needed)
+    implementation("com.google.firebase:firebase-analytics")
 }

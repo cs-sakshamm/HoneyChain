@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { VerifyPage } from './pages/VerifyPage';
+import { PhoneAuthPage } from './pages/PhoneAuthPage';
+import { useFirebaseUser, signOutFirebase } from './auth/useFirebaseUser';
+import { LogOut } from 'lucide-react';
 import { Search, Hexagon } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { getPageVariants, getButtonProps } from './utils/animations';
@@ -8,6 +11,10 @@ export const App: React.FC = () => {
   const [currentBatchId, setCurrentBatchId] = useState<string>('');
   const [inputBatchId, setInputBatchId] = useState<string>('');
   const shouldReduceMotion = useReducedMotion();
+
+  // Phone-OTP session. QR deep links (/verify/:id) stay public for consumers;
+  // the interactive verifier (landing + lookup) requires sign-in.
+  const { user, loading } = useFirebaseUser();
 
   useEffect(() => {
     const parseUrl = () => {
@@ -42,8 +49,49 @@ export const App: React.FC = () => {
     setCurrentBatchId(cleanId);
   };
 
+  // QR deep links stay public (printed on packaging); the lookup app is gated.
+  const isDeepLink = currentBatchId !== '' && window.location.pathname.toLowerCase().startsWith('/verify/');
+
+  if (loading) {
+    return (
+      <div className="app-wrapper" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 600 }}>Loading HoneyChain…</div>
+      </div>
+    );
+  }
+
+  if (!user && !isDeepLink) {
+    return <PhoneAuthPage onAuthenticated={() => {/* onAuthStateChanged updates the session */}} />;
+  }
+
   return (
     <AnimatePresence mode="wait">
+      {!isDeepLink && (
+        <button
+          type="button"
+          aria-label="Sign out"
+          onClick={() => void signOutFirebase()}
+          style={{
+            position: 'fixed',
+            top: '16px',
+            right: '16px',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'rgba(15, 23, 42, 0.8)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '999px',
+            color: 'var(--text-primary)',
+            fontSize: '12px',
+            fontWeight: 700,
+            padding: '8px 14px',
+            cursor: 'pointer',
+          }}
+        >
+          <LogOut size={14} /> Sign out
+        </button>
+      )}
       {currentBatchId ? (
         <motion.div
           key="verify-page"
