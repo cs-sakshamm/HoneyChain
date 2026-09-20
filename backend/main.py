@@ -2462,6 +2462,14 @@ def create_harvest(
         )
         db.add(batch)
     else:
+        # Stage-transition guard: a batch already advanced past harvest must
+        # never be rewound by a re-harvest against the same batch ID.
+        ADVANCED_STAGES = {"COLLECTED", "PROCESSING", "LAB_TESTING", "PACKAGING", "COMPLETED", "QR_VERIFICATION"}
+        if (batch.current_stage or "").upper() in ADVANCED_STAGES:
+            raise HTTPException(
+                status_code=409,
+                detail={"success": False, "code": "INVALID_STAGE", "message": "Batch has already progressed past harvest; re-harvesting would rewind the supply chain."},
+            )
         batch.quantity_kg = quantity
         batch.current_stage = "HARVESTED"
 
@@ -2551,6 +2559,10 @@ def create_lab_report(
     batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == batch_id).first()
     if not batch:
         raise HTTPException(status_code=404, detail={"success": False, "code": "BATCH_NOT_FOUND", "message": "Batch not found."})
+    if db.query(LabReport).filter(LabReport.batch_id == batch_id).first():
+        # Certification flip guard: a second report must never overwrite an
+        # existing PASS/FAIL decision for the batch.
+        raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_REPORT", "message": "A lab report already exists for this batch; certification cannot be overwritten."})
     lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
     if not lab_req:
         raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_REQUEST_MISSING", "message": "Lab request not found for this batch."})

@@ -168,3 +168,22 @@ New test file `backend/tests/test_batch_id_chain.py` (8 tests) pins one batch ID
 Also corrected during verification: the blockchain-record assertion initially required `tx_hash` on every record; the service's designed offline degradation is `status=PENDING, tx_hash=None`, so the test now requires `data_hash` always and `tx_hash` iff `CONFIRMED`.
 
 Result: batch chain **8/8 PASS**, full backend suite **42/42 PASS**.
+
+## 11. Stage-Transition Matrix (spec §13/§14/§30)
+
+New test file `backend/tests/test_stage_transition_matrix.py` (26 tests) exhaustively pins the lifecycle state machine:
+
+| Class | Pins |
+|---|---|
+| `TestInvalidStageJumps` (9) | Processing before accept → 409 `INVALID_STAGE`; lab report with no lab request → `LAB_REQUEST_MISSING`; report before lab accepts → `INVALID_STAGE`; packaging with no prior stages → `PACKAGING_NOT_PERMITTED` naming missing predecessors; packaging after FAILED lab → `LAB_TEST_FAILED`; send-to-lab before accept → `INVALID_STATE`; duplicate collection request → `DUPLICATE_REQUEST`; **re-harvest cannot rewind an in-flight batch → `INVALID_STAGE`** (§13 PROCESSING→HARVEST); **second lab report cannot flip certification → `DUPLICATE_REPORT`** |
+| `TestRoleMatrix` (8) | Non-harvester request creation, harvester/lab accepting collection requests, wrong-lab accepting an assigned request, harvester/collector/packager creating lab reports, non-packager packaging, harvester dispatching to lab, `PUBLIC_CONSUMER` advancing anything — all → 403 `FORBIDDEN` |
+| `TestStateMachineNegatives` (5) | Double accept (collection + lab) → `DUPLICATE_ACCEPT`; reject-then-accept → `INVALID_STATE`; dispatch after failed report → `LAB_TEST_FAILED`; report missing required physicochemical values → 422 `VALIDATION_ERROR` (no fabricated certification) |
+
+Two contract behaviors documented during verification (not bugs — explicitly implemented rules, now pinned):
+
+- **Packaging accepts PASSED-but-undispatched batches**: the §12 gate requires HARVEST+COLLECTION+PROCESSING+LAB_TEST PASSED + authorized packager; an explicit lab dispatch is not part of the gate (`APPROVED` is in the accept allowlist).
+- **Duplicate lab dispatch surfaces as `INVALID_STATE`**: after the first dispatch the collection request leaves `ACCEPTED`, so the state guard fires before the duplicate-request check — layered defense, same 409.
+
+Both new §13 guards (re-harvest rewind block, duplicate-report block) were added earlier this session and are exercised by this matrix for the first time.
+
+Result: matrix **26/26 PASS**, full backend suite **68/68 PASS**, `ai_ml/` untouched.
