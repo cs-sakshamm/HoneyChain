@@ -255,9 +255,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS: default stays permissive for development (Flutter web + local frontends).
+# Production deployments should set CORS_ALLOW_ORIGINS (comma-separated) to lock
+# origins down. Auth is header-JWT (no cookies), which limits wildcard exposure.
+_cors_origins_env = (os.getenv("CORS_ALLOW_ORIGINS") or "").strip()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in _cors_origins_env.split(",") if o.strip()] or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -2240,6 +2244,9 @@ def accept_workflow_request(
         role = (current_user.role or "").upper()
         if not any(k in role for k in ("COLLECT", "PROCESS")):
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Collection & Processing accounts can accept collection requests."})
+        # Profile-completion gate (spec §16): restricted operation.
+        if not (current_user.is_verified or is_collector_profile_complete(current_user)):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         old_status = (req_obj.status or "").upper()
         if old_status == "ACCEPTED":
             raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_ACCEPT", "message": "Request has already been accepted."})
@@ -2276,6 +2283,9 @@ def accept_workflow_request(
     if lab_req:
         if normalize_role(current_user.role) != "LAB":
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Accredited Laboratory accounts can accept lab requests."})
+        # Profile-completion gate (spec §16): restricted operation.
+        if not (current_user.is_verified or is_lab_profile_complete(current_user)):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         lab_ids = [l.id for l in db.query(Lab).filter(Lab.user_id == current_user.id).all()]
         if lab_req.lab_id and lab_req.lab_id not in lab_ids and lab_req.lab_id != current_user.id:
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "This lab request is assigned to another lab."})
@@ -2308,6 +2318,9 @@ def accept_workflow_request(
     if batch:
         if normalize_role(current_user.role) != "PACKAGING":
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Packaging accounts can accept packaging requests."})
+        # Profile-completion gate (spec §16): restricted operation.
+        if not (current_user.is_verified or is_packager_profile_complete(current_user)):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         report = db.query(LabReport).filter(LabReport.batch_id == batch.batch_id).order_by(desc(LabReport.created_at)).first()
         if not report or report.overall_result != "PASS":
             raise HTTPException(status_code=409, detail={"success": False, "code": "PACKAGING_NOT_PERMITTED", "message": "Packaging is not permitted until the lab test has passed."})
@@ -2414,6 +2427,9 @@ def send_workflow_request_next(
     if actor_role == "COLLECTOR_PROCESSOR":
         if not req_obj:
             raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Collection request not found."})
+        # Profile-completion gate (spec §16): restricted dispatch operation.
+        if not (current_user.is_verified or is_collector_profile_complete(current_user)):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         if (req_obj.status or "").upper() != "ACCEPTED":
             raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": "Collection request must be accepted before sending to lab."})
         if not batch:
@@ -2483,6 +2499,9 @@ def send_workflow_request_next(
         lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
         if not lab_req:
             raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Lab request not found."})
+        # Profile-completion gate (spec §16): restricted dispatch operation.
+        if not (current_user.is_verified or is_lab_profile_complete(current_user)):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         report = db.query(LabReport).filter(LabReport.batch_id == batch_id).order_by(desc(LabReport.created_at)).first()
         if not report:
             raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_TEST_MISSING", "message": "Lab test has not been submitted."})

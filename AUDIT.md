@@ -212,3 +212,21 @@ End-to-end audit of the existing alert surface found the full skeleton already p
 
 ### Results
 Backend 86/86 (60 + 26 matrix) · Flutter 53/53 · `ai_ml/` untouched · no new dependencies · no schema changes.
+
+## 13. Specification Re-Audit (§15A Google auth, §16 profile gates, §26 CORS, §28 chain linkage)
+
+Re-verification pass against the full HoneyChain specification. Previously fixed items (Switch Account removal, fake-auth scan, batch-ID chain, stage matrix, honest QR verification — §8–§12) re-checked clean by scan; no regressions.
+
+| Area | Status | Evidence |
+|---|---|---|
+| §15A Google authentication | PASS (pre-existing) | `/api/auth/google` is fail-closed (HC-005): with an idToken the verified email from `id_token.verify_oauth2_token` is the only identity used (401 on failure, never client-supplied email); without a token it is rejected 400 in production or whenever `GOOGLE_CLIENT_ID` is configured; bare-email fallback is dev-only. Google profile image persisted and served via `photoUrl` |
+| §16 Profile completion | FIXED | Stage-creation routes already gated (`require_verified_*` → 403 `PROFILE_INCOMPLETE`), but the **accept** and **send-next** routes checked role only. Added the same backend gate to: collection accept, lab accept, packaging accept, collector dispatch, lab dispatch |
+| §26 CORS | FIXED (additive) | `allow_origins=["*"]` with `allow_credentials=True` was hardcoded. Now `CORS_ALLOW_ORIGINS` (comma-separated) locks origins in production; default stays permissive for dev — no behavior change unless the env var is set |
+| §28 On-chain previous-event linkage | PASS (pre-existing) | `HoneyChainProvenance.sol` events carry `previousEventHash`; batch-ID + hash-chain assertions pinned in `test_batch_id_chain.py` |
+| §15B/§17 regression scan | PASS | `git grep` for switch-account/fake-auth patterns in active code: 0 hits |
+
+### Tests added
+`backend/tests/test_profile_gate_accept.py` (3): incomplete-profile collector blocked at accept (`PROFILE_INCOMPLETE`), complete-profile collector passes the gate, unauthenticated accept still 401.
+
+### Results
+Backend **89/89** (63 + 26 matrix) · `ai_ml/` untouched · no mobile/web changes this pass.
