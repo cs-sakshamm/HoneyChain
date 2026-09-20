@@ -10,8 +10,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/bee_loader.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/workflow_pills_section.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../collection/screens/nearest_centres_screen.dart';
 import '../../profile/controllers/user_controller.dart';
@@ -26,26 +28,24 @@ class LabDashboardScreen extends StatefulWidget {
   State<LabDashboardScreen> createState() => _LabDashboardScreenState();
 }
 
-class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _LabDashboardScreenState extends State<LabDashboardScreen> {
+  // 0 = Collector Requests, 1 = My Requests to Packaging. Only one section
+  // expands at a time so the two groups never mix.
+  int? _expandedSection;
+  int? _collectorSelected;
+  int? _packagingSelected;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserController>().user;
       final userId = user.id ?? user.email;
       if (userId.isNotEmpty) {
         context.read<VerificationController>().loadLabVerification(userId);
       }
+      context.read<WorkflowController>().fetchAllData();
     });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   void _showRejectSampleDialog(BuildContext context, WorkflowRequest req) {
@@ -109,12 +109,11 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
     final workflowCtrl = context.watch<WorkflowController>();
     final requestedSamples = workflowCtrl.labRequestedRequests;
     final acceptedSamples = workflowCtrl.labAcceptedRequests;
-    final completedSamples = workflowCtrl.labCompletedRequests;
-
-    final verCtrl = context.watch<VerificationController>();
-    final labVer = verCtrl.labVerification;
-    final isFullyVerified = labVer.isFullyVerified;
-    final completedCount = labVer.completedStepsCount;
+    final rejectedSamples = workflowCtrl.labRejectedRequests;
+    final pkgPending = workflowCtrl.labOutgoingPackagingPending;
+    final pkgInFlight = workflowCtrl.labOutgoingPackagingInProgress;
+    final pkgCompleted = workflowCtrl.labOutgoingPackagingCompleted;
+    final isInitialLoad = workflowCtrl.isLoading && workflowCtrl.allRequests.isEmpty;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -124,7 +123,7 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -143,60 +142,82 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
                     'Analyze honey samples for purity, moisture content, and quality scoring.',
                     style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
                   ),
-                  const SizedBox(height: 14),
-
-                  const SizedBox(height: 14),
-
-                  TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    labelColor: context.colors.primary,
-                    unselectedLabelColor: context.textSecondaryColor,
-                    indicatorColor: context.colors.primary,
-                    indicatorWeight: 3,
-                    labelStyle: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
-                    unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
-                    tabs: [
-                      Tab(text: 'Requested (${requestedSamples.length})'),
-                      Tab(text: 'Accepted (${acceptedSamples.length})'),
-                      Tab(text: 'Completed (${completedSamples.length})'),
-                    ],
-                  ),
                 ],
               ),
             ),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 0: Requested
-                  _buildLabListView(
-                    context,
-                    requestedSamples,
-                    'No requested samples',
-                    'Incoming honey samples sent by collection centres will appear here.',
-                    showAcceptReject: true,
-                  ),
+              child: RefreshIndicator(
+                onRefresh: () => workflowCtrl.fetchAllData(),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                  children: [
+                    if (isInitialLoad)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 48),
+                        child: BeeLoader(message: 'Fetching your samples...'),
+                      )
+                    else ...[
+                      if (workflowCtrl.errorMessage != null) ...[
+                        _buildErrorBanner(context, workflowCtrl.errorMessage!),
+                        const SizedBox(height: AppConstants.space12),
+                      ],
 
-                  // Tab 1: Accepted
-                  _buildLabListView(
-                    context,
-                    acceptedSamples,
-                    'No accepted samples',
-                    'Samples accepted by this lab ready for physical & chemical testing will appear here.',
-                    showConductTest: true,
-                  ),
+                      // ── Pill 1: Collector Requests ──
+                      ExpandablePillSection(
+                        title: 'Collector Requests',
+                        icon: Icons.local_shipping_outlined,
+                        expanded: _expandedSection == 0,
+                        onToggle: () => setState(() {
+                          _expandedSection = _expandedSection == 0 ? null : 0;
+                          _collectorSelected ??= 0;
+                        }),
+                        statuses: [
+                          ('Request', requestedSamples.length),
+                          ('Accepted', acceptedSamples.length),
+                          ('Rejected', rejectedSamples.length),
+                        ],
+                        selectedStatusIndex: _expandedSection == 0 ? _collectorSelected : null,
+                        onStatusSelected: (i) => setState(() => _collectorSelected = i),
+                        content: _expandedSection == 0
+                            ? _collectorSectionContent(
+                                context,
+                                _collectorSelected,
+                                request: requestedSamples,
+                                accepted: acceptedSamples,
+                                rejected: rejectedSamples,
+                              )
+                            : null,
+                      ),
 
-                  // Tab 2: Completed
-                  _buildLabListView(
-                    context,
-                    completedSamples,
-                    'No completed lab tests',
-                    'Tested and certified honey reports will appear here.',
-                    showSendToPackaging: true,
-                  ),
-                ],
+                      // ── Pill 2: My Requests to Packaging ──
+                      ExpandablePillSection(
+                        title: 'My Requests to Packaging',
+                        icon: Icons.inventory_2_outlined,
+                        expanded: _expandedSection == 1,
+                        onToggle: () => setState(() {
+                          _expandedSection = _expandedSection == 1 ? null : 1;
+                          _packagingSelected ??= 0;
+                        }),
+                        statuses: [
+                          ('Requests', pkgPending.length),
+                          ('Pending', pkgInFlight.length),
+                          ('Completed', pkgCompleted.length),
+                        ],
+                        selectedStatusIndex: _expandedSection == 1 ? _packagingSelected : null,
+                        onStatusSelected: (i) => setState(() => _packagingSelected = i),
+                        content: _expandedSection == 1
+                            ? _packagingSectionContent(
+                                context,
+                                _packagingSelected,
+                                pending: pkgPending,
+                                inProgress: pkgInFlight,
+                                completed: pkgCompleted,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -205,36 +226,157 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
     );
   }
 
-  Widget _buildLabListView(
+  Widget _buildErrorBanner(BuildContext context, String message) {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.space12),
+      decoration: BoxDecoration(
+        color: context.errorBgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.errorColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 18, color: context.errorColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.errorColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.read<WorkflowController>().fetchAllData(),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionEmpty(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.space24),
+      child: EmptyStateWidget(
+        title: 'No requests available',
+        subtitle: 'Requests with this status will appear here.',
+        icon: Icons.inbox_outlined,
+      ),
+    );
+  }
+
+  Widget _collectorSectionContent(
     BuildContext context,
-    List<WorkflowRequest> samples,
-    String emptyTitle,
-    String emptySubtitle, {
+    int? selected, {
+    required List<WorkflowRequest> request,
+    required List<WorkflowRequest> accepted,
+    required List<WorkflowRequest> rejected,
+  }) {
+    final lists = [request, accepted, rejected];
+    final index = (selected ?? 0).clamp(0, lists.length - 1);
+    final items = lists[index];
+    if (items.isEmpty) return _sectionEmpty(context);
+
+    return Column(
+      children: [
+        for (final req in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppConstants.space12),
+            child: _buildLabSampleCard(
+              context,
+              req,
+              showAcceptReject: index == 0,
+              showConductTest: index == 1,
+              isRejected: index == 2,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _packagingSectionContent(
+    BuildContext context,
+    int? selected, {
+    required List<WorkflowRequest> pending,
+    required List<WorkflowRequest> inProgress,
+    required List<WorkflowRequest> completed,
+  }) {
+    final lists = [pending, inProgress, completed];
+    final index = (selected ?? 0).clamp(0, lists.length - 1);
+    final items = lists[index];
+    if (items.isEmpty) return _sectionEmpty(context);
+
+    return Column(
+      children: [
+        for (final req in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppConstants.space12),
+            child: _buildOutgoingPackagingCard(context, req, showTimeline: true),
+          ),
+      ],
+    );
+  }
+
+  /// Read-only dispatch card for batches the Lab sent to Packaging.
+  Widget _buildOutgoingPackagingCard(BuildContext context, WorkflowRequest req, {required bool showTimeline}) {
+    return AppCard(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Batch: ${req.batchId}',
+                  style: GoogleFonts.manrope(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimaryColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              StatusBadge(status: req.status),
+            ],
+          ),
+          const SizedBox(height: AppConstants.space8),
+          Row(
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 15, color: context.textSecondaryColor),
+              const SizedBox(width: AppConstants.space4),
+              Expanded(
+                child: Text(
+                  '${req.estimatedQuantityKg.toStringAsFixed(1)} kg • ${DateFormat('MMM d, yyyy • h:mm a').format(req.createdAt)}',
+                  style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLabSampleCard(
+    BuildContext context,
+    WorkflowRequest req, {
     bool showAcceptReject = false,
     bool showConductTest = false,
-    bool showSendToPackaging = false,
+    bool isRejected = false,
   }) {
-    if (samples.isEmpty) {
-      return EmptyStateWidget(
-        title: emptyTitle,
-        subtitle: '> No data available yet.',
-        icon: Icons.science_outlined,
-      );
-    }
-
     final verCtrl = context.watch<VerificationController>();
     final userCtrl = context.watch<UserController>();
     final isFullyVerified = verCtrl.labVerification.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
+    final formattedDate = DateFormat('MMM dd, yyyy • h:mm a').format(req.createdAt);
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
-      itemCount: samples.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
-      itemBuilder: (context, index) {
-        final req = samples[index];
-        final formattedDate = DateFormat('MMM dd, yyyy • h:mm a').format(req.createdAt);
-
-        return AppCard(
+    return AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -362,86 +504,109 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> with SingleTick
                 ),
               ] else if (showConductTest) ...[
                 const SizedBox(height: AppConstants.space16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      if (!ProfileGuard.checkLabVerificationOrPrompt(context)) return;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LabReportScreen(request: req),
+                if (req.status == RequestStatus.labApproved) ...[
+                  // Tested & verified: offer dispatch to Packaging.
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            if (!ProfileGuard.checkLabVerificationOrPrompt(context)) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => NearestCentresScreen(
+                                  targetRole: 'PACKAGING',
+                                  batchId: req.batchId,
+                                  requestId: req.id,
+                                  quantity: req.estimatedQuantityKg,
+                                  originLocation: req.location,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.local_shipping_rounded, size: 18),
+                          label: const Text('Send to Packaging (Nearest)'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.colors.primary,
+                            foregroundColor: context.colors.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.biotech_rounded, size: 18),
-                    label: const Text('Conduct 6-Parameter Test & Generate Report'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isFullyVerified ? context.colors.primary : context.textMutedColor,
-                      foregroundColor: context.colors.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
+                            );
+                          },
+                          icon: const Icon(Icons.timeline_rounded, size: 16),
+                          label: const Text('Timeline'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        if (!ProfileGuard.checkLabVerificationOrPrompt(context)) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LabReportScreen(request: req),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.biotech_rounded, size: 18),
+                      label: const Text('Conduct 6-Parameter Test & Generate Report'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isFullyVerified ? context.colors.primary : context.textMutedColor,
+                        foregroundColor: context.colors.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
-                ),
-              ] else if (showSendToPackaging) ...[
-                const SizedBox(height: AppConstants.space16),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          if (!ProfileGuard.checkLabVerificationOrPrompt(context)) return;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => NearestCentresScreen(
-                                targetRole: 'PACKAGING',
-                                batchId: req.batchId,
-                                requestId: req.id,
-                                quantity: req.estimatedQuantityKg,
-                                originLocation: req.location,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.local_shipping_rounded, size: 18),
-                        label: const Text('Send to Packaging (Nearest)'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.colors.primary,
-                          foregroundColor: context.colors.onPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ],
+              ] else if (isRejected && req.notes != null && req.notes!.isNotEmpty) ...[
+                const SizedBox(height: AppConstants.space12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: context.errorBgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.errorColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cancel_outlined, size: 16, color: AppConstants.error),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Rejection Reason: ${req.notes}',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppConstants.error),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
-                          );
-                        },
-                        icon: const Icon(Icons.timeline_rounded, size: 16),
-                        label: const Text('Timeline'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildVerificationBanner(BuildContext context, int count, bool isVerified) {

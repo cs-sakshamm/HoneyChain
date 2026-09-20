@@ -24,6 +24,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool? hasUnreadNotifications;
   final bool showActions;
   final List<Widget>? extraActions;
+  final bool showHomeButton;
 
   const GlobalAppBar({
     super.key,
@@ -35,6 +36,7 @@ class GlobalAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.hasUnreadNotifications,
     this.showActions = true,
     this.extraActions,
+    this.showHomeButton = true,
   });
 
   @override
@@ -105,10 +107,10 @@ final canPop = ModalRoute.of(context)?.canPop ?? false;
                         ),
                       )
                     else if (!shouldShowBack)
-                      Row(
+                      const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const AppLogo(
+                          AppLogo(
                             size: 26,
                             showWordmark: true,
                           ),
@@ -118,11 +120,21 @@ final canPop = ModalRoute.of(context)?.canPop ?? false;
                 ),
               ),
 
-              // Right Section: Inbox / Message Button (ONLY, "+" icon removed)
+              // Right Section: Home + Inbox buttons
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (extraActions != null) ...extraActions!,
+                  if (showActions && showHomeButton)
+                    _TopNavActionButton(
+                      icon: Icons.home_outlined,
+                      tooltip: 'Home',
+                      hasBadge: false,
+                      onTap: () {
+                        // Return to the role's main dashboard, preserving auth.
+                        Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+                      },
+                    ),
                   if (showActions)
                     _TopNavActionButton(
                       icon: Icons.chat_bubble_outline_rounded,

@@ -8,8 +8,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/bee_loader.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/workflow_pills_section.dart';
 import 'batch_timeline_screen.dart';
 import 'harvester_detail_screen.dart';
 import 'nearest_centres_screen.dart';
@@ -27,26 +29,24 @@ class CollectionDashboardScreen extends StatefulWidget {
   State<CollectionDashboardScreen> createState() => _CollectionDashboardScreenState();
 }
 
-class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
+  // 0 = Harvester Requests, 1 = My Requests to Lab. Only one section expands
+  // at a time so its status pills never mix with the other section's.
+  int? _expandedSection;
+  int? _harvesterSelected;
+  int? _labSelected;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserController>().user;
       final userId = user.id ?? user.email;
       if (userId.isNotEmpty) {
         context.read<VerificationController>().loadCollectorVerification(userId);
       }
+      context.read<WorkflowController>().fetchAllData();
     });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   void _showRejectDialog(BuildContext context, WorkflowRequest req) {
@@ -219,7 +219,10 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
     final newRequests = workflowCtrl.collectionNewRequests;
     final acceptedRequests = workflowCtrl.collectionAcceptedRequests;
     final rejectedRequests = workflowCtrl.collectionRejectedRequests;
-    final completedRequests = workflowCtrl.collectionCompletedRequests;
+    final labActive = workflowCtrl.collectionOutgoingLabActive;
+    final labApproved = workflowCtrl.collectionOutgoingLabApproved;
+    final labRejected = workflowCtrl.collectionOutgoingLabRejected;
+    final isInitialLoad = workflowCtrl.isLoading && workflowCtrl.allRequests.isEmpty;
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -229,7 +232,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -253,43 +256,85 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
                       color: context.textSecondaryColor,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    labelColor: context.colors.primary,
-                    unselectedLabelColor: context.textSecondaryColor,
-                    indicatorColor: context.colors.primary,
-                    indicatorWeight: 3,
-                    tabAlignment: TabAlignment.start,
-                    labelStyle: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
-                    unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
-                    tabs: [
-                      Tab(text: 'New Requests (${newRequests.length})'),
-                      Tab(text: 'Accepted (${acceptedRequests.length})'),
-                      Tab(text: 'Rejected (${rejectedRequests.length})'),
-                      Tab(text: 'Completed (${completedRequests.length})'),
-                    ],
-                  ),
                 ],
               ),
             ),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 0: New Requests
-                  _buildRequestListView(context, newRequests, 'No new pending requests', 'New harvest batches sent by harvesters will appear here.', showAcceptReject: true),
+              child: RefreshIndicator(
+                onRefresh: () => workflowCtrl.fetchAllData(),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                  children: [
+                    _buildVerificationBanner(context),
+                    const SizedBox(height: AppConstants.space16),
 
-                  // Tab 1: Accepted Requests
-                  _buildRequestListView(context, acceptedRequests, 'No accepted requests', 'Harvest batches you have accepted will appear here ready for extraction.', showSendToLab: true),
+                    if (isInitialLoad)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 48),
+                        child: BeeLoader(message: 'Fetching your requests...'),
+                      )
+                    else ...[
+                      if (workflowCtrl.errorMessage != null) ...[
+                        _buildErrorBanner(context, workflowCtrl.errorMessage!),
+                        const SizedBox(height: AppConstants.space12),
+                      ],
 
-                  // Tab 2: Rejected Requests
-                  _buildRequestListView(context, rejectedRequests, 'No rejected requests', 'Harvest batches that were rejected will appear here for audit history.', isRejectedTab: true),
+                      // ── Pill 1: Harvester Requests ──
+                      ExpandablePillSection(
+                        title: 'Harvester Requests',
+                        icon: Icons.agriculture_rounded,
+                        expanded: _expandedSection == 0,
+                        onToggle: () => setState(() {
+                          _expandedSection = _expandedSection == 0 ? null : 0;
+                          _harvesterSelected ??= 0;
+                        }),
+                        statuses: [
+                          ('Request', newRequests.length),
+                          ('Accepted', acceptedRequests.length),
+                          ('Rejected', rejectedRequests.length),
+                        ],
+                        selectedStatusIndex: _expandedSection == 0 ? _harvesterSelected : null,
+                        onStatusSelected: (i) => setState(() => _harvesterSelected = i),
+                        content: _expandedSection == 0
+                            ? _harvesterSectionContent(
+                                context,
+                                _harvesterSelected,
+                                request: newRequests,
+                                accepted: acceptedRequests,
+                                rejected: rejectedRequests,
+                              )
+                            : null,
+                      ),
 
-                  // Tab 3: Completed Processing
-                  _buildRequestListView(context, completedRequests, 'No completed batches', 'Batches that have finished processing and were sent to testing labs will appear here.', isCompletedTab: true),
-                ],
+                      // ── Pill 2: My Requests to Lab ──
+                      ExpandablePillSection(
+                        title: 'My Requests to Lab',
+                        icon: Icons.science_outlined,
+                        expanded: _expandedSection == 1,
+                        onToggle: () => setState(() {
+                          _expandedSection = _expandedSection == 1 ? null : 1;
+                          _labSelected ??= 0;
+                        }),
+                        statuses: [
+                          ('Request', labActive.length),
+                          ('Approved', labApproved.length),
+                          ('Rejected', labRejected.length),
+                        ],
+                        selectedStatusIndex: _expandedSection == 1 ? _labSelected : null,
+                        onStatusSelected: (i) => setState(() => _labSelected = i),
+                        content: _expandedSection == 1
+                            ? _labSectionContent(
+                                context,
+                                _labSelected,
+                                active: labActive,
+                                approved: labApproved,
+                                rejected: labRejected,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -298,52 +343,167 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> w
     );
   }
 
-  Widget _buildRequestListView(
-    BuildContext context,
-    List<WorkflowRequest> requests,
-    String emptyTitle,
-    String emptySubtitle, {
-    bool showAcceptReject = false,
-    bool showSendToLab = false,
-    bool isRejectedTab = false,
-    bool isCompletedTab = false,
-  }) {
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 0),
-            child: _buildVerificationBanner(context),
+  Widget _buildErrorBanner(BuildContext context, String message) {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.space12),
+      decoration: BoxDecoration(
+        color: context.errorBgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.errorColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 18, color: context.errorColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.errorColor),
+            ),
           ),
-        ),
-        requests.isEmpty
-            ? SliverFillRemaining(
-                hasScrollBody: false,
-                child: _buildEmptyState(context, emptyTitle, emptySubtitle),
-              )
-            : SliverPadding(
-                padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final req = requests[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppConstants.space16),
-                        child: _buildRequestCard(
-                          context,
-                          req,
-                          showAcceptReject: showAcceptReject,
-                          showSendToLab: showSendToLab,
-                          isRejectedTab: isRejectedTab,
-                          isCompletedTab: isCompletedTab,
-                        ),
-                      );
-                    },
-                    childCount: requests.length,
+          TextButton(
+            onPressed: () => context.read<WorkflowController>().fetchAllData(),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionEmpty(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.space24),
+      child: EmptyStateWidget(
+        title: 'No requests available',
+        subtitle: 'Requests with this status will appear here.',
+        icon: Icons.inbox_outlined,
+      ),
+    );
+  }
+
+  Widget _harvesterSectionContent(
+    BuildContext context,
+    int? selected, {
+    required List<WorkflowRequest> request,
+    required List<WorkflowRequest> accepted,
+    required List<WorkflowRequest> rejected,
+  }) {
+    final lists = [request, accepted, rejected];
+    final index = (selected ?? 0).clamp(0, lists.length - 1);
+    final items = lists[index];
+    if (items.isEmpty) return _sectionEmpty(context);
+
+    return Column(
+      children: [
+        for (final req in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppConstants.space12),
+            child: _buildRequestCard(
+              context,
+              req,
+              showAcceptReject: index == 0,
+              showSendToLab: index == 1,
+              isRejectedTab: index == 2,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _labSectionContent(
+    BuildContext context,
+    int? selected, {
+    required List<WorkflowRequest> active,
+    required List<WorkflowRequest> approved,
+    required List<WorkflowRequest> rejected,
+  }) {
+    final lists = [active, approved, rejected];
+    final index = (selected ?? 0).clamp(0, lists.length - 1);
+    final items = lists[index];
+    if (items.isEmpty) return _sectionEmpty(context);
+
+    return Column(
+      children: [
+        for (final req in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppConstants.space12),
+            child: _buildOutgoingLabCard(context, req, isRejected: index == 2),
+          ),
+      ],
+    );
+  }
+
+  /// Read-only dispatch card for batches the collector sent to the Lab.
+  Widget _buildOutgoingLabCard(BuildContext context, WorkflowRequest req, {required bool isRejected}) {
+    return AppCard(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Batch: ${req.batchId}',
+                  style: GoogleFonts.manrope(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimaryColor,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-      ],
+              StatusBadge(status: req.status),
+            ],
+          ),
+          const SizedBox(height: AppConstants.space8),
+          if (req.labSampleId != null && req.labSampleId!.isNotEmpty) ...[
+            Row(
+              children: [
+                Icon(Icons.science_outlined, size: 15, color: context.textSecondaryColor),
+                const SizedBox(width: AppConstants.space4),
+                Text('Sample: ${req.labSampleId}', style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor)),
+              ],
+            ),
+            const SizedBox(height: AppConstants.space4),
+          ],
+          Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, size: 15, color: context.textSecondaryColor),
+              const SizedBox(width: AppConstants.space4),
+              Expanded(
+                child: Text(
+                  '${req.estimatedQuantityKg.toStringAsFixed(1)} kg • ${DateFormat('MMM d, yyyy • h:mm a').format(req.createdAt)}',
+                  style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
+                ),
+              ),
+            ],
+          ),
+          if (isRejected && req.notes.isNotEmpty) ...[
+            const SizedBox(height: AppConstants.space8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: context.errorBgColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: context.errorColor.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                'Rejection: ${req.notes}',
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.errorColor),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

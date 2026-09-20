@@ -333,6 +333,7 @@ RequestStatus _parseStatus(String? status) {
     case 'PENDING_LAB':
     case 'PROCESSING_COMPLETED':
     case 'AWAITING_TEST':
+    case 'SENT_TO_LAB': // dispatch completed: harvest left the collector's Accepted queue
       return RequestStatus.awaitingTest;
     case 'IN_PROGRESS':
     case 'TESTING':

@@ -85,10 +85,41 @@ class WorkflowController extends ChangeNotifier {
 
   List<WorkflowRequest> get collectionRejectedRequests => _requests
       .where((r) =>
-          (r.toRole == 'COLLECTOR_PROCESSOR' || r.fromRole == 'COLLECTOR_PROCESSOR') &&
+          r.toRole == 'COLLECTOR_PROCESSOR' &&
+          r.requestType == 'HARVEST_TO_COLLECTION' &&
           r.status == RequestStatus.denied)
       .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  // ── Collection & Processing: outgoing Lab dispatches ("My Requests to Lab") ──
+  List<WorkflowRequest> get collectionOutgoingLabRequests =>
+      _requests
+          .where((r) =>
+              r.fromRole == 'COLLECTOR_PROCESSOR' &&
+              r.requestType == 'COLLECTION_TO_LAB')
+          .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  List<WorkflowRequest> get collectionOutgoingLabActive => collectionOutgoingLabRequests
+      .where((r) =>
+          r.status == RequestStatus.pending ||
+          r.status == RequestStatus.accepted ||
+          r.status == RequestStatus.processing ||
+          r.status == RequestStatus.awaitingTest ||
+          r.status == RequestStatus.testing)
+      .toList();
+
+  List<WorkflowRequest> get collectionOutgoingLabApproved => collectionOutgoingLabRequests
+      .where((r) =>
+          r.status == RequestStatus.labApproved ||
+          r.status == RequestStatus.completed)
+      .toList();
+
+  List<WorkflowRequest> get collectionOutgoingLabRejected => collectionOutgoingLabRequests
+      .where((r) =>
+          r.status == RequestStatus.labRejected ||
+          r.status == RequestStatus.denied)
+      .toList();
 
   List<WorkflowRequest> get collectionCompletedRequests => _requests
       .where((r) =>
@@ -120,7 +151,16 @@ class WorkflowController extends ChangeNotifier {
           r.requestType == 'COLLECTION_TO_LAB' &&
           (r.status == RequestStatus.accepted ||
               r.status == RequestStatus.testing ||
-              r.status == RequestStatus.awaitingTest))
+              r.status == RequestStatus.awaitingTest ||
+              r.status == RequestStatus.labApproved))
+      .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  List<WorkflowRequest> get labRejectedRequests => _requests
+      .where((r) =>
+          r.toRole == 'LAB' &&
+          r.requestType == 'COLLECTION_TO_LAB' &&
+          (r.status == RequestStatus.labRejected || r.status == RequestStatus.denied))
       .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
@@ -133,6 +173,35 @@ class WorkflowController extends ChangeNotifier {
               r.status == RequestStatus.denied))
       .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  // ── Lab Testing: outgoing Packaging dispatches ("My Requests to Packaging") ──
+  List<WorkflowRequest> get labOutgoingPackagingRequests =>
+      _requests
+          .where((r) =>
+              r.fromRole == 'LAB' &&
+              r.requestType == 'LAB_TO_PACKAGING')
+          .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  List<WorkflowRequest> get labOutgoingPackagingPending => labOutgoingPackagingRequests
+      .where((r) => r.status == RequestStatus.pending)
+      .toList();
+
+  List<WorkflowRequest> get labOutgoingPackagingInProgress => labOutgoingPackagingRequests
+      .where((r) =>
+          r.status == RequestStatus.accepted ||
+          r.status == RequestStatus.processing ||
+          r.status == RequestStatus.readyForPackaging ||
+          r.status == RequestStatus.packagingApproved ||
+          r.status == RequestStatus.awaitingTest ||
+          r.status == RequestStatus.testing)
+      .toList();
+
+  List<WorkflowRequest> get labOutgoingPackagingCompleted => labOutgoingPackagingRequests
+      .where((r) =>
+          r.status == RequestStatus.completed ||
+          r.status == RequestStatus.qrGenerated)
+      .toList();
 
   // Legacy aliases
   List<WorkflowRequest> get labPendingRequests => [
@@ -166,6 +235,7 @@ class WorkflowController extends ChangeNotifier {
   List<WorkflowRequest> get packagingProcessingRequests => _requests
       .where((r) =>
           r.toRole == 'PACKAGING' &&
+          r.requestType == 'LAB_TO_PACKAGING' &&
           r.status == RequestStatus.processing)
       .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));

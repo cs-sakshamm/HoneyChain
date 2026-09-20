@@ -10,8 +10,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
+import '../../../core/widgets/bee_loader.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/workflow_pills_section.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../profile/controllers/user_controller.dart';
 import '../../verification/controllers/verification_controller.dart';
@@ -26,26 +28,21 @@ class PackagingDashboardScreen extends StatefulWidget {
   State<PackagingDashboardScreen> createState() => _PackagingDashboardScreenState();
 }
 
-class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> {
+  // Packaging workflow: Requested → Accepted → Processing → Completed.
+  int _selectedStage = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserController>().user;
       final userId = user.id ?? user.email;
       if (userId.isNotEmpty) {
         context.read<VerificationController>().loadPackagingVerification(userId);
       }
+      context.read<WorkflowController>().fetchAllData();
     });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   void _showFinalizePackagingDialog(BuildContext context, WorkflowRequest req) {
@@ -240,6 +237,13 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
     final packagingVer = verCtrl.packagingVerification;
     final isFullyVerified = packagingVer.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
     final completedCount = isFullyVerified ? 3 : packagingVer.completedStepsCount;
+    final isInitialLoad = controller.isLoading && controller.allRequests.isEmpty;
+    final stages = [
+      ('Requested', requestedBatches),
+      ('Accepted', acceptedBatches),
+      ('Processing', processingBatches),
+      ('Completed', completedBatches),
+    ];
 
     return Scaffold(
       backgroundColor: context.scaffoldBg,
@@ -286,71 +290,53 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
                     style: GoogleFonts.inter(fontSize: 13, color: context.textSecondaryColor),
                   ),
                   const SizedBox(height: 14),
-
-                  // ── 3/3 Profile Verification Banner Card ──
-                  _buildVerificationBanner(context, completedCount, isFullyVerified),
-                  const SizedBox(height: 14),
-
-                  TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    labelColor: context.colors.primary,
-                    unselectedLabelColor: context.textSecondaryColor,
-                    indicatorColor: context.colors.primary,
-                    indicatorWeight: 3,
-                    labelStyle: GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
-                    unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
-                    tabs: [
-                      Tab(text: 'Requested (${requestedBatches.length})'),
-                      Tab(text: 'Accepted (${acceptedBatches.length})'),
-                      Tab(text: 'Processing (${processingBatches.length})'),
-                      Tab(text: 'Completed (${completedBatches.length})'),
-                    ],
-                  ),
                 ],
               ),
             ),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 0: Requested
-                  _buildPackagingListView(
-                    context,
-                    requestedBatches,
-                    'No requested packaging batches',
-                    'Batches tested and approved by labs will appear here.',
-                    showAcceptReject: true,
-                  ),
+              child: RefreshIndicator(
+                onRefresh: () => controller.fetchAllData(),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                  children: [
+                    // ── Profile Verification Banner Card ──
+                    _buildVerificationBanner(context, completedCount, isFullyVerified),
+                    const SizedBox(height: AppConstants.space16),
 
-                  // Tab 1: Accepted
-                  _buildPackagingListView(
-                    context,
-                    acceptedBatches,
-                    'No accepted batches',
-                    'Batches accepted by this facility ready to start packaging will appear here.',
-                    showStartPackaging: true,
-                  ),
+                    if (isInitialLoad)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 48),
+                        child: BeeLoader(message: 'Fetching your batches...'),
+                      )
+                    else ...[
+                      if (controller.errorMessage != null) ...[
+                        _buildErrorBanner(context, controller.errorMessage!),
+                        const SizedBox(height: AppConstants.space12),
+                      ],
 
-                  // Tab 2: Processing
-                  _buildPackagingListView(
-                    context,
-                    processingBatches,
-                    'No batches currently packaging',
-                    'Active bottling lines in progress ready for sealing & QR generation will appear here.',
-                    showFinalize: true,
-                  ),
+                      // ── Workflow status pills: Requested → Accepted → Processing → Completed ──
+                      Wrap(
+                        spacing: AppConstants.space8,
+                        runSpacing: AppConstants.space8,
+                        children: [
+                          for (var i = 0; i < stages.length; i++)
+                            StatusPill(
+                              label: stages[i].$1,
+                              count: stages[i].$2.length,
+                              isSelected: _selectedStage == i,
+                              onTap: () => setState(() => _selectedStage = i),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppConstants.space16),
 
-                  // Tab 3: Completed
-                  _buildPackagingListView(
-                    context,
-                    completedBatches,
-                    'No completed packaging batches',
-                    'Batches packaged, sealed, and assigned QR traceability will appear here.',
-                    showViewQr: true,
-                  ),
-                ],
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: _stageContent(context, stages),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -359,34 +345,82 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
     );
   }
 
-  Widget _buildPackagingListView(
+  Widget _stageContent(BuildContext context, List<(String, List<WorkflowRequest>)> stages) {
+    final stage = stages[_selectedStage.clamp(0, stages.length - 1)];
+    final items = stage.$2;
+
+    if (items.isEmpty) {
+      return SizedBox(
+        key: ValueKey('empty-$_selectedStage'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppConstants.space24),
+          child: EmptyStateWidget(
+            title: 'No requests available',
+            subtitle: 'Batches with status "${stage.$1}" will appear here.',
+            icon: Icons.inventory_2_outlined,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      key: ValueKey('list-$_selectedStage'),
+      children: [
+        for (final req in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppConstants.space12),
+            child: _buildPackagingCard(
+              context,
+              req,
+              showAcceptReject: _selectedStage == 0,
+              showStartPackaging: _selectedStage == 1,
+              showFinalize: _selectedStage == 2,
+              showViewQr: _selectedStage == 3,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildErrorBanner(BuildContext context, String message) {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.space12),
+      decoration: BoxDecoration(
+        color: context.errorBgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.errorColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 18, color: context.errorColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: context.errorColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.read<WorkflowController>().fetchAllData(),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPackagingCard(
     BuildContext context,
-    List<WorkflowRequest> batches,
-    String emptyTitle,
-    String emptySubtitle, {
+    WorkflowRequest req, {
     bool showAcceptReject = false,
     bool showStartPackaging = false,
     bool showFinalize = false,
     bool showViewQr = false,
   }) {
-    if (batches.isEmpty) {
-      return EmptyStateWidget(
-        title: emptyTitle,
-        subtitle: '> No data available yet.',
-        icon: Icons.inventory_2_outlined,
-      );
-    }
-
     final verCtrl = context.watch<VerificationController>();
     final isFullyVerified = verCtrl.packagingVerification.isFullyVerified;
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(AppConstants.space16, AppConstants.space16, AppConstants.space16, 120),
-      itemCount: batches.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppConstants.space16),
-      itemBuilder: (context, index) {
-        final req = batches[index];
-        final formattedDate = DateFormat('MMM dd, yyyy • h:mm a').format(req.createdAt);
+    final formattedDate = DateFormat('MMM dd, yyyy • h:mm a').format(req.createdAt);
 
         return AppCard(
           child: Column(
@@ -620,8 +654,6 @@ class _PackagingDashboardScreenState extends State<PackagingDashboardScreen> wit
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildVerificationBanner(BuildContext context, int count, bool isVerified) {
