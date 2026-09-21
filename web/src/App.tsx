@@ -3,6 +3,36 @@ import { PublicVerification } from './pages/PublicVerification';
 
 type ModalKey = 'Home' | 'About' | 'Traceability' | 'Technology' | 'Laboratory' | 'Contact' | null;
 
+const i18n: Record<string, any> = {
+  EN: {
+    verifyOrigin: "Verify Origin",
+    enterBatch: "Enter a batch identifier to inspect the tamper-evident provenance.",
+    batchIdLabel: "Batch ID",
+    verifyBtn: "VERIFY",
+    footerCopy: "HoneyChain. Team DataMineX.",
+    nav: { Home: "Home", About: "About", Traceability: "Traceability", Technology: "Technology", Laboratory: "Laboratory", Contact: "Contact" },
+    close: "Close"
+  },
+  ES: {
+    verifyOrigin: "Verificar Origen",
+    enterBatch: "Ingrese un identificador de lote para inspeccionar la procedencia a prueba de manipulaciones.",
+    batchIdLabel: "ID de Lote",
+    verifyBtn: "VERIFICAR",
+    footerCopy: "HoneyChain. Equipo DataMineX.",
+    nav: { Home: "Inicio", About: "Acerca de", Traceability: "Trazabilidad", Technology: "Tecnología", Laboratory: "Laboratorio", Contact: "Contacto" },
+    close: "Cerrar"
+  },
+  FR: {
+    verifyOrigin: "Vérifier l'Origine",
+    enterBatch: "Entrez un identifiant de lot pour inspecter la provenance inviolable.",
+    batchIdLabel: "ID du Lot",
+    verifyBtn: "VÉRIFIER",
+    footerCopy: "HoneyChain. Équipe DataMineX.",
+    nav: { Home: "Accueil", About: "À propos", Traceability: "Traçabilité", Technology: "Technologie", Laboratory: "Laboratoire", Contact: "Contact" },
+    close: "Fermer"
+  }
+};
+
 const HoneyChainLogo = ({ size = 28, showWordmark = true }) => {
   return (
     <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => {
@@ -39,6 +69,8 @@ export const App: React.FC = () => {
   const [language, setLanguage] = useState<string>('EN');
   const [showLangMenu, setShowLangMenu] = useState(false);
   
+  const t = i18n[language] || i18n['EN'];
+
   // Theme Management
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem('hc_theme');
@@ -189,16 +221,16 @@ export const App: React.FC = () => {
 
       <main className="app-main">
         {currentBatchId ? (
-          <PublicVerification batchId={currentBatchId} />
+          <PublicVerification batchId={currentBatchId} language={language} />
         ) : (
           <div className="landing-container">
-            <h1 className="landing-title">Verify Origin</h1>
+            <h1 className="landing-title">{t.verifyOrigin}</h1>
             <p className="landing-subtitle">
-              Enter a batch identifier to inspect the tamper-evident provenance.
+              {t.enterBatch}
             </p>
 
             <form onSubmit={handleLookup} className="lookup-form">
-              <label htmlFor="batchId">Batch ID</label>
+              <label htmlFor="batchId">{t.batchIdLabel}</label>
               <div className="lookup-input-group">
                 <input
                   id="batchId"
@@ -208,7 +240,7 @@ export const App: React.FC = () => {
                   placeholder="HC-001"
                 />
                 <button type="submit" className="btn-primary">
-                  VERIFY
+                  {t.verifyBtn}
                 </button>
               </div>
             </form>
@@ -220,11 +252,11 @@ export const App: React.FC = () => {
         <div className="footer-nav">
           {footerLinks.map(link => (
             <button key={link} className="footer-nav-link" onClick={() => setActiveModal(link)}>
-              {link}
+              {t.nav[link as string] || link}
             </button>
           ))}
         </div>
-        <p className="footer-copy">&copy; {new Date().getFullYear()} HoneyChain. Team DataMineX.</p>
+        <p className="footer-copy">&copy; {new Date().getFullYear()} {t.footerCopy}</p>
       </footer>
 
       {/* Modal Overlay for Footer Links */}
@@ -232,8 +264,8 @@ export const App: React.FC = () => {
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">{activeModal}</h2>
-              <button className="modal-close" onClick={() => setActiveModal(null)}>Close</button>
+              <h2 className="modal-title">{t.nav[activeModal as string] || activeModal}</h2>
+              <button className="modal-close" onClick={() => setActiveModal(null)}>{t.close}</button>
             </div>
             <div className="modal-body">
               {getModalContent(activeModal)}

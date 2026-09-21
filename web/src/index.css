@@ -8,7 +8,7 @@
   --accent-color: #EAB308;
   --error-color: #EF4444;
   --success-color: #22C55E;
-  --honeycomb: url("data:image/svg+xml,%3Csvg width='60' height='103.923' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M60 25.98l-30 17.32L0 25.98V-8.66l30-17.32L60-8.66V25.98zm0 69.282l-30 17.32L0 95.262V60.622L30 43.301l30 17.32v34.641z' fill='none' stroke='rgba(234, 179, 8, 0.05)' stroke-width='1.5'/%3E%3C/svg%3E");
+  --honeycomb: url("data:image/svg+xml,%3Csvg width='60' height='103.923' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M60 25.98l-30 17.32L0 25.98V-8.66l30-17.32L60-8.66V25.98zm0 69.282l-30 17.32L0 95.262V60.622L30 43.301l30 17.32v34.641z' fill='none' stroke='rgba(9, 9, 11, 0.05)' stroke-width='1.5'/%3E%3C/svg%3E");
 }
 
 [data-theme='dark'] {

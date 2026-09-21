@@ -3,15 +3,76 @@ import { fetchVerificationData, VerificationResponse } from '../api/honeychainAp
 
 interface Props {
   batchId: string;
+  language?: string;
 }
 
-export const PublicVerification: React.FC<Props> = ({ batchId }) => {
+const pvI18n: Record<string, any> = {
+  EN: {
+    loading: "Verifying record...",
+    error: "Verification service is temporarily unavailable.",
+    notFound: "Record not found",
+    title: "Product Verification",
+    pending: "PENDING",
+    verified: "VERIFIED",
+    traceId: "Trace ID",
+    nodes: {
+      harvester: "01 Harvester",
+      hive: "02 Hive",
+      collection: "03 Collection & Processing",
+      laboratory: "04 Laboratory Test",
+      lab_report: "05 Lab Report",
+      packaging: "06 Packaging"
+    },
+    traceability: "Complete Traceability",
+    close: "Close"
+  },
+  ES: {
+    loading: "Verificando registro...",
+    error: "El servicio de verificación no está disponible temporalmente.",
+    notFound: "Registro no encontrado",
+    title: "Verificación de Producto",
+    pending: "PENDIENTE",
+    verified: "VERIFICADO",
+    traceId: "ID de Rastreo",
+    nodes: {
+      harvester: "01 Cosechador",
+      hive: "02 Colmena",
+      collection: "03 Recolección y Procesamiento",
+      laboratory: "04 Prueba de Laboratorio",
+      lab_report: "05 Reporte de Laboratorio",
+      packaging: "06 Empaque"
+    },
+    traceability: "Trazabilidad Completa",
+    close: "Cerrar"
+  },
+  FR: {
+    loading: "Vérification du registre...",
+    error: "Le service de vérification est temporairement indisponible.",
+    notFound: "Registre introuvable",
+    title: "Vérification du Produit",
+    pending: "EN ATTENTE",
+    verified: "VÉRIFIÉ",
+    traceId: "ID de Trace",
+    nodes: {
+      harvester: "01 Récolteur",
+      hive: "02 Ruche",
+      collection: "03 Collecte & Traitement",
+      laboratory: "04 Test en Laboratoire",
+      lab_report: "05 Rapport de Laboratoire",
+      packaging: "06 Emballage"
+    },
+    traceability: "Traçabilité Complète",
+    close: "Fermer"
+  }
+};
+
+export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }) => {
   const [data, setData] = useState<VerificationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Modal State
   const [activeStage, setActiveStage] = useState<string | null>(null);
+
+  const t = pvI18n[language] || pvI18n['EN'];
 
   const loadData = async () => {
     setLoading(true);
@@ -20,7 +81,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
       const res = await fetchVerificationData(batchId);
       setData(res);
     } catch (err: any) {
-      setError('Verification service is temporarily unavailable.');
+      setError(t.error);
     } finally {
       setLoading(false);
     }
@@ -35,7 +96,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
   if (loading) {
     return (
       <div className="pv-message-container">
-        <p className="pv-message">Verifying record...</p>
+        <p className="pv-message">{t.loading}</p>
       </div>
     );
   }
@@ -51,7 +112,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
   if (data && !data.found) {
     return (
       <div className="pv-message-container">
-        <h2 className="pv-message-title">Record not found</h2>
+        <h2 className="pv-message-title">{t.notFound}</h2>
       </div>
     );
   }
@@ -66,12 +127,12 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
   const hasPackaging = !!data.packaging && data.packaging.facility !== 'No data available yet.';
 
   const workflowNodes = [
-    { id: 'harvester', title: '01 Harvester', active: hasHarvester },
-    { id: 'hive', title: '02 Hive', active: hasHive },
-    { id: 'collection', title: '03 Collection & Processing', active: hasCollection },
-    { id: 'laboratory', title: '04 Laboratory Test', active: hasLabTest },
-    { id: 'lab_report', title: '05 Lab Report', active: hasLabReport },
-    { id: 'packaging', title: '06 Packaging', active: hasPackaging }
+    { id: 'harvester', title: t.nodes.harvester, active: hasHarvester },
+    { id: 'hive', title: t.nodes.hive, active: hasHive },
+    { id: 'collection', title: t.nodes.collection, active: hasCollection },
+    { id: 'laboratory', title: t.nodes.laboratory, active: hasLabTest },
+    { id: 'lab_report', title: t.nodes.lab_report, active: hasLabReport },
+    { id: 'packaging', title: t.nodes.packaging, active: hasPackaging }
   ];
 
   const renderModalContent = () => {
@@ -150,11 +211,11 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
   return (
     <div className="pv-container">
       <div className="pv-header">
-        <h1 className="pv-title">Product Verification</h1>
+        <h1 className="pv-title">{t.title}</h1>
         <div className="pv-status-badge">
-          {data.isFullyVerified ? 'VERIFIED' : 'PENDING'}
+          {data.isFullyVerified ? t.verified : t.pending}
         </div>
-        <p className="pv-trace-id">Trace ID: {data.batchId || batchId}</p>
+        <p className="pv-trace-id">{t.traceId}: {data.batchId || batchId}</p>
       </div>
 
       <div className="pv-workflow">
@@ -172,7 +233,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
       </div>
 
       <div className="pv-footer">
-        <h2 className="pv-section-title">Complete Traceability</h2>
+        <h2 className="pv-section-title">{t.traceability}</h2>
         <p className="pv-trace-status">{data.status}</p>
       </div>
 
@@ -183,7 +244,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
               <h2 className="modal-title">
                 {workflowNodes.find(n => n.id === activeStage)?.title.substring(3)}
               </h2>
-              <button className="modal-close" onClick={() => setActiveStage(null)}>Close</button>
+              <button className="modal-close" onClick={() => setActiveStage(null)}>{t.close}</button>
             </div>
             <div className="modal-body">
               {renderModalContent()}
