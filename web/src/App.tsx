@@ -5,30 +5,36 @@ type ModalKey = 'Home' | 'About' | 'Traceability' | 'Technology' | 'Laboratory' 
 
 const i18n: Record<string, any> = {
   EN: {
+    greeting: "Welcome to HoneyChain",
+    aboutIntro: "The world's first cryptographically secure provenance platform for authentic, unadulterated honey.",
     verifyOrigin: "Verify Origin",
     enterBatch: "Enter a batch identifier to inspect the tamper-evident provenance.",
     batchIdLabel: "Batch ID",
     verifyBtn: "VERIFY",
     footerCopy: "HoneyChain. Team DataMineX.",
-    nav: { Home: "Home", About: "About", Traceability: "Traceability", Technology: "Technology", Laboratory: "Laboratory", Contact: "Contact" },
+    nav: { About: "About", Traceability: "Traceability", Technology: "Technology", Laboratory: "Laboratory", Contact: "Contact" },
     close: "Close"
   },
   ES: {
+    greeting: "Bienvenido a HoneyChain",
+    aboutIntro: "La primera plataforma de procedencia criptográficamente segura del mundo para miel auténtica y sin adulterar.",
     verifyOrigin: "Verificar Origen",
     enterBatch: "Ingrese un identificador de lote para inspeccionar la procedencia a prueba de manipulaciones.",
     batchIdLabel: "ID de Lote",
     verifyBtn: "VERIFICAR",
     footerCopy: "HoneyChain. Equipo DataMineX.",
-    nav: { Home: "Inicio", About: "Acerca de", Traceability: "Trazabilidad", Technology: "Tecnología", Laboratory: "Laboratorio", Contact: "Contacto" },
+    nav: { About: "Acerca de", Traceability: "Trazabilidad", Technology: "Tecnología", Laboratory: "Laboratorio", Contact: "Contacto" },
     close: "Cerrar"
   },
   FR: {
+    greeting: "Bienvenue sur HoneyChain",
+    aboutIntro: "La première plateforme de provenance cryptographiquement sécurisée au monde pour un miel authentique et non frelaté.",
     verifyOrigin: "Vérifier l'Origine",
     enterBatch: "Entrez un identifiant de lot pour inspecter la provenance inviolable.",
     batchIdLabel: "ID du Lot",
     verifyBtn: "VÉRIFIER",
     footerCopy: "HoneyChain. Équipe DataMineX.",
-    nav: { Home: "Accueil", About: "À propos", Traceability: "Traçabilité", Technology: "Technologie", Laboratory: "Laboratoire", Contact: "Contact" },
+    nav: { About: "À propos", Traceability: "Traçabilité", Technology: "Technologie", Laboratory: "Laboratoire", Contact: "Contact" },
     close: "Fermer"
   }
 };
@@ -208,8 +214,18 @@ export const App: React.FC = () => {
 
       <main className="app-main">
         {/* Centered Logo in the middle of the screen */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px', textAlign: 'center' }}>
           <HoneyChainLogo size={42} showWordmark={true} />
+          {!currentBatchId && (
+            <div style={{ marginTop: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: "'Manrope', sans-serif" }}>
+                {t.greeting}
+              </h2>
+              <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginTop: '8px', maxWidth: '420px', lineHeight: 1.5 }}>
+                {t.aboutIntro}
+              </p>
+            </div>
+          )}
         </div>
         {currentBatchId ? (
           <PublicVerification batchId={currentBatchId} language={language} />
