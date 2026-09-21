@@ -38,7 +38,8 @@ class AppConstants {
     if (_publicVerifyUrlOverride.isNotEmpty) {
       return _publicVerifyUrlOverride.replaceAll(RegExp(r'/+$'), '');
     }
-    return backendBaseUrl;
+    // Point QR codes to the Vercel frontend rather than the local backend
+    return 'https://web-of-honeychain.vercel.app';
   }
 
   static const String legalDisclaimer =

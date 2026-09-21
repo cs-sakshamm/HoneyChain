@@ -127,10 +127,26 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
       case 'lab_report':
         return (
           <div className="pv-kv-list">
+            <div className="pv-kv-row"><span className="pv-kv-label">Laboratory</span><span className="pv-kv-value">{data.labVerification!.labName}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Report Number</span><span className="pv-kv-value">{data.labVerification!.reportId}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Quality Score</span><span className="pv-kv-value">{data.labVerification!.qualityScore}/100</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Overall Status</span><span className="pv-kv-value" style={{fontWeight: 700}}>{data.labVerification!.status}</span></div>
+            
+            <h4 style={{ margin: '16px 0 8px 0', fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Detailed Parameters</h4>
             {data.labVerification!.parameters.map((param, i) => (
-              <div className="pv-kv-row" key={i}>
-                <span className="pv-kv-label">{param.name}</span>
-                <span className="pv-kv-value">{param.value} ({param.status})</span>
+              <div className="pv-kv-row" key={i} style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '12px 0', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <span className="pv-kv-label" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{param.name}</span>
+                  <span className="pv-kv-value" style={{ 
+                    fontWeight: 700, 
+                    fontSize: '13px',
+                    color: param.status === 'Pass' ? '#10b981' : param.status === 'Fail' ? '#ef4444' : 'var(--text-secondary)'
+                  }}>{param.status}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  <span>Result: <strong>{param.value}</strong></span>
+                  <span>Standard: {param.standard}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -152,11 +168,12 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   return (
     <div className="pv-container">
       <div className="pv-header">
-        <h1 className="pv-title">{t.title}</h1>
-        <div className="pv-status-badge">
-          {data.isFullyVerified ? t.verified : t.pending}
+        <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>HoneyChain</h1>
+        <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 16px 0', textTransform: 'uppercase' }}>Honey Traceability & Verification</h2>
+        <div className="pv-status-badge" style={{ backgroundColor: data.isFullyVerified ? '#10b981' : '#f59e0b' }}>
+          {data.isFullyVerified ? 'VERIFIED' : 'PENDING'}
         </div>
-        <p className="pv-trace-id">{t.traceId}: {data.batchId || batchId}</p>
+        <p className="pv-trace-id" style={{ marginTop: '12px', fontWeight: 600 }}>{t.traceId}: {data.batchId || batchId}</p>
       </div>
 
       <div className="pv-workflow">
@@ -173,9 +190,13 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
         ))}
       </div>
 
-      <div className="pv-footer">
-        <h2 className="pv-section-title">{t.traceability}</h2>
-        <p className="pv-trace-status">{data.status}</p>
+      <div className="pv-footer" style={{ marginTop: '24px', textAlign: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
+        <h2 className="pv-section-title" style={{ fontSize: '18px', fontWeight: 800 }}>
+          {data.isFullyVerified ? t.traceability : 'INCOMPLETE TRACEABILITY'}
+        </h2>
+        <p className="pv-trace-status" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+          {data.status}
+        </p>
       </div>
 
       {activeStage && (

@@ -259,7 +259,9 @@ h1, h2, h3, h4, h5, h6 {
 .pv-workflow {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 32px; /* Increased gap to fit the arrows */
+  position: relative;
+  width: 100%;
 }
 
 .pv-workflow-node {
@@ -273,16 +275,27 @@ h1, h2, h3, h4, h5, h6 {
   text-align: left;
   border-radius: 4px;
   cursor: pointer;
-  transition: border-color 0.2s, background-color 0.2s;
+  transition: all 0.2s ease;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
 }
 
 .pv-workflow-node::after {
-  content: '→';
+  content: '↓';
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: 20px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.pv-workflow-node:last-child::after {
+  display: none;
 }
 
 .pv-workflow-node:hover {

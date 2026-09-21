@@ -115,14 +115,18 @@ class AuthController extends ChangeNotifier {
     } else if (_authService.isFirebaseInitialized) {
       _currentUser = _authService.currentUser;
       if (_currentUser != null) {
+        // Live Firebase session but NO stored backend JWT. Exchange it now
+        // instead of rendering a dashboard where every API call would 401
+        // ("Authentication token is required.").
         _status = AuthStateStatus.authenticated;
         notifyListeners();
+        await _restoreSession();
       }
     }
   }
 
   /// Re-validates the persisted session by exchanging the current Firebase
-  /// ID token (if any) for a fresh backend JWT. Fire-and-forget at startup:
+  /// ID token for a fresh backend JWT. Fire-and-forget at startup:
   /// the app renders as authenticated meanwhile, then silently re-auths or
   /// signs out based on the result.
   Future<void> _restoreSession() async {
@@ -134,15 +138,40 @@ class AuthController extends ChangeNotifier {
         await signOut();
         return;
       }
+      final prefs = await SharedPreferences.getInstance();
+
+      // Restore through the SAME provider the session was created with.
+      // Phone-OTP sessions re-exchange via /api/auth/phone. Google sessions
+      // MUST NOT: a Google/Firebase ID token carries no verified
+      // phone_number claim, so /api/auth/phone correctly rejects it with
+      // 401 INVALID_PHONE_TOKEN. This path previously treated that as a
+      // dead session and signed the user out — silently destroying a
+      // perfectly valid backend identity at every app start, which left
+      // Add Hive (and every other call) without an Authorization header:
+      // the backend's 401 "Authentication token is required."
+      final storedProvider = prefs.getString(_SessionKeys.profileAuthProvider);
+      final isPhoneSession = storedProvider != null
+          ? storedProvider == 'phone'
+          : (_authService.currentUser?.phoneNumber ?? '').isNotEmpty;
+
+      final savedRole = prefs.getString(_SessionKeys.profileRole);
       final response = await _client
           .post(
-            Uri.parse('$_baseUrl/api/auth/phone'),
+            Uri.parse('$_baseUrl${isPhoneSession ? '/api/auth/phone' : '/api/auth/google'}'),
             headers: _headers,
-            body: jsonEncode({
-              'idToken': idToken,
-              // No role: the backend falls back to the existing account for
-              // this verified number instead of creating a duplicate.
-            }),
+            body: jsonEncode(
+              isPhoneSession
+                  // No role: the backend falls back to the existing account
+                  // for this verified number instead of creating a duplicate.
+                  ? {'idToken': idToken}
+                  // Role from the original sign-in so the backend resolves
+                  // the SAME (email, role) account row — omitting it would
+                  // default to HARVESTER and fork duplicates for other roles.
+                  : {
+                      'idToken': idToken,
+                      if (savedRole != null && savedRole.isNotEmpty) 'role': savedRole,
+                    },
+            ),
           )
           .timeout(_authTimeout);
 
@@ -152,11 +181,18 @@ class AuthController extends ChangeNotifier {
       }
 
       final data = jsonDecode(response.body);
-      final prefs = await SharedPreferences.getInstance();
       if (data['token'] != null) {
         await prefs.setString(_SessionKeys.token, data['token']);
         AuthTokenStore.set(token: data['token']);
       }
+      // Persist which provider owns this session so the NEXT restore
+      // exchanges through the same endpoint (phone -> /api/auth/phone,
+      // google -> /api/auth/google). Writing a hardcoded 'phone' here
+      // would misroute the next Google restore and re-trigger the bug.
+      await prefs.setString(
+        _SessionKeys.profileAuthProvider,
+        isPhoneSession ? 'phone' : 'google',
+      );
       final u = data['user'];
       if (u is Map<String, dynamic>) {
         if (u['id'] != null) {
@@ -564,13 +600,18 @@ class AuthController extends ChangeNotifier {
 
             // No backend session = the workflow cannot run. Surface it instead
             // of silently continuing to a dashboard where every call 401s.
+            // _currentUser must be cleared too: isAuthenticated() is true
+            // while it is set, so the error state would still route to the
+            // (tokenless) dashboard instead of back to the login screen.
             if (!AuthTokenStore.hasToken) {
+              _currentUser = null;
               _status = AuthStateStatus.error;
               _errorMessage = 'Signed in with Google, but the server session could not be created. Please try again.';
             }
           } catch (e) {
             debugPrint('[AuthController] Google backend session exchange failed: $e');
             if (!AuthTokenStore.hasToken) {
+              _currentUser = null;
               _status = AuthStateStatus.error;
               _errorMessage = 'Could not reach HoneyChain servers. Check your connection and try again.';
             }

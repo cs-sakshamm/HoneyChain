@@ -102,11 +102,37 @@ check("POST /api/requests (Collection & Processing)", status == 200,
 status, phone_resp = request("POST", "/api/auth/phone", {"idToken": "google-user-has-no-phone-claim"})
 detail = phone_resp.get("detail")
 detail_msg = detail.get("message") or detail.get("error") if isinstance(detail, dict) else detail
-check("POST /api/auth/phone with non-phone Firebase token (restore path)",
-      status in (200, 401), f"HTTP {status}, message='{detail_msg}'")
-if status == 401:
-    print("      ^^ CONFIRMED: Google users fail /api/auth/phone restore (no phone claim)")
-    print("         -> _restoreSession() then calls signOut(), discarding the valid session")
+check("POST /api/auth/phone with non-phone Firebase token (old broken restore path)",
+      status == 401, f"HTTP {status}, message='{detail_msg}'")
+print("      ^^ /api/auth/phone correctly rejects Google tokens (no phone claim) —")
+print("         the FIXED client now routes Google restores to /api/auth/google instead")
+
+# ── 7. FIXED restore: Google session re-exchanges via /api/auth/google ─────
+# (role is re-sent from the saved session so the SAME (email, role) row is
+#  resolved — no duplicate account forking)
+status, restored = request("POST", "/api/auth/google", {
+    "email": email, "name": "Google E2E Harvester", "role": "HARVESTER",
+})
+same_user = (restored.get("user") or {}).get("id") == user.get("id")
+restored_token = restored.get("token") or ""
+check("RESTORE (fixed): /api/auth/google re-exchange -> same user, fresh JWT",
+      status == 200 and same_user and bool(restored_token),
+      f"HTTP {status}, sameUserId={same_user}")
+
+# ── 8. Restored session can still Add Hive (the actual bug scenario) ───────
+hive_code2 = f"HIVE-{uuid.uuid4().hex[:6].upper()}"
+status, created2 = request("POST", "/api/hives", {
+    "id": "", "userId": user.get("id"), "name": "Restored Session Hive",
+    "hiveCode": hive_code2, "apiaryLocation": "Google Apiary A", "hiveType": "Langstroth",
+    "dateAdded": now_iso, "queenStatus": "Mated", "totalFrames": 10, "broodFrames": 3,
+    "colonyStrength": "Strong", "queenAgeMonths": 1, "beeBreed": "Italian",
+    "expectedProductionKg": 10.0, "previousYearProductionKg": 5.0, "currentYearProductionKg": 2.0,
+    "honeyType": "Wildflower", "lastInspectionDate": now_iso, "miteStatus": "None",
+    "diseaseStatus": "None", "feedingRequired": False, "queenCondition": "Good",
+    "overallHealth": "Healthy", "notes": "restored-session e2e", "updatedAt": now_iso,
+}, token=restored_token)
+check("Add Hive with RESTORED Google session token", status == 200 and bool((created2.get("hive") or {}).get("id")),
+      f"HTTP {status}, hiveId={(created2.get('hive') or {}).get('id')}")
 
 failed = [r for r in results if not r[1]]
 print(f"\n===== {len(results) - len(failed)}/{len(results)} checks passed =====")
