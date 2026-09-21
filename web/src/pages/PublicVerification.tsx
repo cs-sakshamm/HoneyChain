@@ -214,26 +214,26 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
               onClick={() => setActiveStage(node.id)}
               style={{ 
                 position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '12px', 
-                padding: '16px 20px', cursor: 'pointer', textAlign: 'left', width: '100%',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'all 0.2s ease'
+                background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '9999px', 
+                padding: '12px 24px', cursor: 'pointer', textAlign: 'left', width: '100%',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.2s ease'
               }}
-              onMouseOver={(e) => e.currentTarget.style.borderColor = '#facc15'}
-              onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+              onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--accent-color)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{node.title}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{node.title}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600 }}>Tap to view details</span>
+                <span style={{ fontSize: '12px', fontWeight: 600 }}>Details</span>
                 <span style={{ fontSize: '18px' }}>→</span>
               </div>
             </button>
           )
         ))}
         {data.isFullyVerified && (
-             <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: '#10b981', color: '#fff', borderRadius: '12px', fontWeight: 700 }}>
-                 <span style={{ fontSize: '20px' }}>✓</span> VERIFIED
+             <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 24px', background: '#10b981', color: '#fff', borderRadius: '9999px', fontWeight: 700, boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)' }}>
+                 <span style={{ fontSize: '18px' }}>✓</span> VERIFIED
              </div>
         )}
       </div>

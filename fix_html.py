@@ -1,6 +1,6 @@
 import base64
 
-with open('C:/Users/Prabh/.gemini/antigravity/brain/a3729446-dfba-4690-a2ef-50247953c206/honeychain-demo-qr.png', 'rb') as f:
+with open('C:/Users/Prabh/.gemini/antigravity/brain/a3729446-dfba-4690-a2ef-50247953c206/honeychain-sih-qr.png', 'rb') as f:
     b64 = base64.b64encode(f.read()).decode('utf-8')
 
 html = f"""<!DOCTYPE html>
