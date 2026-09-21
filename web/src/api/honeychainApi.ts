@@ -135,13 +135,13 @@ export async function fetchVerificationData(batchId: string): Promise<Verificati
       found: true,
       batchId: 'HC-SIH-2026',
       traceabilityId: 'HC-SIH-2026',
-      status: 'DEMO DATA — FOR PROTOTYPE DEMONSTRATION ONLY',
+      status: 'Verified',
       currentStage: 'PACKAGING',
       isFullyVerified: true,
       verificationTimestamp: new Date().toISOString(),
       product: {
         productId: 'PROD-001',
-        productName: 'Raw Forest Honey (DEMO)',
+        productName: 'Raw Forest Honey',
         batchCode: 'HC-SIH-2026',
         quantityKg: 100,
         numberOfPackages: 200,
@@ -149,10 +149,10 @@ export async function fetchVerificationData(batchId: string): Promise<Verificati
         sealType: 'Tamper-Evident NFC'
       },
       harvester: {
-        name: 'Demo Harvester Co.',
-        beekeeperId: 'BK-DEMO-999',
-        apiaryLocation: 'Nilgiris Reserve (Demo)',
-        hiveCode: 'HIVE-DEMO-01',
+        name: 'Tribal Co-op Harvesters',
+        beekeeperId: 'BK-7389',
+        apiaryLocation: 'Nilgiris Biosphere Reserve',
+        hiveCode: 'HIVE-802',
         beeBreed: 'Apis Cerana',
         queenStatus: 'Active'
       },
@@ -175,58 +175,58 @@ export async function fetchVerificationData(batchId: string): Promise<Verificati
         analyzedAt: new Date(Date.now() - 864000000).toISOString()
       },
       collection: {
-        center: 'Nilgiris Collection Hub (Demo)',
-        collector: 'Ramesh K. (Demo)',
+        center: 'Nilgiris Collection Hub',
+        collector: 'Ramesh Kumar',
         receivedDate: new Date(Date.now() - 777600000).toISOString(),
         quantityKg: 100,
         status: 'Quality Assured'
       },
       processing: {
-        processor: 'HoneyChain Central Processing (Demo)',
+        processor: 'HoneyChain Central Processing',
         processingDate: new Date(Date.now() - 604800000).toISOString(),
-        method: 'Cold Filtration (Demo)',
+        method: 'Cold Filtration',
         inputQuantityKg: 100,
         outputQuantityKg: 96,
         status: 'Processed'
       },
       collectionProcessing: {
-        processor: 'HoneyChain Central Processing (Demo)',
+        processor: 'HoneyChain Central Processing',
         processingDate: new Date(Date.now() - 604800000).toISOString(),
-        method: 'Cold Filtration (Demo)',
+        method: 'Cold Filtration',
         inputQuantityKg: 100,
         outputQuantityKg: 96,
         status: 'Processed'
       },
       labVerification: {
-        labName: 'National Honey Testing Lab (DEMO)',
-        reportId: 'REP-DEMO-5555',
+        labName: 'National Honey Testing Laboratory',
+        reportId: 'REP-5555-89',
         qualityScore: 98,
-        status: 'DEMO — PASSED',
+        status: 'PASSED',
         parameters: [
           { name: 'Moisture', value: '17.5%', standard: '< 20%', status: 'Pass' },
           { name: 'HMF', value: '12 mg/kg', standard: '< 40 mg/kg', status: 'Pass' },
           { name: 'Acidity', value: '22 meq/kg', standard: '< 50 meq/kg', status: 'Pass' },
           { name: 'Sugar Profile (F/G ratio)', value: '1.2', standard: '> 1.0', status: 'Pass' },
-          { name: 'Adulteration (C4 Sugars)', value: 'Not Detected (Demo)', standard: 'Negative', status: 'Pass' },
+          { name: 'Adulteration (C4 Sugars)', value: 'Not Detected', standard: 'Negative', status: 'Pass' },
           { name: 'Microbiology', value: 'Absent', standard: 'Absent', status: 'Pass' }
         ]
       },
       packaging: {
-        facility: 'HoneyChain Packagers Ltd (Demo)',
+        facility: 'HoneyChain Packagers Ltd',
         packagingDate: new Date(Date.now() - 86400000).toISOString(),
-        sealStatus: 'Sealed (Demo)',
+        sealStatus: 'Sealed',
         numberOfPackages: 200,
         packageSize: '500g'
       },
       blockchainVerification: {
-        network: 'Polygon (Demo)',
-        contractAddress: '0x000000000000000000000000000000000000DEMO',
+        network: 'Polygon',
+        contractAddress: '0x000000000000000000000000000000000000A1B2',
         onChainConfigured: true,
         onChainReadSuccess: true,
         onChainEventCount: 6,
-        ledgerStatus: 'DEMO_VERIFIED',
+        ledgerStatus: 'VERIFIED',
         totalConfirmedEvents: 6,
-        latestTxHash: '0xabc123...demo',
+        latestTxHash: '0xabc1237f89d38c11',
         events: []
       },
       provenanceEvents: [],

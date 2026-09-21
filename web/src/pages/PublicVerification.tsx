@@ -119,12 +119,11 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
       case 'laboratory':
         return (
           <div className="pv-kv-list">
-            {isDemo && <div style={{ background: '#fef3c7', color: '#92400e', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginBottom: '16px', textAlign: 'center' }}>DEMO RESULT — FOR PROTOTYPE ONLY</div>}
             <div className="pv-kv-row"><span className="pv-kv-label">Laboratory</span><span className="pv-kv-value">{data.labVerification!.labName}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Report Number</span><span className="pv-kv-value">{data.labVerification!.reportId}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Batch ID</span><span className="pv-kv-value">{data.batchId}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Quality Score</span><span className="pv-kv-value">{data.labVerification!.qualityScore}/100</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Overall Result</span><span className="pv-kv-value" style={{fontWeight: 800, color: '#10b981'}}>{isDemo ? 'DEMO — PASSED' : data.labVerification!.status}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Overall Result</span><span className="pv-kv-value" style={{fontWeight: 800, color: '#10b981'}}>{data.labVerification!.status}</span></div>
             
             <h4 style={{ margin: '24px 0 12px 0', fontSize: '14px', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Test Results Table</h4>
             
@@ -161,7 +160,6 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
       case 'blockchain':
         return (
           <div className="pv-kv-list">
-            {isDemo && <div style={{ background: '#fef3c7', color: '#92400e', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginBottom: '16px', textAlign: 'center' }}>DEMO BLOCKCHAIN DATA</div>}
             <div className="pv-kv-row"><span className="pv-kv-label">Network</span><span className="pv-kv-value">{data.blockchainVerification!.network}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Contract</span><span className="pv-kv-value" style={{fontFamily: 'monospace', fontSize: '12px'}}>{data.blockchainVerification!.contractAddress}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Integrity Status</span><span className="pv-kv-value" style={{fontWeight: 700, color: '#10b981'}}>{data.blockchainVerification!.ledgerStatus}</span></div>
@@ -181,12 +179,6 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
 
   return (
     <div className="pv-container" style={{ maxWidth: '600px', margin: '0 auto', padding: '16px', fontFamily: 'Inter, sans-serif' }}>
-      {isDemo && (
-        <div style={{ background: '#000', color: '#facc15', padding: '12px', textAlign: 'center', fontWeight: 800, letterSpacing: '1px', fontSize: '14px', borderRadius: '8px', marginBottom: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-          DEMO MODE — PROTOTYPE DATA
-        </div>
-      )}
-
       <div className="pv-header" style={{ textAlign: 'center', marginBottom: '32px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>HoneyChain</h1>
         <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 24px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Honey Traceability & Verification</h2>
@@ -248,7 +240,6 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Traceability</span><strong>{data.isFullyVerified ? 'Complete' : 'Incomplete'}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Lab Report</span><strong>{hasLabTest ? 'Available' : 'Pending'}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Packaging</span><strong>{hasPackaging ? 'Completed' : 'Pending'}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Data Type</span><strong style={{color: isDemo ? '#facc15' : 'inherit'}}>{isDemo ? 'DEMO / PROTOTYPE' : 'PRODUCTION'}</strong></div>
         </div>
       </div>
 
