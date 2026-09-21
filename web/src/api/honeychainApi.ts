@@ -129,12 +129,12 @@ const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_
 export async function fetchVerificationData(batchId: string): Promise<VerificationResponse> {
   // --- DEMO FALLBACK FOR PROTOTYPE ---
   // If the batchId is specifically the demo ID, return the isolated demo record.
-  if (batchId === 'HC-DEMO-2026') {
+  if (batchId === 'HC-SIH-2026') {
     return {
       success: true,
       found: true,
-      batchId: 'HC-DEMO-2026',
-      traceabilityId: 'HC-DEMO-2026',
+      batchId: 'HC-SIH-2026',
+      traceabilityId: 'HC-SIH-2026',
       status: 'DEMO DATA — FOR PROTOTYPE DEMONSTRATION ONLY',
       currentStage: 'PACKAGING',
       isFullyVerified: true,
@@ -142,7 +142,7 @@ export async function fetchVerificationData(batchId: string): Promise<Verificati
       product: {
         productId: 'PROD-001',
         productName: 'Raw Forest Honey (DEMO)',
-        batchCode: 'HC-DEMO-2026',
+        batchCode: 'HC-SIH-2026',
         quantityKg: 100,
         numberOfPackages: 200,
         packageSize: '500g',

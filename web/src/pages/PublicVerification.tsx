@@ -14,7 +14,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   const [activeStage, setActiveStage] = useState<string | null>(null);
 
   const t = (i18nDict[language] || i18nDict['EN']).pv;
-  const isDemo = data?.batchId === 'HC-DEMO-2026';
+  const isDemo = data?.batchId === 'HC-SIH-2026';
 
   const loadData = async () => {
     setLoading(true);
