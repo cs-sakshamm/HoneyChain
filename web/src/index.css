@@ -293,10 +293,43 @@ h1, h2, h3, h4, h5, h6 {
 /* App Footer */
 .app-footer {
   padding: 32px 24px;
-  text-align: center;
   background-color: var(--surface-color);
   border-top: 1px solid var(--border-color);
   margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-left, .footer-right {
+  flex: 1;
+}
+
+.footer-left {
+  text-align: left;
+}
+
+.footer-right {
+  text-align: right;
+}
+
+.footer-center {
+  text-align: center;
+  flex: 2;
+}
+
+.footer-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  display: inline-block;
 }
 
 .footer-text {
@@ -313,5 +346,20 @@ h1, h2, h3, h4, h5, h6 {
   margin-left: 8px;
   display: inline-block;
   transform: translateY(2px);
+}
+
+@media (max-width: 768px) {
+  .app-footer {
+    flex-direction: column;
+    text-align: center;
+  }
+  .footer-left, .footer-right, .footer-center {
+    text-align: center;
+    flex: auto;
+  }
+  .footer-center {
+    order: -1;
+    margin-bottom: 8px;
+  }
 }
 

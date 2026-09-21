@@ -100,10 +100,16 @@ export const App: React.FC = () => {
       </main>
 
       <footer className="app-footer">
-        <p>
+        <div className="footer-left">
+          <span className="footer-tag">Secured by Polygon Ledger</span>
+        </div>
+        <div className="footer-center">
           <span className="footer-text">Developed and Designed by</span> 
           <span className="footer-signature">Team DataMineX</span>
-        </p>
+        </div>
+        <div className="footer-right">
+          <span className="footer-tag">Immutable Provenance</span>
+        </div>
       </footer>
     </div>
   );
