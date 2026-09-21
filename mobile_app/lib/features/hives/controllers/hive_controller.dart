@@ -2,13 +2,30 @@ import 'package:flutter/foundation.dart';
 import '../models/hive_model.dart';
 import '../services/hive_storage_service.dart';
 
+/// A hive submission that the backend rejected (or that never reached it).
+/// Kept in memory so the UI can render an honest per-hive error card with a
+/// Retry action instead of silently dropping the failure.
+class FailedHiveSubmission {
+  final String localKey;
+  final Hive hive;
+  final String message;
+  FailedHiveSubmission({
+    required this.localKey,
+    required this.hive,
+    required this.message,
+  });
+}
+
 /// State management controller for HoneyChain Hives backed by PostgreSQL
+/// with genuine database persistence and local cache fallback.
 class HiveController extends ChangeNotifier {
   final HiveStorageService _storageService = HiveStorageService();
 
   List<Hive> _hives = [];
   bool _isLoading = false;
+  bool _isSubmitting = false;
   String _searchQuery = '';
+  final Map<String, FailedHiveSubmission> _failedSubmissions = {};
   String _selectedFilter = 'All'; // All, Healthy, Needs Attention, High Production, Recently Added
   String _selectedSort = 'Name A-Z'; // Name A-Z, Production High-Low, Last Inspected, Date Added
   String? _activeUserId;
@@ -16,6 +33,10 @@ class HiveController extends ChangeNotifier {
 
   List<Hive> get hives => _hives;
   bool get isLoading => _isLoading;
+  /// True while a hive create/update call is in flight — guards double-taps.
+  bool get isSubmitting => _isSubmitting;
+  /// Failed create submissions keyed by the client-side hive code used.
+  Map<String, FailedHiveSubmission> get failedSubmissions => Map.unmodifiable(_failedSubmissions);
   String get searchQuery => _searchQuery;
   String get selectedFilter => _selectedFilter;
   String get selectedSort => _selectedSort;
@@ -25,13 +46,15 @@ class HiveController extends ChangeNotifier {
     loadHives();
   }
 
-  /// Initialize and load hives from PostgreSQL backend for the active beekeeper
-  Future<void> loadHives({String? userId}) async {
+  /// Initialize and load hives from PostgreSQL backend for the active beekeeper.
+  /// [clearFailures] resets per-session failed submission cards (default true).
+  Future<void> loadHives({String? userId, bool clearFailures = true}) async {
     if (userId != null && userId.trim().isNotEmpty) {
       _activeUserId = userId.trim();
     }
     _isLoading = true;
     _lastError = null;
+    if (clearFailures) _failedSubmissions.clear();
     notifyListeners();
 
     _hives = await _storageService.loadHives(userId: _activeUserId);
@@ -53,20 +76,51 @@ class HiveController extends ChangeNotifier {
 
   /// Add a new hive to PostgreSQL and local state.
   /// Uses server-assigned unique ID and server-validated hive code.
+  ///
+  /// On failure the attempted submission is recorded so the matching hive
+  /// card can show the real backend error with a Retry action.
   Future<bool> addHive(Hive hive, {String? userId}) async {
+    if (_isSubmitting) return false;
     final effectiveUserId = userId ?? _activeUserId;
     _lastError = null;
-    final createdHive = await _storageService.createHive(hive, userId: effectiveUserId);
-
-    if (createdHive != null) {
-      _hives.insert(0, createdHive);
-      await _storageService.saveHives(_hives);
-      notifyListeners();
-      return true;
-    }
-    _lastError = _storageService.lastError;
+    _isSubmitting = true;
     notifyListeners();
-    return false;
+
+    try {
+      final createdHive = await _storageService.createHive(hive, userId: effectiveUserId);
+
+      if (createdHive != null) {
+        _failedSubmissions.remove(hive.hiveCode);
+        // Re-sync from the backend so the list reflects exactly what is
+        // persisted (no optimistic fake rows, no stale cache order).
+        _hives = await _storageService.loadHives(userId: effectiveUserId);
+        await _storageService.saveHives(_hives);
+        return true;
+      }
+      _lastError = _storageService.lastError;
+      _failedSubmissions[hive.hiveCode] = FailedHiveSubmission(
+        localKey: hive.hiveCode,
+        hive: hive,
+        message: _lastError ?? 'Unable to create hive. Please try again.',
+      );
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Retry a previously failed hive submission (same payload, fresh attempt).
+  Future<bool> retryFailedSubmission(String localKey) async {
+    final failed = _failedSubmissions[localKey];
+    if (failed == null) return false;
+    return addHive(failed.hive, userId: failed.hive.userId ?? _activeUserId);
+  }
+
+  /// Dismiss a failed submission card once the user is done with it.
+  void dismissFailedSubmission(String localKey) {
+    _failedSubmissions.remove(localKey);
+    notifyListeners();
   }
 
   /// Update an existing hive in PostgreSQL and local state

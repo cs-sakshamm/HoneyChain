@@ -9,7 +9,7 @@ import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/profile_guard.dart';
+import '../widgets/failed_hive_card.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/auto_image_slider.dart';
 import '../../../core/widgets/critical_alert_dialog.dart';
@@ -18,16 +18,13 @@ import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/global_app_bar.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../profile/controllers/user_controller.dart';
-import '../../verification/controllers/verification_controller.dart';
-import '../../verification/screens/harvester_verification_screen.dart';
-import '../../verification/screens/verification_certificate_screen.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import 'add_edit_hive_screen.dart';
 import 'hive_details_screen.dart';
 
 /// Harvester Home — greeting, hive overview with real data, Add Hive action,
-/// identity card, and recent collection requests. No fake telemetry.
+/// and recent collection requests. No fake telemetry.
 class HarvesterDashboardScreen extends StatefulWidget {
   const HarvesterDashboardScreen({super.key});
 
@@ -36,6 +33,40 @@ class HarvesterDashboardScreen extends StatefulWidget {
 }
 
 class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
+  /// Real backend status of the collection request attached to a hive.
+  /// Reads only from WorkflowController data fetched from GET /api/requests —
+  /// no local/dummy status is invented.
+  String _requestStatusLabel(String? hiveId) {
+    if (hiveId == null || hiveId.isEmpty) return 'Request Not Sent';
+    final workflowCtrl = context.read<WorkflowController>();
+    final requests = workflowCtrl.harvesterRequests
+        .where((r) => r.hiveId == hiveId)
+        .toList();
+    if (requests.isEmpty) return 'Request Not Sent';
+    // Most recent request for this hive wins.
+    requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return requests.first.status.label;
+  }
+
+  Color _requestStatusColor(String label) {
+    switch (label) {
+      case 'Request Not Sent':
+        return context.textMutedColor;
+      case 'Pending':
+        return context.warningColor;
+      case 'Accepted':
+      case 'Processing':
+      case 'Lab Verified':
+      case 'Completed':
+        return context.successColor;
+      case 'Denied':
+      case 'Lab Rejected':
+        return context.errorColor;
+      default:
+        return context.colors.primary;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +74,6 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
       final user = context.read<UserController>().user;
       final userId = (user.id != null && user.id!.isNotEmpty) ? user.id! : user.email;
       if (userId.isNotEmpty) {
-        context.read<VerificationController>().loadVerification(userId);
         context.read<TelemetryAlertController>().startMonitoring(userId: userId);
       }
     });
@@ -63,7 +93,8 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
   }
 
   void _openAddHive() {
-    if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+    // Accessible to any authenticated harvester (e.g. Google sign-in) —
+    // no profile-verification gate.
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddEditHiveScreen()),
@@ -91,7 +122,17 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
     final greeting = _timeBasedGreeting();
     final greetingDisplay = beekeeperName.isNotEmpty ? '$greeting, $beekeeperName 👋' : '$greeting 👋';
     
-    final activeRequests = workflowController.pendingCollectionRequests.length;
+    // Active requests from THIS harvester: still in progress (not yet
+    // accepted/completed/rejected). pendingCollectionRequests is the
+    // collector-inbound getter and would count other users' requests.
+    final activeRequests = workflowController.harvesterRequests
+        .where((r) =>
+            r.status == RequestStatus.pending ||
+            r.status == RequestStatus.accepted ||
+            r.status == RequestStatus.processing ||
+            r.status == RequestStatus.awaitingTest ||
+            r.status == RequestStatus.testing)
+        .length;
     final hives = hiveController.hives;
     final criticalAlert = telemetryAlertCtrl.activeUnacknowledgedAlert;
 
@@ -125,7 +166,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Overview of your apiary, identity, and honey collection.',
+                        'Overview of your apiary and honey collection.',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           color: context.textSecondaryColor,
@@ -135,11 +176,6 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                   ),
 
                   const SizedBox(height: AppConstants.space20),
-
-                  // 3. Real Beekeeper Information & Identity
-                  _IdentityCard(),
-
-                  const SizedBox(height: AppConstants.space16),
 
                   // Stats Row
                   Row(
@@ -175,10 +211,24 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                   ),
                   const SizedBox(height: AppConstants.space12),
 
-                  if (hives.isEmpty)
+                  if (hives.isEmpty && hiveController.failedSubmissions.isEmpty)
                     _HiveEmptyState(onAddHive: _openAddHive)
-                  else
-                    ...hives.take(3).map((hive) => _HiveInfoCard(hive: hive)),
+                  else ...[
+                    // Honest per-hive error cards for submissions the backend
+                    // rejected — real message + Retry, never a fake success.
+                    ...hiveController.failedSubmissions.values.map(
+                      (failed) => FailedHiveCard(
+                        failed: failed,
+                        onRetry: () => hiveController.retryFailedSubmission(failed.localKey),
+                        onDismiss: () => hiveController.dismissFailedSubmission(failed.localKey),
+                      ),
+                    ),
+                    ...hives.take(3).map((hive) => _HiveInfoCard(
+                          hive: hive,
+                          requestStatusLabel: _requestStatusLabel(hive.id),
+                          requestStatusColor: _requestStatusColor(_requestStatusLabel(hive.id)),
+                        )),
+                  ],
 
                   const SizedBox(height: AppConstants.space20),
 
@@ -217,7 +267,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                             );
                           },
                           child: Text(
-                            'View All (${workflowController.allRequests.length})',
+                            'View All (${workflowController.harvesterRequests.length})',
                             style: GoogleFonts.manrope(
                               fontWeight: FontWeight.w700,
                               color: context.colors.primary,
@@ -232,7 +282,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
             ),
           ),
 
-          if (workflowController.allRequests.isEmpty)
+          if (workflowController.harvesterRequests.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppConstants.space24),
@@ -243,8 +293,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final sortedRequests = List<WorkflowRequest>.from(workflowController.allRequests)
-                    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                  final sortedRequests = workflowController.harvesterRequests;
 
                   final request = sortedRequests[index];
                   return Padding(
@@ -322,7 +371,7 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
                     ),
                   );
                 },
-                childCount: workflowController.allRequests.length,
+                childCount: workflowController.harvesterRequests.length,
               ),
             ),
 
@@ -473,231 +522,16 @@ class _AddHiveCard extends StatelessWidget {
   }
 }
 
-/// Harvester identity & verification status card with dynamic linear progress indicator
-/// and 3-parameter verification workflow.
-class _IdentityCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final verCtrl = context.watch<VerificationController>();
-    final ver = verCtrl.verification;
-    final isVerified = ver.isFullyVerified;
-    final int count = ver.completedStepsCount;
-    final double progress = (count / 3.0).clamp(0.0, 1.0);
-    final int percentage = (progress * 100).round();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final String statusBadgeText;
-    final Color statusColor;
-    final Color statusBgColor;
-
-    if (isVerified || count == 3) {
-      statusBadgeText = 'Profile Verified (3 of 3)';
-      statusColor = context.successColor;
-      statusBgColor = context.successBgColor;
-    } else if (count == 0) {
-      statusBadgeText = 'Profile Setup (0 of 3)';
-      statusColor = context.warningColor;
-      statusBgColor = context.warningBgColor;
-    } else {
-      statusBadgeText = 'Partially Verified ($count of 3)';
-      statusColor = context.colors.primary;
-      statusBgColor = context.primarySoftColor;
-    }
-
-    final String supportingText;
-    if (isVerified) {
-      supportingText = 'Profile Verified — Harvester access enabled.';
-    } else {
-      supportingText = 'Complete profile verification to add hives and start harvesting activities.';
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppConstants.space16),
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isVerified
-              ? context.successColor.withValues(alpha: 0.5)
-              : (isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isVerified
-                ? context.successColor.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(
-                      isVerified ? Icons.verified_user_rounded : Icons.hive_rounded,
-                      size: 20,
-                      color: statusColor,
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Harvester Verification',
-                        style: GoogleFonts.manrope(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: context.textPrimaryColor,
-                          letterSpacing: -0.2,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBgColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  statusBadgeText,
-                  style: GoogleFonts.manrope(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor.withValues(alpha: 0.5),
-                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '$percentage%',
-                style: GoogleFonts.manrope(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: statusColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              _buildMiniCheck(context, 'Govt ID', ver.isStep1Complete),
-              _buildMiniCheck(context, 'Mobile OTP', ver.isStep2Complete),
-              _buildMiniCheck(context, 'Apiary & Reg', ver.isStep3Complete),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  supportingText,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: context.textSecondaryColor,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () {
-                  if (isVerified) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
-                    );
-                  }
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isVerified ? context.successBgColor : context.primarySoftColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isVerified ? context.successColor.withValues(alpha: 0.4) : context.borderColor,
-                    ),
-                  ),
-                  child: Text(
-                    isVerified ? 'View Certificate ✓' : 'Verify Profile →',
-                    style: GoogleFonts.manrope(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isVerified ? context.successColor : context.textPrimaryColor,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniCheck(BuildContext context, String title, bool isDone) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-          size: 14,
-          color: isDone ? context.successColor : context.textMutedColor,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: isDone ? FontWeight.w600 : FontWeight.w500,
-            color: isDone ? context.textPrimaryColor : context.textMutedColor,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _HiveInfoCard extends StatefulWidget {
   final Hive hive;
+  final String requestStatusLabel;
+  final Color requestStatusColor;
 
-  const _HiveInfoCard({required this.hive});
+  const _HiveInfoCard({
+    required this.hive,
+    required this.requestStatusLabel,
+    required this.requestStatusColor,
+  });
 
   @override
   State<_HiveInfoCard> createState() => _HiveInfoCardState();
@@ -785,20 +619,44 @@ class _HiveInfoCardState extends State<_HiveInfoCard> {
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: healthy ? context.successBgColor : context.warningBgColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        widget.hive.overallHealth,
-                        style: GoogleFonts.manrope(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: healthy ? context.successColor : context.warningColor,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Real workflow status for this hive from the backend
+                        // (Request Not Sent → Pending → Accepted → …).
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: widget.requestStatusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            widget.requestStatusLabel,
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: widget.requestStatusColor,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: healthy ? context.successBgColor : context.warningBgColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            widget.hive.overallHealth,
+                            style: GoogleFonts.manrope(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: healthy ? context.successColor : context.warningColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1007,3 +865,4 @@ class _RequestsEmptyState extends StatelessWidget {
     );
   }
 }
+

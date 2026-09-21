@@ -31,6 +31,14 @@
 
   <title>HoneyChain</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    /* Hide Firebase Auth's floating reCAPTCHA badge on every page.
+       `visibility: hidden` (not display:none) keeps the iframe rendered so
+       phone-auth (invisible reCAPTCHA) continues to function. */
+    .grecaptcha-badge {
+      visibility: hidden;
+    }
+  </style>
 </head>
 <body>
   <!-- Firebase JS SDK & Analytics Initialization -->

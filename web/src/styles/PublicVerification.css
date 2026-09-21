@@ -1,0 +1,200 @@
+/* PublicVerification.css - Ultra minimal plain text style */
+
+:root {
+  --pv-bg: #ffffff;
+  --pv-text: #111111;
+  --pv-text-muted: #555555;
+  --pv-border: #e0e0e0;
+  --pv-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: var(--pv-bg);
+  color: var(--pv-text);
+}
+
+.pv-container {
+  font-family: var(--pv-font);
+  background-color: var(--pv-bg);
+  color: var(--pv-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 60px;
+  line-height: 1.5;
+}
+
+.pv-wrapper {
+  width: 100%;
+  max-width: 600px;
+}
+
+.pv-divider {
+  border: none;
+  border-top: 1px solid var(--pv-border);
+  margin: 32px 0;
+}
+
+/* Header */
+.pv-header {
+  padding: 32px 0 0;
+}
+
+.pv-header-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--pv-text);
+}
+
+.pv-header-subtitle {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--pv-text-muted);
+  margin: 0;
+}
+
+/* Top Verification */
+.pv-status-section {
+  margin-bottom: 16px;
+}
+
+.pv-status-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.pv-status-badge {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--pv-text);
+}
+
+.pv-status-trace {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--pv-text-muted);
+}
+
+/* Main Section Heading */
+.pv-main-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0 0 32px 0;
+}
+
+/* Steps */
+.pv-step {
+  margin-bottom: 40px;
+}
+
+.pv-step-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pv-step-number {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--pv-text);
+}
+
+.pv-step-title {
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* Key Value Table */
+.pv-kv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pv-kv-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.pv-kv-label {
+  flex: 0 0 200px;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--pv-text-muted);
+}
+
+.pv-kv-value {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pv-text);
+  word-break: break-word;
+}
+
+/* Sub-sections (like Lab parameters) */
+.pv-sub-section {
+  margin-top: 24px;
+}
+
+.pv-sub-heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+}
+
+/* Final Status */
+.pv-footer-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.pv-footer-desc {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--pv-text-muted);
+  margin: 0;
+}
+
+/* Messages */
+.pv-center-msg {
+  padding-top: 60px;
+  text-align: left;
+}
+
+.pv-center-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.pv-center-desc {
+  font-size: 0.875rem;
+  color: var(--pv-text-muted);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .pv-kv-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pv-kv-label {
+    flex: none;
+    font-size: 0.75rem;
+  }
+  .pv-kv-value {
+    font-size: 0.9375rem;
+  }
+}

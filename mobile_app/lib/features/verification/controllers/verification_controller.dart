@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../models/collector_verification_model.dart';
@@ -180,7 +181,23 @@ class VerificationController extends ChangeNotifier {
     }
   }
 
-  /// Step 1 (Fallback / Direct): Submit Government ID
+  /// Extracts the backend's validation message (HTTPException detail) so
+  /// format errors surface verbatim, e.g. "Invalid AADHAAR format. Expected: ...".
+  String _errorMessageFrom(Object e) {
+    final raw = e.toString().replaceAll('Exception: ', '');
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        final detail = decoded['detail'] ?? decoded;
+        if (detail is Map) {
+          return (detail['message'] ?? detail['error'] ?? raw).toString();
+        }
+      }
+    } catch (_) {}
+    return raw;
+  }
+
+  /// Step 1 (Fallback / Direct): Submit Government ID (format validation only)
   Future<bool> submitGovernmentId({
     required String docType,
     required String docNumber,
@@ -196,10 +213,12 @@ class VerificationController extends ChangeNotifier {
         documentType: docType,
         documentNumber: docNumber,
       );
-      _successMessage = 'Government ID verified successfully.';
+      // Honest message: the backend validates FORMAT only — no government
+      // registry is contacted, so this is not "verified".
+      _successMessage = 'Government ID saved — format is valid (not yet government-verified).';
       return true;
     } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _errorMessage = _errorMessageFrom(e);
       return false;
     } finally {
       _isLoading = false;
@@ -225,10 +244,10 @@ class VerificationController extends ChangeNotifier {
         registrationId: registrationId,
         registrationType: registrationType,
       );
-      _successMessage = 'Beekeeper registration ID verified successfully.';
+      _successMessage = 'Registration ID submitted. It is recorded, not yet authority-verified.';
       return true;
     } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _errorMessage = _errorMessageFrom(e);
       return false;
     } finally {
       _isLoading = false;
@@ -250,10 +269,10 @@ class VerificationController extends ChangeNotifier {
         harvesterId: _verification.harvesterId,
         fssaiLicense: fssaiLicense,
       );
-      _successMessage = 'FSSAI License verified successfully.';
+      _successMessage = 'FSSAI license saved — format is valid (not yet officially verified).';
       return true;
     } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _errorMessage = _errorMessageFrom(e);
       return false;
     } finally {
       _isLoading = false;
@@ -279,10 +298,10 @@ class VerificationController extends ChangeNotifier {
         apiaryLocation: apiaryLocation,
         apiaryCoordinates: apiaryCoordinates,
       );
-      _successMessage = 'Apiary location registered and verified.';
+      _successMessage = 'Apiary location saved.';
       return true;
     } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _errorMessage = _errorMessageFrom(e);
       return false;
     } finally {
       _isLoading = false;

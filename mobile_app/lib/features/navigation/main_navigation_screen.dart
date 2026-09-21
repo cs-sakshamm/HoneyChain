@@ -169,7 +169,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
                           label: context.tr('add_hive'),
                           isSelected: _currentIndex == 1,
                           onTapOverride: () {
-                             if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
                              Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditHiveScreen()));
                           }
                         ),

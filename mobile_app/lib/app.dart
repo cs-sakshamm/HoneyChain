@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/constants/app_constants.dart';
+import 'core/controllers/workflow_controller.dart';
+import 'features/hives/controllers/hive_controller.dart';
 import 'core/localization/localization_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -63,12 +65,20 @@ class _AuthRouterState extends State<AuthRouter> {
       return const LoginScreen();
     }
 
-    // Automatically synchronize user profile on login
+    // Automatically synchronize user profile + workflow data on login.
+    // The token is now in AuthTokenStore, so REST calls authenticate properly;
+    // receivers also pick up any requests created while they were offline.
     final currentUid = authController.currentUser?.uid ?? 'authenticated';
     if (_lastLoadedUserId != currentUid) {
       _lastLoadedUserId = currentUid;
+      final workflowController = context.read<WorkflowController>();
+      final hiveController = context.read<HiveController>();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         userController.reloadProfile();
+        workflowController.fetchAllData();
+        // Hives are PostgreSQL-backed and need the fresh session token;
+        // without this the dashboard can show a stale/other-user list.
+        hiveController.setActiveBeekeeper(userController.user.id);
       });
     }
 

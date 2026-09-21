@@ -108,7 +108,29 @@ class VerificationApiService {
     }
   }
 
-  /// Step 1: Submit Government ID (Standard Fallback)
+  /// Surfaces the backend's structured error message (HTTPException detail)
+  /// so the UI can show exactly why a format was rejected.
+  dynamic _decodeBody(http.Response response) {
+    try {
+      return jsonDecode(response.body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _errorMessageFrom(http.Response response, String fallback) {
+    final data = _decodeBody(response);
+    if (data is Map) {
+      final detail = data['detail'] ?? data;
+      if (detail is Map) {
+        return (detail['message'] ?? detail['error'] ?? fallback).toString();
+      }
+      if (detail is String && detail.isNotEmpty) return detail;
+    }
+    return fallback;
+  }
+
+  /// Step 1: Submit Government ID (format validation only)
   Future<HarvesterVerificationModel> submitGovernmentId({
     required String harvesterId,
     required String documentType,
@@ -123,14 +145,13 @@ class VerificationApiService {
     });
 
     final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
+    final data = _decodeBody(response);
+    if (response.statusCode == 200 && data is Map && data['success'] == true && data['verification'] != null) {
       final model = HarvesterVerificationModel.fromJson(data['verification']);
       await _cacheLocalVerification(cleanId, model);
       return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Failed to verify Government ID.');
     }
+    throw Exception(_errorMessageFrom(response, 'Failed to save Government ID.'));
   }
 
 
@@ -150,17 +171,16 @@ class VerificationApiService {
     });
 
     final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
+    final data = _decodeBody(response);
+    if (response.statusCode == 200 && data is Map && data['success'] == true && data['verification'] != null) {
       final model = HarvesterVerificationModel.fromJson(data['verification']);
       await _cacheLocalVerification(cleanId, model);
       return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Failed to verify Beekeeper Registration ID.');
     }
+    throw Exception(_errorMessageFrom(response, 'Failed to submit registration ID.'));
   }
 
-  /// Step 3.5: Submit FSSAI License
+  /// Step 3.5: Submit FSSAI License (format validation only)
   Future<HarvesterVerificationModel> submitHarvesterFssaiLicense({
     required String harvesterId,
     required String fssaiLicense,
@@ -173,14 +193,13 @@ class VerificationApiService {
     });
 
     final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
+    final data = _decodeBody(response);
+    if (response.statusCode == 200 && data is Map && data['success'] == true && data['verification'] != null) {
       final model = HarvesterVerificationModel.fromJson(data['verification']);
       await _cacheLocalVerification(cleanId, model);
       return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Failed to verify FSSAI License.');
     }
+    throw Exception(_errorMessageFrom(response, 'Failed to save FSSAI license.'));
   }
 
   /// Step 4: Submit Apiary Location
@@ -200,14 +219,13 @@ class VerificationApiService {
     });
 
     final response = await _client.post(url, headers: _headers, body: body).timeout(const Duration(seconds: 8));
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success'] == true && data['verification'] != null) {
+    final data = _decodeBody(response);
+    if (response.statusCode == 200 && data is Map && data['success'] == true && data['verification'] != null) {
       final model = HarvesterVerificationModel.fromJson(data['verification']);
       await _cacheLocalVerification(cleanId, model);
       return model;
-    } else {
-      throw Exception(data['error'] ?? data['message'] ?? 'Failed to verify Apiary Location.');
     }
+    throw Exception(_errorMessageFrom(response, 'Failed to save apiary location.'));
   }
 
   /// Step 5: Submit Final Blockchain Verification

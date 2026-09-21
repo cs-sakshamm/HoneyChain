@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { VerifyPage } from './pages/VerifyPage';
+import { PublicVerification } from './pages/PublicVerification';
 import { PhoneAuthPage } from './pages/PhoneAuthPage';
 import { useFirebaseUser, signOutFirebase } from './auth/useFirebaseUser';
 import { LogOut } from 'lucide-react';
@@ -101,7 +101,7 @@ export const App: React.FC = () => {
           variants={getPageVariants(shouldReduceMotion ?? false)}
           style={{ width: '100%', height: '100%' }}
         >
-          <VerifyPage batchId={currentBatchId} />
+          <PublicVerification batchId={currentBatchId} />
         </motion.div>
       ) : (
         <motion.div

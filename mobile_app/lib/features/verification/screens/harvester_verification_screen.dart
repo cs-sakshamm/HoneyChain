@@ -21,6 +21,38 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
   // Step 1 Form (Harvester Full Name)
   final TextEditingController _fullNameController = TextEditingController();
 
+  // Step 1 Form (Government ID)
+  final TextEditingController _govIdNumberController = TextEditingController();
+  String _selectedGovIdType = 'AADHAAR';
+
+  static const Map<String, String> _govIdTypes = {
+    'AADHAAR': 'Aadhaar Card',
+    'PAN': 'PAN Card',
+    'PASSPORT': 'Passport',
+    'DRIVING_LICENSE': 'Driving License',
+    'VOTER_ID': 'Voter ID',
+  };
+
+  static const Map<String, String> _govIdExamples = {
+    'AADHAAR': '2345 6789 0123',
+    'PAN': 'ABCDE1234F',
+    'PASSPORT': 'A1234567',
+    'DRIVING_LICENSE': 'DL-1420110012345',
+    'VOTER_ID': 'ABC1234567',
+  };
+
+  // RegExp isn't const-constructible, so this map cannot be `const`.
+  static final Map<String, RegExp> _govIdValidators = {
+    'AADHAAR': RegExp(r'^[2-9]\d{11}$'),
+    'PAN': RegExp(r'^[A-Z]{5}\d{4}[A-Z]$'),
+    'PASSPORT': RegExp(r'^[A-Z]\d{7}$'),
+    'DRIVING_LICENSE': RegExp(r'^[A-Z0-9][A-Z0-9\-]{7,15}$'),
+    'VOTER_ID': RegExp(r'^[A-Z]{3}\d{7}$'),
+  };
+
+  // FSSAI License (format validation only — no official registry lookup)
+  final TextEditingController _fssaiController = TextEditingController();
+
   // Legacy Step 1 Form (Aadhaar Card ONLY)
   final TextEditingController _aadhaarNumberController = TextEditingController();
   final TextEditingController _aadhaarOtpController = TextEditingController();
@@ -91,6 +123,12 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
         _fullNameController.text = user.name;
       }
 
+      // Pre-select the Government ID type already on record, if any.
+      final savedGovType = context.read<VerificationController>().verification.governmentIdType;
+      if (savedGovType != null && _govIdTypes.containsKey(savedGovType.toUpperCase())) {
+        setState(() => _selectedGovIdType = savedGovType.toUpperCase());
+      }
+
       if (user.organizationName != null && user.organizationName!.isNotEmpty) {
         _apiaryNameController.text = user.organizationName!;
       }
@@ -119,6 +157,8 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
   @override
   void dispose() {
     _fullNameController.dispose();
+    _govIdNumberController.dispose();
+    _fssaiController.dispose();
     _aadhaarNumberController.dispose();
     _aadhaarOtpController.dispose();
 
@@ -558,14 +598,14 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                 icon: Icons.person_pin_rounded,
                 isCompleted: context.watch<UserController>().user.name.trim().isNotEmpty,
                 statusText: (context.watch<UserController>().user.name.trim().isNotEmpty)
-                    ? 'Identity Verified ✓'
+                    ? 'Identity Saved ✓'
                     : 'Name Required',
                 content: (ver.isStep2Complete && context.watch<UserController>().user.name.trim().isNotEmpty)
                     ? _buildVerifiedStepInfo(
                         label: 'Verified Harvester Identity',
-                        value: '${context.watch<UserController>().user.name}',
-                        subtext: 'Harvester full name identity confirmed',
-                        verifiedBadgeText: 'Full Name — Verified ✓',
+                        value: context.watch<UserController>().user.name,
+                        subtext: 'Harvester full name saved to your profile',
+                        verifiedBadgeText: 'Full Name — Saved ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,7 +644,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                                 );
                                 return;
                               }
-                              // We simulate verification to proceed to next step
+                              // Save the name via the profile API (real backend data).
                               final userCtrl = context.read<UserController>();
                               await userCtrl.updateProfile(
                                 name: name,
@@ -620,20 +660,119 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
 
               const SizedBox(height: AppConstants.space16),
 
+              // ── STEP 1b: Government ID (format validation only) ──
+              _buildStepCard(
+                stepNumber: 1,
+                title: 'Government ID',
+                subtitle: 'Format check only — not a government database lookup',
+                icon: Icons.badge_outlined,
+                isCompleted: ver.isStep1Complete,
+                statusText: ver.governmentIdVerified == 'Not Started'
+                    ? 'Not Verified'
+                    : ver.governmentIdVerified,
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ID Type',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: context.scaffoldBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedGovIdType,
+                          isExpanded: true,
+                          icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textSecondaryColor),
+                          dropdownColor: context.surfaceColor,
+                          items: _govIdTypes.entries.map((entry) {
+                            return DropdownMenuItem<String>(
+                              value: entry.key,
+                              child: Text(
+                                entry.value,
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedGovIdType = val);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Example format (not a real ID): ${_govIdExamples[_selectedGovIdType]}',
+                      style: GoogleFonts.inter(fontSize: 11, color: context.textMutedColor),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Government ID Number',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _govIdNumberController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        hintText: _govIdExamples[_selectedGovIdType],
+                        helperText: 'Example only — enter your own ${_govIdTypes[_selectedGovIdType]} number',
+                        prefixIcon: Icon(Icons.credit_card_rounded, size: 20, color: context.textSecondaryColor),
+                        hintStyle: GoogleFonts.inter(color: context.textMutedColor),
+                        filled: true,
+                        fillColor: context.scaffoldBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _ActionButton(
+                      label: 'Save Government ID',
+                      icon: Icons.verified_user_outlined,
+                      isLoading: verCtrl.isLoading,
+                      onTap: () {
+                        final raw = _govIdNumberController.text.trim().toUpperCase();
+                        final normalized = _selectedGovIdType == 'DRIVING_LICENSE'
+                            ? raw
+                            : raw.replaceAll(RegExp(r'[\s\-]'), '');
+                        final valid = _govIdValidators[_selectedGovIdType]!.hasMatch(normalized);
+                        if (!valid) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Invalid ${_govIdTypes[_selectedGovIdType]} format. Expected (example only): ${_govIdExamples[_selectedGovIdType]}')),
+                          );
+                          return;
+                        }
+                        verCtrl.submitGovernmentId(docType: _selectedGovIdType, docNumber: normalized);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppConstants.space16),
+
               // ── STEP 2: Beekeeper Registration ──
               _buildStepCard(
                 stepNumber: 2,
                 title: 'Beekeeper Registration',
                 subtitle: 'Authority Accreditation & HoneyChain Beekeeper ID',
                 icon: Icons.workspace_premium_outlined,
-                isCompleted: ver.isStep3Complete,
+                isCompleted: ver.isStep2Complete,
                 statusText: ver.step3DisplayStatus,
-                content: ver.isStep3Complete
+                content: ver.isStep2Complete
                     ? _buildVerifiedStepInfo(
-                        label: 'Registration ID',
-                        value: ver.registrationId ?? 'Verified',
-                        subtext: 'Authority: ${_registrationAuthorities[ver.registrationType] ?? ver.registrationType ?? 'State Agriculture'}',
-                        verifiedBadgeText: 'Beekeeper Registration — Verified ✓',
+                        label: 'Registration ID (Submitted — not authority-verified)',
+                        value: ver.registrationId ?? 'Submitted',
+                        subtext: 'Authority: ${_registrationAuthorities[ver.registrationType] ?? ver.registrationType ?? 'State Agriculture'} — awaiting authority review',
+                        verifiedBadgeText: 'Registration — Submitted ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -799,7 +938,7 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           ),
                           const SizedBox(height: 12),
                           _ActionButton(
-                            label: 'Verify Registration',
+                            label: 'Submit Registration ID',
                             icon: Icons.verified_outlined,
                             isLoading: verCtrl.isLoading,
                             onTap: () {
@@ -824,13 +963,13 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                 subtitle: 'State, District & Village / City Registry',
                 icon: Icons.pin_drop_outlined,
                 isCompleted: ver.isStep3Complete,
-                statusText: ver.locationVerified == 'Verified' ? 'Location — Completed ✓' : ver.locationVerified,
+                statusText: ver.isStep3Complete ? 'Location — Saved ✓' : ver.locationVerified,
                 content: ver.isStep3Complete
                     ? _buildVerifiedStepInfo(
                         label: 'Location',
                         value: ver.apiaryLocation ?? 'Registered Apiary',
-                        subtext: 'State, District & Village registry confirmed',
-                        verifiedBadgeText: 'Location — Completed ✓',
+                        subtext: 'State, district & village saved to your profile',
+                        verifiedBadgeText: 'Location — Saved ✓',
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -985,6 +1124,65 @@ class _HarvesterVerificationScreenState extends State<HarvesterVerificationScree
                           ),
                         ],
                       ),
+              ),
+
+              const SizedBox(height: AppConstants.space16),
+
+              // ── OPTIONAL: FSSAI License (format validation only) ──
+              _buildStepCard(
+                stepNumber: 4,
+                title: 'FSSAI License (Optional)',
+                subtitle: '14-digit format check — not an official FoSCoS lookup',
+                icon: Icons.restaurant_menu_rounded,
+                isCompleted: ver.isFssaiComplete,
+                statusText: ver.fssaiLicenseVerified == 'Not Started'
+                    ? 'Not Verified'
+                    : ver.fssaiLicenseVerified,
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'FSSAI License Number',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: context.textPrimaryColor),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _fssaiController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 14,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        counterText: '',
+                        hintText: '12345678901234',
+                        helperText: 'Example only — 14 digits, no letters or spaces',
+                        prefixIcon: Icon(Icons.numbers_rounded, size: 20, color: context.textSecondaryColor),
+                        hintStyle: GoogleFonts.inter(color: context.textMutedColor, letterSpacing: 1.5),
+                        filled: true,
+                        fillColor: context.scaffoldBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.borderColor)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: context.primaryColor, width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _ActionButton(
+                      label: 'Save FSSAI License',
+                      icon: Icons.approval_rounded,
+                      isLoading: verCtrl.isLoading,
+                      onTap: () {
+                        final fssai = _fssaiController.text.trim();
+                        if (!RegExp(r'^\d{14}$').hasMatch(fssai)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invalid FSSAI format. Expected 14 digits, e.g. 12345678901234 — example only.')),
+                          );
+                          return;
+                        }
+                        verCtrl.submitHarvesterFssaiLicense(fssaiLicense: fssai);
+                      },
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: AppConstants.space16),

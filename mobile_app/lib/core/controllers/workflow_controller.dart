@@ -22,7 +22,13 @@ class WorkflowController extends ChangeNotifier {
   WorkflowController({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
         apiUrl = baseUrl ?? _resolveApiUrl() {
-    fetchAllData();
+    // Only fetch when a session token already exists: this controller is
+    // constructed at app startup, before login, and an unauthenticated call
+    // would just produce a 401 ("Authentication token is required").
+    // AuthRouter triggers a fresh fetch the moment a user signs in.
+    if (AuthTokenStore.hasToken) {
+      fetchAllData();
+    }
   }
 
   static String _resolveApiUrl() {

@@ -3,6 +3,7 @@ class WorkflowRequest {
   final String id;
   final String requestId;
   final String batchId;
+  final String? hiveId;
   final String harvesterName;
   final String fromRole;
   final String toRole;
@@ -50,6 +51,7 @@ class WorkflowRequest {
     required this.id,
     String? requestId,
     required this.batchId,
+    this.hiveId,
     required this.harvesterName,
     this.fromRole = 'HARVESTER',
     this.toRole = 'COLLECTOR_PROCESSOR',
@@ -90,6 +92,7 @@ class WorkflowRequest {
     String? id,
     String? requestId,
     String? batchId,
+    String? hiveId,
     String? harvesterName,
     String? fromRole,
     String? toRole,
@@ -129,6 +132,7 @@ class WorkflowRequest {
       id: id ?? this.id,
       requestId: requestId ?? this.requestId,
       batchId: batchId ?? this.batchId,
+      hiveId: hiveId ?? this.hiveId,
       harvesterName: harvesterName ?? this.harvesterName,
       fromRole: fromRole ?? this.fromRole,
       toRole: toRole ?? this.toRole,
@@ -189,6 +193,7 @@ class WorkflowRequest {
         id: json['id'] ?? '',
         requestId: json['requestId'] ?? json['id'] ?? '',
         batchId: json['batchId'] ?? (batchObj != null ? batchObj['id'] : 'UNKNOWN'),
+        hiveId: json['hiveId'] as String?,
         harvesterName: fromUserObj?['name'] ?? harvesterObj?['name'] ?? 'Harvester',
         fromRole: json['fromRole'] ?? 'HARVESTER',
         toRole: json['toRole'] ?? 'COLLECTOR_PROCESSOR',
@@ -239,6 +244,7 @@ class WorkflowRequest {
       id: harvest['id'] ?? json['id'] ?? 'N/A',
       requestId: json['id'] ?? 'UNKNOWN',
       batchId: json['id'] ?? 'UNKNOWN',
+      hiveId: harvest['hiveId'] as String?,
       harvesterName: harvester['name'] ?? harvest['harvesterId'] ?? 'Unknown Harvester',
       fromRole: 'HARVESTER',
       toRole: 'COLLECTOR_PROCESSOR',

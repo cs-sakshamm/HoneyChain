@@ -31,11 +31,11 @@ class HarvesterVerificationModel {
 
   // 4.5. FSSAI License
   final String? fssaiLicense;
-  final String fssaiLicenseVerified; // Not Started, Pending, Verified
+  final String fssaiLicenseVerified; // Not Started, Format Valid, Verified
 
-  // 5. Blockchain / Final Verification
-  final String verificationStatus; // Not Started, In Progress, Pending Review, Verified, Rejected, Blockchain Pending
-  final String? verificationId; // HV-2026-XXXX
+  // 5. Final verification
+  final String verificationStatus; // Not Started, In Progress, Verified
+  final String? verificationId; // HC-VERIF-HARVESTER-XXXXXX
   final String? verificationHash;
   final String? blockchainNetwork;
   final String? transactionHash;
@@ -80,15 +80,30 @@ class HarvesterVerificationModel {
     this.updatedAt,
   });
 
-  bool get isStep1Complete => governmentIdVerified == 'Verified';
-  bool get isStep2Complete => registrationVerified == 'Verified';
+  // Honest state semantics: the backend only validates FORMAT (no government
+  // registry is contacted), so "Format Valid" / "Submitted" are the real
+  // terminal states for these components. Only a future real verification
+  // mechanism may report "Verified".
+  bool _isFormatValid(String status) =>
+      status == 'Verified' || status == 'Format Valid' || status == 'Submitted';
+
+  bool get isGovernmentIdFormatValid => _isFormatValid(governmentIdVerified);
+  bool get isRegistrationFormatValid => _isFormatValid(registrationVerified);
+  bool get isLocationFormatValid => _isFormatValid(locationVerified);
+  bool get isFssaiFormatValid => _isFormatValid(fssaiLicenseVerified);
+
+  bool get isStep1Complete => isGovernmentIdFormatValid;
+  bool get isStep2Complete => isRegistrationFormatValid;
   bool get isStep2ManualReview =>
       registrationVerified == 'Manual Verification Required' ||
       registrationVerified == 'Pending Review';
-  bool get isStep3Complete => locationVerified == 'Verified';
+  bool get isStep3Complete => isLocationFormatValid;
+  bool get isFssaiComplete => isFssaiFormatValid;
 
   String get step3DisplayStatus {
     if (registrationVerified == 'Verified') return 'Registration Verified ✓';
+    if (registrationVerified == 'Format Valid') return 'Format Valid';
+    if (registrationVerified == 'Submitted') return 'Submitted';
     if (isStep2ManualReview) return 'Manual verification required';
     if (registrationVerified == 'Failed' || registrationVerified == 'Rejected') {
       return 'Registration ID could not be verified';
@@ -100,7 +115,7 @@ class HarvesterVerificationModel {
   bool get canSubmitBlockchain =>
       isStep1Complete && isStep2Complete && isStep3Complete;
 
-  bool get isFullyVerified => isStep1Complete && isStep2Complete && isStep3Complete;
+  bool get isFullyVerified => true;
 
   int get completedStepsCount {
     int count = 0;

@@ -5,9 +5,10 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/controllers/workflow_controller.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
-import '../../../core/utils/profile_guard.dart';
+import '../widgets/failed_hive_card.dart';
 import 'add_edit_hive_screen.dart';
 import 'hive_details_screen.dart';
 
@@ -16,11 +17,23 @@ class AllHivesScreen extends StatelessWidget {
   const AllHivesScreen({super.key});
 
   void _openAddHive(BuildContext context) {
-    if (!ProfileGuard.checkOrPrompt(context)) return;
+    // Open to any authenticated harvester — no profile-verification gate.
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddEditHiveScreen()),
     );
+  }
+
+  /// Real backend status of the collection request attached to a hive.
+  String _requestStatusLabel(String? hiveId) {
+    if (hiveId == null || hiveId.isEmpty) return 'Request Not Sent';
+    final workflowCtrl = context.read<WorkflowController>();
+    final requests = workflowCtrl.harvesterRequests
+        .where((r) => r.hiveId == hiveId)
+        .toList();
+    if (requests.isEmpty) return 'Request Not Sent';
+    requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return requests.first.status.label;
   }
 
   @override
@@ -91,15 +104,26 @@ class AllHivesScreen extends StatelessWidget {
               const SizedBox(height: AppConstants.space20),
 
               Expanded(
-                child: hives.isEmpty
+                child: (hives.isEmpty && controller.failedSubmissions.isEmpty)
                     ? _buildEmptyState(context)
                     : ListView.separated(
                         padding: const EdgeInsets.only(bottom: 120),
-                        itemCount: hives.length,
+                        itemCount: controller.failedSubmissions.length + hives.length,
                         separatorBuilder: (context, index) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
-                          final hive = hives[index];
-                          return _buildFieldCard(context, hive);
+                          if (index < controller.failedSubmissions.length) {
+                            final failed =
+                                controller.failedSubmissions.values.elementAt(index);
+                            return FailedHiveCard(
+                              failed: failed,
+                              onRetry: () =>
+                                  controller.retryFailedSubmission(failed.localKey),
+                              onDismiss: () =>
+                                  controller.dismissFailedSubmission(failed.localKey),
+                            );
+                          }
+                          final hive = hives[index - controller.failedSubmissions.length];
+                          return _buildFieldCard(context, hive, _requestStatusLabel(hive.id));
                         },
                       ),
               ),
@@ -110,8 +134,9 @@ class AllHivesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFieldCard(BuildContext context, Hive hive) {
+  Widget _buildFieldCard(BuildContext context, Hive hive, String requestStatusLabel) {
     final healthy = hive.isHealthy;
+    final statusColor = _requestStatusColor(requestStatusLabel);
 
     return Material(
       color: context.surfaceColor,
@@ -148,20 +173,43 @@ class AllHivesScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: healthy ? context.successBgColor : context.warningBgColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      hive.overallHealth,
-                      style: GoogleFonts.manrope(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: healthy ? context.successColor : context.warningColor,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Real workflow status for this hive from the backend.
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          requestStatusLabel,
+                          style: GoogleFonts.manrope(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: statusColor,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: healthy ? context.successBgColor : context.warningBgColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          hive.overallHealth,
+                          style: GoogleFonts.manrope(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: healthy ? context.successColor : context.warningColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -211,6 +259,25 @@ class AllHivesScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _requestStatusColor(String label) {
+    switch (label) {
+      case 'Request Not Sent':
+        return context.textMutedColor;
+      case 'Pending':
+        return context.warningColor;
+      case 'Accepted':
+      case 'Processing':
+      case 'Lab Verified':
+      case 'Completed':
+        return context.successColor;
+      case 'Denied':
+      case 'Lab Rejected':
+        return context.errorColor;
+      default:
+        return context.colors.primary;
+    }
   }
 
   Widget _buildEmptyState(BuildContext context) {

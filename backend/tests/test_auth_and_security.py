@@ -35,7 +35,10 @@ def test_auth_registration_and_login(client, db):
     assert payload['email'] == email
     assert payload['role'] == 'HARVESTER'
 
-def test_profile_gates_and_forbidden(client, db):
+def test_incomplete_profile_harvester_can_add_hive(client, db):
+    """Product decision: a successfully authenticated Harvester (even with an
+    incomplete profile, e.g. a fresh Google sign-in) may register hives.
+    The old PROFILE_INCOMPLETE 403 gate on POST /api/hives was removed."""
     inc_email = 'incomplete_harvester@example.com'
     client.post('/api/auth/register', json={'name': 'Unknown', 'email': inc_email, 'password': 'Pass123!', 'role': 'HARVESTER'})
     u = db.query(User).filter(User.email == inc_email).first()
@@ -44,9 +47,11 @@ def test_profile_gates_and_forbidden(client, db):
     db.commit()
     token = create_access_token({'sub': u.id, 'email': u.email, 'role': u.role})
     headers = {'Authorization': f'Bearer {token}'}
-    hive_res = client.post('/api/hives', json={'name': 'Forbidden Hive', 'apiaryLocation': 'Secret', 'userId': u.id}, headers=headers)
-    assert hive_res.status_code == 403
-    assert hive_res.json()['detail']['code'] == 'PROFILE_INCOMPLETE'
+    hive_res = client.post('/api/hives', json={'name': 'Allowed Hive', 'apiaryLocation': 'Secret', 'userId': u.id}, headers=headers)
+    assert hive_res.status_code == 200, hive_res.text
+    body = hive_res.json()
+    assert body['success'] is True
+    assert body['hive']['userId'] == u.id
 
 def test_profile_completion_then_add_hive_end_to_end(client, db):
     suffix = uuid.uuid4().hex[:8]
@@ -71,13 +76,14 @@ def test_profile_completion_then_add_hive_end_to_end(client, db):
     user_id = login_res.json()['user']['id']
     headers = {'Authorization': f'Bearer {token}'}
 
-    blocked_res = client.post('/api/hives', json={
-        'name': 'Blocked Hive',
+    # Product decision: hive creation is no longer blocked on profile
+    # completion — an authenticated harvester may add hives immediately.
+    allowed_res = client.post('/api/hives', json={
+        'name': 'First Hive',
         'hiveCode': f'HC-BLOCK-{suffix}',
         'apiaryLocation': 'North Apiary',
     }, headers=headers)
-    assert blocked_res.status_code == 403
-    assert blocked_res.json()['detail']['code'] == 'PROFILE_INCOMPLETE'
+    assert allowed_res.status_code == 200, allowed_res.text
 
     profile_res = client.put('/api/profile', json={
         'userId': user_id,
@@ -94,7 +100,7 @@ def test_profile_completion_then_add_hive_end_to_end(client, db):
 
     hive_res = client.post('/api/hives', json={
         'name': 'E2E Hive',
-        'hiveCode': f'HC-E2E-{suffix}',
+        'hiveCode': f'HC-E2E-{suffix}',  # different code from the first hive
         'apiaryLocation': 'North Apiary',
         'hiveType': 'Langstroth',
         'dateAdded': '2026-09-19T10:00:00',

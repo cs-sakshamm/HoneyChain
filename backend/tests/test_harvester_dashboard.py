@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 from backend.database import SessionLocal, init_db
 from backend.main import app
-from backend.models import CollectionRequest, Hive, User
+from backend.models import CollectionRequest, Hive, Profile, User
 
 
 @pytest.fixture(scope="module")
@@ -26,9 +26,17 @@ def client():
     db = SessionLocal()
     try:
         # Remove rows from previous runs of this module (test DB persists).
-        for email in ("b1_harvester@example.com", "b3_harvester@example.com",
-                      "b3_other@example.com", "b4_collector@example.com"):
-            db.query(User).filter(User.email == email).delete(synchronize_session=False)
+        # Requests reference users, so they must go first to avoid FK violations.
+        emails = ("b1_harvester@example.com", "b3_harvester@example.com",
+                  "b3_other@example.com", "b4_collector@example.com")
+        users = db.query(User).filter(User.email.in_(emails)).all()
+        user_ids = [u.id for u in users]
+        if user_ids:
+            db.query(CollectionRequest).filter(
+                CollectionRequest.harvester_id.in_(user_ids)).delete(synchronize_session=False)
+            db.query(Hive).filter(Hive.user_id.in_(user_ids)).delete(synchronize_session=False)
+            db.query(Profile).filter(Profile.user_id.in_(user_ids)).delete(synchronize_session=False)
+        db.query(User).filter(User.email.in_(emails)).delete(synchronize_session=False)
         db.commit()
     finally:
         db.close()
@@ -132,5 +140,65 @@ def test_collector_sees_harvester_request(client):
     db = SessionLocal()
     try:
         assert db.query(CollectionRequest).filter(CollectionRequest.batch_id == batch).count() == 1
+    finally:
+        db.close()
+
+
+# ── Receiver validation on POST /api/requests ──
+
+def test_create_request_rejects_invalid_receiver(client):
+    """Regression: receiver identity used to be trusted blindly; a request
+    targeted at a nonexistent or wrong-role user must fail validation."""
+    harv = _register_and_login(client, "B1 Harvester", "b1_harvester@example.com", "HARVESTER")
+
+    # Nonexistent receiver.
+    r = client.post("/api/requests", json={
+        "batchId": f"BAD-{uuid.uuid4().hex[:6]}",
+        "collectionCentreId": "00000000-0000-0000-0000-000000000000",
+        "quantity": 1.0,
+    }, headers=harv["headers"])
+    assert r.status_code == 422
+    assert r.json()["detail"]["code"] == "RECEIVER_NOT_FOUND"
+
+    # Receiver exists but is a harvester, not a collection centre.
+    other = _register_and_login(client, "B3 Other", "b3_other@example.com", "HARVESTER")
+    r = client.post("/api/requests", json={
+        "batchId": f"BAD-{uuid.uuid4().hex[:6]}",
+        "collectionCentreId": other["id"],
+        "quantity": 1.0,
+    }, headers=harv["headers"])
+    assert r.status_code == 422
+    assert r.json()["detail"]["code"] == "INVALID_RECEIVER_ROLE"
+
+
+def test_reject_after_accept_is_blocked(client):
+    """Regression: a collector could reject an already-ACCEPTED request."""
+    harv = _register_and_login(client, "B1 Harvester", "b1_harvester@example.com", "HARVESTER")
+    coll = _register_and_login(client, "B4 Collector", "b4_collector@example.com", "COLLECTOR_PROCESSOR")
+    # Complete the collector profile so the accept gate passes.
+    r = client.put("/api/profile", json={
+        "name": "B4 Collector", "phone": "+919876540000",
+        "organizationName": "Test Centre", "facilityLocation": "Pune",
+        "licenseNumber": "LIC-TEST-1",
+    }, headers=coll["headers"])
+    assert r.status_code == 200
+
+    batch = f"ACC-BATCH-{uuid.uuid4().hex[:6].upper()}"
+    r = client.post("/api/requests", json={
+        "batchId": batch, "collectionCentreId": coll["id"], "quantity": 2.0,
+    }, headers=harv["headers"])
+    assert r.status_code == 200, r.text
+    request_id = r.json()["requestId"]
+
+    r = client.patch(f"/api/requests/{request_id}/accept", json={}, headers=coll["headers"])
+    assert r.status_code == 200
+
+    r = client.patch(f"/api/requests/{request_id}/reject", json={"reason": "late"}, headers=coll["headers"])
+    assert r.status_code == 409
+
+    db = SessionLocal()
+    try:
+        row = db.query(CollectionRequest).filter(CollectionRequest.batch_id == batch).first()
+        assert row is not None and row.status == "ACCEPTED"
     finally:
         db.close()

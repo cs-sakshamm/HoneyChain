@@ -27,6 +27,14 @@
   padding: 0;
 }
 
+/* Hide Firebase Auth's floating reCAPTCHA badge on every page.
+   `visibility: hidden` (not display:none) keeps the iframe rendered so the
+   phone-auth challenge continues to work; the explicit container-scoped
+   widget on the phone-auth page is unaffected. */
+.grecaptcha-badge {
+  visibility: hidden;
+}
+
 html, body {
   background-color: var(--bg-main);
   color: var(--text-primary);

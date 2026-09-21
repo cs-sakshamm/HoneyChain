@@ -18,7 +18,7 @@ class VerificationCertificateScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ver = context.watch<VerificationController>().verification;
     final user = context.watch<UserController>().user;
-    final verificationId = ver.verificationId ?? (user.beekeeperId != null ? 'BKR-${user.beekeeperId}' : 'UNVERIFIED');
+    final verificationId = ver.verificationId ?? 'NOT ISSUED';
     final qrPayload = ver.verificationId != null
         ? 'https://honeychain.io/verify/harvester/${ver.verificationId}'
         : 'https://honeychain.io/verify/harvester/$verificationId';
@@ -202,24 +202,10 @@ class VerificationCertificateScreen extends StatelessWidget {
                     Divider(height: 1, color: context.borderColor),
                     const SizedBox(height: AppConstants.space16),
 
-                    // Verification Metadata Rows
-                    _metaRow(context, 'Status', ver.isFullyVerified ? 'Approved & Verified ✓' : ver.verificationStatus, isSuccess: ver.isFullyVerified),
-                    _metaRow(context, 'Blockchain Network', ver.blockchainNetwork ?? 'HoneyChain Provenance Ledger'),
-                    _metaRow(
-                      context,
-                      'Transaction Hash',
-                      ver.transactionHash != null && ver.transactionHash!.length > 18
-                          ? '${ver.transactionHash!.substring(0, 10)}...${ver.transactionHash!.substring(ver.transactionHash!.length - 8)}'
-                          : ver.transactionHash ?? 'Pending Blockchain Submission',
-                    ),
-                    _metaRow(
-                      context,
-                      'Record Hash (SHA-256)',
-                      ver.verificationHash != null && ver.verificationHash!.length > 18
-                          ? '${ver.verificationHash!.substring(0, 10)}...${ver.verificationHash!.substring(ver.verificationHash!.length - 8)}'
-                          : ver.verificationHash ?? 'Pending Generation',
-                    ),
-                    _metaRow(context, 'Integrity Status', ver.isFullyVerified ? 'Cryptographic Match Confirmed ✓' : 'Pending Verification', isSuccess: ver.isFullyVerified),
+                    // Verification Metadata Rows — only claims the backend can
+                    // actually back: no fabricated blockchain, hash, or
+                    // "cryptographic integrity" assertions.
+                    _metaRow(context, 'Status', ver.isFullyVerified ? 'Profile Verified ✓' : ver.verificationStatus, isSuccess: ver.isFullyVerified),
                     _metaRow(context, 'Apiary Region', ver.apiaryLocation ?? 'Not Registered'),
                     _metaRow(context, 'Government ID Ref', ver.governmentIdReference ?? 'Not Submitted'),
                     _metaRow(context, 'Accreditation ID', ver.registrationId ?? 'Not Submitted'),

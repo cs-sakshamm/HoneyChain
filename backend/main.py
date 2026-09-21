@@ -136,10 +136,29 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Event loop captured at startup; lets sync endpoints schedule realtime
+# broadcasts without blocking the DB-backed request they follow.
+_main_loop: Optional["asyncio.AbstractEventLoop"] = None
+
+
+def _broadcast_after_commit(event: str, payload: Dict[str, Any]) -> None:
+    """Fire-and-forget realtime notification AFTER a successful DB commit.
+
+    REST + PostgreSQL remain the source of truth: failures here must never
+    affect the persisted request (offline receivers simply re-fetch via REST).
+    """
+    if _main_loop is None or _main_loop.is_closed():
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(manager.broadcast({"event": event, **payload}), _main_loop)
+    except Exception as e:  # noqa: BLE001 - notifications must never break requests
+        logger.debug(f"Realtime broadcast skipped ({event}): {e}")
+
 
 # ── Lifespan Context Manager ──
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _main_loop
     logger.info("Initializing HoneyChain Database and Models...")
     init_db()
 
@@ -230,15 +249,15 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
 
-    main_loop = asyncio.get_running_loop()
+    _main_loop = asyncio.get_running_loop()
 
     # Register MQTT broadcast bridge to WebSockets (thread-safe)
     def on_mqtt_data(data: Dict[str, Any]):
         try:
-            if main_loop and main_loop.is_running():
-                asyncio.run_coroutine_threadsafe(manager.broadcast(data), main_loop)
+            if _main_loop and _main_loop.is_running():
+                asyncio.run_coroutine_threadsafe(manager.broadcast(data), _main_loop)
             else:
-                asyncio.run(manager.broadcast(data))
+                logger.debug("MQTT data arrived before the server loop was ready; dropping realtime copy")
         except Exception as e:
             logger.debug(f"MQTT to WebSocket broadcast warning: {e}")
 
@@ -622,20 +641,26 @@ def is_user_profile_complete(user: Optional[User]) -> bool:
     return is_harvester_profile_complete(user)
 
 
-def require_verified_harvester(user: User = Depends(get_current_user)) -> User:
+def require_harvester(user: User = Depends(get_current_user)) -> User:
+    """Hive management requires an authenticated Harvester account only.
+
+    Profile/verification completion is deliberately NOT enforced here:
+    a successfully authenticated harvester (e.g. via Google sign-in) must be
+    able to register and manage hives immediately.
+    """
     if normalize_role(user.role) != "HARVESTER":
         raise HTTPException(
             status_code=403,
             detail={"success": False, "code": "FORBIDDEN", "message": "Only Harvester accounts can perform this action."}
         )
-    if not (user.is_verified or is_harvester_profile_complete(user)):
+    return user
+
+
+def require_verified_harvester(user: User = Depends(get_current_user)) -> User:
+    if normalize_role(user.role) != "HARVESTER":
         raise HTTPException(
             status_code=403,
-            detail={
-                "success": False,
-                "code": "PROFILE_INCOMPLETE",
-                "message": "Complete your profile before continuing."
-            }
+            detail={"success": False, "code": "FORBIDDEN", "message": "Only Harvester accounts can perform this action."}
         )
     return user
 
@@ -668,15 +693,6 @@ def require_verified_collector(user: User = Depends(get_current_user)) -> User:
             status_code=403,
             detail={"success": False, "code": "FORBIDDEN", "message": "Only Collection & Processing accounts can perform this action."}
         )
-    if not (user.is_verified or is_collector_profile_complete(user)):
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "success": False,
-                "code": "PROFILE_INCOMPLETE",
-                "message": "Complete your profile before continuing."
-            }
-        )
     return user
 
 
@@ -685,15 +701,6 @@ def require_verified_lab(user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=403,
             detail={"success": False, "code": "FORBIDDEN", "message": "Only Accredited Laboratory accounts can perform this action."}
-        )
-    if not (user.is_verified or is_lab_profile_complete(user)):
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "success": False,
-                "code": "PROFILE_INCOMPLETE",
-                "message": "Complete your profile before continuing."
-            }
         )
     return user
 
@@ -704,15 +711,6 @@ def require_verified_packager(user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=403,
             detail={"success": False, "code": "FORBIDDEN", "message": "Only Packaging accounts can perform this action."}
-        )
-    if not (user.is_verified or is_packager_profile_complete(user)):
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "success": False,
-                "code": "PROFILE_INCOMPLETE",
-                "message": "Complete your profile before continuing."
-            }
         )
     return user
 
@@ -1330,7 +1328,7 @@ def get_hives(
 @app.post("/hives")
 def create_hive(
     payload: HiveCreateRequest,
-    current_user: User = Depends(require_verified_harvester),
+    current_user: User = Depends(require_harvester),
     db: Session = Depends(get_db)
 ):
     auto_generated = not payload.hiveCode
@@ -1410,7 +1408,7 @@ def get_hive_detail(hive_id: str, current_user: User = Depends(get_current_user)
 def update_hive(
     hive_id: str,
     payload: HiveCreateRequest,
-    current_user: User = Depends(require_verified_harvester),
+    current_user: User = Depends(require_harvester),
     db: Session = Depends(get_db)
 ):
     hive = db.query(Hive).filter((Hive.id == hive_id) | (Hive.hive_code == hive_id)).first()
@@ -1472,7 +1470,7 @@ def update_hive(
 @app.delete("/hives/{hive_id}")
 def delete_hive(
     hive_id: str,
-    current_user: User = Depends(require_verified_harvester),
+    current_user: User = Depends(require_harvester),
     db: Session = Depends(get_db)
 ):
     hive = db.query(Hive).filter((Hive.id == hive_id) | (Hive.hive_code == hive_id)).first()
@@ -2245,6 +2243,22 @@ def create_workflow_request(
     qty = float(payload.get("quantity") or payload.get("estimatedQuantityKg") or 15.0)
     target_center_id = payload.get("collectionCentreId") or payload.get("toUserId")
 
+    # Validate the receiver when one is targeted: must exist and hold a
+    # collection/processing role. (Unaddressed requests stay allowed.)
+    receiver = None
+    if target_center_id:
+        receiver = db.query(User).filter(User.id == target_center_id).first()
+        if not receiver:
+            raise HTTPException(
+                status_code=422,
+                detail={"success": False, "code": "RECEIVER_NOT_FOUND", "message": "The selected collection centre no longer exists."},
+            )
+        if not any(k in (receiver.role or "").upper() for k in ("COLLECT", "PROCESS")):
+            raise HTTPException(
+                status_code=422,
+                detail={"success": False, "code": "INVALID_RECEIVER_ROLE", "message": "The selected target cannot accept collection requests."},
+            )
+
     duplicate = db.query(CollectionRequest).filter(
         CollectionRequest.harvester_id == current_user.id,
         CollectionRequest.batch_id == batch_code,
@@ -2301,6 +2315,17 @@ def create_workflow_request(
         payload={"batch_id": batch_code, "quantity": col_req.requested_quantity_kg, "hive_id": hive_id},
     )
     db.commit()
+
+    # Realtime notification only — the request is already durable in PostgreSQL.
+    _broadcast_after_commit("request_created", {
+        "requestId": req_code,
+        "batchId": batch_code,
+        "fromUserId": current_user.id,
+        "fromRole": "HARVESTER",
+        "toUserId": target_center_id,
+        "toRole": "COLLECTOR_PROCESSOR",
+        "status": "PENDING",
+    })
 
     return {
         "success": True,
@@ -2392,9 +2417,6 @@ def accept_workflow_request(
         role = (current_user.role or "").upper()
         if not any(k in role for k in ("COLLECT", "PROCESS")):
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Collection & Processing accounts can accept collection requests."})
-        # Profile-completion gate (spec §16): restricted operation.
-        if not (current_user.is_verified or is_collector_profile_complete(current_user)):
-            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         old_status = (req_obj.status or "").upper()
         if old_status == "ACCEPTED":
             raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_ACCEPT", "message": "Request has already been accepted."})
@@ -2419,6 +2441,12 @@ def accept_workflow_request(
         )
         _notify(db, req_obj.harvester_id, "REQUEST_ACCEPTED", "Collection request accepted", f"Your collection request {req_obj.request_id} was accepted by {current_user.organization_name or current_user.name}.", {"requestId": req_obj.request_id})
         db.commit()
+        _broadcast_after_commit("request_updated", {
+            "requestId": req_obj.request_id,
+            "status": "ACCEPTED",
+            "fromUserId": req_obj.harvester_id,
+            "toUserId": current_user.id,
+        })
         return {"success": True, "message": "Request accepted successfully", "requestId": req_obj.request_id, "status": "ACCEPTED", "blockchain": bc}
 
     # 2. Check LabRequest
@@ -2431,9 +2459,6 @@ def accept_workflow_request(
     if lab_req:
         if normalize_role(current_user.role) != "LAB":
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Accredited Laboratory accounts can accept lab requests."})
-        # Profile-completion gate (spec §16): restricted operation.
-        if not (current_user.is_verified or is_lab_profile_complete(current_user)):
-            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         lab_ids = [l.id for l in db.query(Lab).filter(Lab.user_id == current_user.id).all()]
         if lab_req.lab_id and lab_req.lab_id not in lab_ids and lab_req.lab_id != current_user.id:
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "This lab request is assigned to another lab."})
@@ -2466,9 +2491,6 @@ def accept_workflow_request(
     if batch:
         if normalize_role(current_user.role) != "PACKAGING":
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Packaging accounts can accept packaging requests."})
-        # Profile-completion gate (spec §16): restricted operation.
-        if not (current_user.is_verified or is_packager_profile_complete(current_user)):
-            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         report = db.query(LabReport).filter(LabReport.batch_id == batch.batch_id).order_by(desc(LabReport.created_at)).first()
         if not report or report.overall_result != "PASS":
             raise HTTPException(status_code=409, detail={"success": False, "code": "PACKAGING_NOT_PERMITTED", "message": "Packaging is not permitted until the lab test has passed."})
@@ -2504,7 +2526,7 @@ def reject_workflow_request(
         if normalize_role(current_user.role) != "COLLECTOR_PROCESSOR":
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Collection & Processing accounts can reject collection requests."})
         old_status = (req_obj.status or "").upper()
-        if old_status in ("COMPLETED", "DENIED", "REJECTED"):
+        if old_status in ("ACCEPTED", "COMPLETED", "DENIED", "REJECTED"):
             raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Request already {old_status}."})
         reason = payload.get("reason") or payload.get("notes") or "Rejected by reviewer"
         req_obj.status = "DENIED"
@@ -2514,6 +2536,12 @@ def reject_workflow_request(
             batch.status = "DENIED"
         _notify(db, req_obj.harvester_id, "REQUEST_REJECTED", "Collection request rejected", f"Your collection request {req_obj.request_id} was rejected: {reason}", {"requestId": req_obj.request_id})
         db.commit()
+        _broadcast_after_commit("request_updated", {
+            "requestId": req_obj.request_id,
+            "status": "DENIED",
+            "fromUserId": req_obj.harvester_id,
+            "toUserId": current_user.id,
+        })
         return {"success": True, "message": f"Request rejected"}
 
     lab_req = db.query(LabRequest).filter((LabRequest.id == request_id) | (LabRequest.request_id == request_id) | (LabRequest.batch_id == request_id)).first()
@@ -2575,9 +2603,6 @@ def send_workflow_request_next(
     if actor_role == "COLLECTOR_PROCESSOR":
         if not req_obj:
             raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Collection request not found."})
-        # Profile-completion gate (spec §16): restricted dispatch operation.
-        if not (current_user.is_verified or is_collector_profile_complete(current_user)):
-            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         if (req_obj.status or "").upper() != "ACCEPTED":
             raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": "Collection request must be accepted before sending to lab."})
         if not batch:
@@ -2647,9 +2672,6 @@ def send_workflow_request_next(
         lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
         if not lab_req:
             raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Lab request not found."})
-        # Profile-completion gate (spec §16): restricted dispatch operation.
-        if not (current_user.is_verified or is_lab_profile_complete(current_user)):
-            raise HTTPException(status_code=403, detail={"success": False, "code": "PROFILE_INCOMPLETE", "message": "Complete your profile before continuing."})
         report = db.query(LabReport).filter(LabReport.batch_id == batch_id).order_by(desc(LabReport.created_at)).first()
         if not report:
             raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_TEST_MISSING", "message": "Lab test has not been submitted."})
@@ -3651,6 +3673,258 @@ def verify_otp(payload: Dict[str, Any], db: Session = Depends(get_db)):
     return {"success": True, "message": "Mobile number successfully verified."}
 
 
+# ── Harvester-specific verification endpoints ────────────────────────────────
+# These endpoints validate the FORMAT of identifiers (Government ID, FSSAI)
+# and persist submitted values in PostgreSQL. Format validity is NOT
+# government verification: no external registry is contacted, so the persisted
+# state is "Format Valid" / "Submitted" — never "Verified" — until a real
+# verification mechanism marks it so.
+
+GOV_ID_FORMATS: Dict[str, str] = {
+    "AADHAAR": r"^[2-9]\d{11}$",
+    "PAN": r"^[A-Z]{5}\d{4}[A-Z]$",
+    "PASSPORT": r"^[A-Z]\d{7}$",
+    "DRIVING_LICENSE": r"^[A-Z0-9][A-Z0-9\-]{7,15}$",
+    "VOTER_ID": r"^[A-Z]{3}\d{7}$",
+}
+
+GOV_ID_EXAMPLES: Dict[str, str] = {
+    "AADHAAR": "12 digits (first digit 2-9), e.g. 234567890123 — example only",
+    "PAN": "10 characters, e.g. ABCDE1234F — example only",
+    "PASSPORT": "1 letter + 7 digits, e.g. A1234567 — example only",
+    "DRIVING_LICENSE": "8-16 letters, digits or dashes, e.g. DL1420110012345 — example only",
+    "VOTER_ID": "3 letters + 7 digits, e.g. ABC1234567 — example only",
+}
+
+FSSAI_LICENSE_PATTERN = r"^\d{14}$"
+
+
+def _government_id_format_error(doc_type: Optional[str], doc_number: Optional[str]) -> Optional[str]:
+    """Return an error message when the ID does not match its documented
+    format, or None when the format is valid. A format match never implies
+    that any government registry verified the value."""
+    t = (doc_type or "AADHAAR").upper()
+    pattern = GOV_ID_FORMATS.get(t)
+    if pattern is None:
+        return f"Unsupported Government ID type: {t}."
+    number = (doc_number or "").strip().upper()
+    if t != "DRIVING_LICENSE":
+        number = re.sub(r"[\s\-]", "", number)
+    if not number or not re.match(pattern, number):
+        return f"Invalid {t} format. Expected: {GOV_ID_EXAMPLES.get(t, 'the documented format')}"
+    return None
+
+
+def _mask_reference(reference: Optional[str]) -> Optional[str]:
+    if not reference or not reference.strip():
+        return None
+    ref = reference.strip()
+    if len(ref) <= 4:
+        return f"****{ref[-1:]}"
+    return f"{'*' * (len(ref) - 4)}{ref[-4:]}"
+
+
+def _profile_notes(profile: Optional[Profile]) -> Dict[str, Any]:
+    if not profile or not profile.review_notes:
+        return {}
+    try:
+        parsed = json.loads(profile.review_notes)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def _harvester_verification_payload(user: User, profile: Optional[Profile]) -> Dict[str, Any]:
+    """Honest per-component verification state for a harvester, built only
+    from what is actually stored in PostgreSQL."""
+    notes = _profile_notes(profile)
+    kyc = (profile.kyc_status if profile else None) or "Not Started"
+    registration_verified = "Submitted" if user.license_number else "Not Started"
+    location_verified = "Submitted" if user.facility_location else "Not Started"
+    fssai_verified = notes.get("fssaiStatus") or "Not Started"
+    is_complete = is_user_profile_complete(user)
+    verified_str = "Verified" if (user.is_verified or is_complete) else "In Progress"
+    return {
+        "id": user.id,
+        "harvesterId": user.id,
+        "fullName": user.name,
+        "governmentIdType": profile.government_id_type if profile else None,
+        "governmentIdReference": _mask_reference(profile.government_id_reference if profile else None),
+        "governmentIdVerified": kyc,
+        "governmentIdSubmittedAt": profile.kyc_verified_at.isoformat() if (profile and profile.kyc_verified_at) else None,
+        "mobileNumber": user.phone,
+        "mobileVerified": (profile.mobile_verified if profile else None) or "Not Started",
+        "registrationId": user.license_number,
+        "registrationType": notes.get("registrationType"),
+        "registrationVerified": registration_verified,
+        "apiaryName": user.organization_name,
+        "apiaryLocation": user.facility_location,
+        "locationVerified": location_verified,
+        "fssaiLicense": notes.get("fssaiLicense"),
+        "fssaiLicenseVerified": fssai_verified,
+        "verificationStatus": verified_str,
+        "verificationId": notes.get("verificationId"),
+        "isProfileComplete": is_complete,
+    }
+
+
+def _harvester_target_user(payload: Dict[str, Any], current_user: User, db: Session) -> User:
+    """Resolve the account being verified, enforcing ownership (IDOR guard):
+    a harvester may only manage their own verification; admins may act on any
+    harvester account."""
+    requested_id = payload.get("harvesterId")
+    if requested_id and requested_id not in (current_user.id, current_user.email):
+        if "ADMIN" not in (current_user.role or ""):
+            raise HTTPException(
+                status_code=403,
+                detail={"success": False, "code": "FORBIDDEN", "message": "You can only manage your own verification."},
+            )
+        user = db.query(User).filter((User.id == requested_id) | (User.email == requested_id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail={"success": False, "code": "NOT_FOUND", "message": "Harvester not found."})
+        return user
+    if "ADMIN" not in (current_user.role or "") and normalize_role(current_user.role) != "HARVESTER":
+        raise HTTPException(
+            status_code=403,
+            detail={"success": False, "code": "FORBIDDEN", "message": "Only Harvester accounts can use this endpoint."},
+        )
+    return current_user
+
+
+def _harvester_profile_for(user: User, db: Session) -> Profile:
+    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+    if not profile:
+        profile = Profile(user_id=user.id)
+        db.add(profile)
+        db.flush()
+    return profile
+
+
+@app.post("/api/verification/harvester/government-id")
+def submit_harvester_government_id(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = _harvester_target_user(payload, current_user, db)
+    doc_type = (payload.get("documentType") or payload.get("governmentIdType") or "AADHAAR").strip()
+    doc_number = (payload.get("documentNumber") or payload.get("governmentIdNumber") or "").strip()
+    if not doc_number:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "GOV_ID_REQUIRED", "message": "Government ID number is required."})
+    error = _government_id_format_error(doc_type, doc_number)
+    if error:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "GOV_ID_INVALID_FORMAT", "message": error})
+
+    profile = _harvester_profile_for(user, db)
+    clean_number = doc_number if doc_type.upper() == "DRIVING_LICENSE" else re.sub(r"[\s\-]", "", doc_number).upper()
+    profile.government_id_type = doc_type.upper()[:64]
+    profile.government_id_reference = clean_number[:128]
+    # Honest state: the value matches the documented format, but NO government
+    # registry has been contacted — this is "Format Valid", never "Verified".
+    profile.kyc_status = "Format Valid"
+    profile.kyc_verified_at = _utcnow()
+    if is_user_profile_complete(user):
+        user.is_verified = True
+    db.commit()
+    db.refresh(profile)
+    return {
+        "success": True,
+        "message": "Government ID saved. Format is valid — not yet government-verified.",
+        "verification": _harvester_verification_payload(user, profile),
+    }
+
+
+@app.post("/api/verification/harvester/fssai")
+def submit_harvester_fssai(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = _harvester_target_user(payload, current_user, db)
+    fssai = (payload.get("fssaiLicense") or payload.get("fssai") or "").strip()
+    if not fssai:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "FSSAI_REQUIRED", "message": "FSSAI license number is required."})
+    if not re.match(FSSAI_LICENSE_PATTERN, fssai):
+        raise HTTPException(status_code=422, detail={"success": False, "code": "FSSAI_INVALID_FORMAT", "message": "Invalid FSSAI format. Expected 14 digits, e.g. 12345678901234 — example only."})
+
+    profile = _harvester_profile_for(user, db)
+    notes = _profile_notes(profile)
+    notes["fssaiLicense"] = fssai
+    # Honest state: format-valid only; this endpoint does not query FoSCoS.
+    notes["fssaiStatus"] = "Format Valid"
+    notes["fssaiFormatValidAt"] = _utcnow().isoformat()
+    profile.review_notes = json.dumps(notes)
+    db.commit()
+    db.refresh(profile)
+    return {
+        "success": True,
+        "message": "FSSAI license saved. Format is valid — not yet officially verified.",
+        "verification": _harvester_verification_payload(user, profile),
+    }
+
+
+@app.post("/api/verification/harvester/registration")
+def submit_harvester_registration(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = _harvester_target_user(payload, current_user, db)
+    registration_id = (payload.get("registrationId") or "").strip()
+    registration_type = (payload.get("registrationType") or "STATE_AGRICULTURE").strip()
+    if not registration_id:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "REGISTRATION_REQUIRED", "message": "Registration ID is required."})
+
+    profile = _harvester_profile_for(user, db)
+    user.license_number = registration_id[:128]
+    notes = _profile_notes(profile)
+    notes["registrationType"] = registration_type[:64]
+    # No authority registry is contacted — the value is stored, not verified.
+    notes["registrationStatus"] = "Submitted"
+    profile.review_notes = json.dumps(notes)
+    if is_user_profile_complete(user):
+        user.is_verified = True
+    db.commit()
+    db.refresh(profile)
+    return {
+        "success": True,
+        "message": "Beekeeper registration ID submitted.",
+        "verification": _harvester_verification_payload(user, profile),
+    }
+
+
+@app.post("/api/verification/harvester/location")
+def submit_harvester_location(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = _harvester_target_user(payload, current_user, db)
+    apiary_location = (payload.get("apiaryLocation") or "").strip()
+    apiary_name = (payload.get("apiaryName") or "").strip()
+    coordinates = (payload.get("apiaryCoordinates") or "").strip()
+    if not apiary_location:
+        raise HTTPException(status_code=422, detail={"success": False, "code": "LOCATION_REQUIRED", "message": "Apiary location is required."})
+
+    profile = _harvester_profile_for(user, db)
+    user.facility_location = apiary_location[:256]
+    if apiary_name:
+        user.organization_name = apiary_name[:128]
+    if coordinates:
+        notes = _profile_notes(profile)
+        notes["apiaryCoordinates"] = coordinates[:128]
+        profile.review_notes = json.dumps(notes)
+    if is_user_profile_complete(user):
+        user.is_verified = True
+    db.commit()
+    db.refresh(profile)
+    return {
+        "success": True,
+        "message": "Apiary location saved.",
+        "verification": _harvester_verification_payload(user, profile),
+    }
+
+
 @app.get("/api/verification/{role}/status/{user_id}")
 def get_verification_status(
     role: str,
@@ -3676,13 +3950,21 @@ def get_verification_status(
         db.refresh(profile)
 
     is_complete = is_user_profile_complete(user)
+    role_norm = normalize_role(user.role)
     if is_complete and not user.is_verified:
         user.is_verified = True
         profile.verification_status = "Verified"
-        profile.mobile_verified = "Verified"
-        profile.kyc_status = "Verified"
+        # Auto-stamping mobile/KYC as "Verified" is only legitimate where a
+        # real verification step already ran. Harvesters have none — their
+        # per-component states must stay honest (Format Valid / Submitted).
+        if "HARVESTER" not in role_norm:
+            profile.mobile_verified = "Verified"
+            profile.kyc_status = "Verified"
         db.commit()
     # Report REAL per-component status; never synthesize blanket "Verified".
+
+    if "HARVESTER" in role_norm:
+        return {"success": True, "verification": _harvester_verification_payload(user, profile)}
 
     verified_str = "Verified" if (user.is_verified or is_complete) else "In Progress"
 
@@ -3726,6 +4008,7 @@ def handle_generic_verification(
     step: str, 
     payload: Dict[str, Any], 
     sub: str = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # For send-otp steps
@@ -3736,6 +4019,14 @@ def handle_generic_verification(
     user_id = payload.get("harvesterId") or payload.get("collectorId") or payload.get("labId") or payload.get("packagerId")
     if not user_id:
         return {"success": False, "error": "User ID not found in payload"}
+
+    # IDOR guard: a user may only submit verification steps for their own
+    # account (admins excepted).
+    if user_id not in (current_user.id, current_user.email) and "ADMIN" not in (current_user.role or ""):
+        raise HTTPException(
+            status_code=403,
+            detail={"success": False, "code": "FORBIDDEN", "message": "You can only manage your own verification."},
+        )
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

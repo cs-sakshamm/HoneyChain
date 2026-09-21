@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
-import '../../../core/utils/profile_guard.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../collection/screens/nearest_centres_screen.dart';
@@ -216,7 +215,8 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
   }
 
   Future<void> _saveHive() async {
-    if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+    // Re-entrancy guard: ignore taps while a submission is already in flight.
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -227,7 +227,6 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
       );
       return;
     }
-    if (_isSaving) return;
 
     final userController = context.read<UserController>();
     setState(() => _isSaving = true);
@@ -585,6 +584,8 @@ class _AddEditHiveScreenState extends State<AddEditHiveScreen> {
                   children: [
                     Expanded(
                       child: _buildTextField(
+                        // Localization label already carries the unit exactly
+                        // once, e.g. "Expected (kg)" — never append another.
                         label: '${context.tr('expected_honey')} *',
                         hint: 'e.g. 35.0',
                         controller: _expectedProductionController,

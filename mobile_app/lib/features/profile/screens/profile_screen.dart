@@ -305,27 +305,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           },
                         ),
                         const SizedBox(width: AppConstants.space16),
-                        _PillAction(
-                          label: complete ? 'Verified' : 'Complete Profile',
-                          icon: complete ? Icons.verified_rounded : Icons.pending_actions_rounded,
-                          color: complete ? context.successBgColor : context.warningBgColor,
-                          textColor: complete ? context.successColor : context.warningColor,
-                          onTap: () {
-                            if (!complete) {
-                              if (user.role.toUpperCase().contains('COLLECT') || user.role.toUpperCase().contains('PROCESS')) {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()));
-                              } else if (user.role.toUpperCase().contains('LAB')) {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const LabVerificationScreen()));
-                              } else if (user.role.toUpperCase().contains('PKG') || user.role.toUpperCase().contains('PACKAG')) {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()));
+                        // Harvester branch removed: no profile-verification
+                        // option for harvesters. Other roles keep theirs.
+                        if (!(user.role.toUpperCase() == 'HARVESTER' ||
+                            user.role.toUpperCase().trim().isEmpty))
+                          _PillAction(
+                            label: complete ? 'Verified' : 'Complete Profile',
+                            icon: complete ? Icons.verified_rounded : Icons.pending_actions_rounded,
+                            color: complete ? context.successBgColor : context.warningBgColor,
+                            textColor: complete ? context.successColor : context.warningColor,
+                            onTap: () {
+                              if (!complete) {
+                                if (user.role.toUpperCase().contains('COLLECT') || user.role.toUpperCase().contains('PROCESS')) {
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()));
+                                } else if (user.role.toUpperCase().contains('LAB')) {
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => const LabVerificationScreen()));
+                                } else if (user.role.toUpperCase().contains('PKG') || user.role.toUpperCase().contains('PACKAG')) {
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()));
+                                }
                               } else {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()));
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()));
                               }
-                            } else {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()));
-                            }
-                          },
-                        ),
+                            },
+                          ),
                       ],
                     ),
                   ],
@@ -335,7 +337,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: AppConstants.space20),
 
               // ── 3. Role-Specific Verification Checklist Card ──
-              _buildRoleVerificationChecklistCard(context, user.role, verCtrl, userCtrl),
+              // (Harvester Profile Verification section removed by product
+              // decision: harvesters no longer have a separate verification
+              // flow. Other roles keep their existing verification cards.)
+              if (!(user.role.toUpperCase() == 'HARVESTER' ||
+                  user.role.toUpperCase().trim().isEmpty))
+                _buildRoleVerificationChecklistCard(context, user.role, verCtrl, userCtrl),
 
               const SizedBox(height: AppConstants.space20),
 
@@ -472,35 +479,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             MaterialPageRoute(builder: (context) => const PackagingVerificationScreen()),
                           );
                         },
-                      )
-                    else
-                      _buildSettingsTile(
-                        context,
-                        title: 'Harvester Verification',
-                        icon: Icons.verified_user_outlined,
-                        trailingBadge: context.watch<VerificationController>().verification.isFullyVerified
-                            ? 'Verified ✓'
-                            : '${context.watch<VerificationController>().verification.completedStepsCount}/3 Steps',
-                        badgeColor: context.watch<VerificationController>().verification.isFullyVerified
-                            ? context.successColor
-                            : context.textPrimaryColor,
-                        badgeBg: context.watch<VerificationController>().verification.isFullyVerified
-                            ? context.successBgColor
-                            : context.primarySoftColor,
-                        onTap: () {
-                          if (context.read<VerificationController>().verification.isFullyVerified) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const VerificationCertificateScreen()),
-                            );
-                          } else {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const HarvesterVerificationScreen()),
-                            );
-                          }
-                        },
                       ),
+                    // NOTE: 'Harvester Verification' tile removed by product
+                    // decision — harvesters no longer have a separate
+                    // profile-verification flow. Other roles keep theirs.
                     Divider(height: 1, indent: 56, color: context.borderColor),
                     _buildSettingsTile(
                       context,
@@ -979,7 +961,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.add_circle_outline_rounded,
             primary: true,
             onTap: () {
-              if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+              // Open to any authenticated harvester — no verification gate.
               Navigator.push(context, MaterialPageRoute(builder: (context) => const AddEditHiveScreen()));
             },
           ),
@@ -996,7 +978,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             subtitle: 'Record raw harvest weight & dispatch to collection hub',
             icon: Icons.agriculture_rounded,
             onTap: () {
-              if (!ProfileGuard.checkHarvesterVerificationOrPrompt(context)) return;
+              // Open to any authenticated harvester — no verification gate.
               final hives = context.read<HiveController>().hives;
               if (hives.isNotEmpty) {
                 Navigator.push(
