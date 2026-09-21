@@ -305,3 +305,4 @@ with open("src/i18n.ts", "w", encoding="utf-8") as f:
     f.write("export const i18nDict: Record<string, any> = ")
     f.write(json.dumps(out_dict, ensure_ascii=False, indent=2))
     f.write(";\n")
+
