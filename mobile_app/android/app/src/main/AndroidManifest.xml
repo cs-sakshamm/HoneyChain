@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The app talks to the HoneyChain FastAPI backend over the network.
+         Required in the main manifest so release/profile builds keep API access
+         (debug/profile overlays already declare it for Flutter tooling). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="HoneyChain"
         android:name="${applicationName}"

@@ -11,6 +11,13 @@ import '../models/hive_model.dart';
 /// with genuine database persistence and local cache fallback.
 class HiveStorageService {
   static const String _storageKey = 'honeychain_hives_data_v2';
+
+  /// Backend calls include bcrypt-verified JWT round-trips and cloud
+  /// PostgreSQL latency (~2s measured locally). Budgets below that aborted
+  /// legitimate requests and surfaced them as false "Unable to reach the
+  /// backend" errors. 15s matches the auth controller's budget.
+  static const Duration _requestTimeout = Duration(seconds: 15);
+
   final http.Client _client;
   final String _baseUrl;
   String? _lastError;
@@ -35,6 +42,7 @@ class HiveStorageService {
 
   /// Load hives from PostgreSQL backend API for the specified beekeeper.
   Future<List<Hive>> loadHives({String? userId}) async {
+    http.Response? response;
     try {
       _lastError = null;
       final uri = Uri.parse('$_baseUrl/api/hives').replace(
@@ -42,9 +50,9 @@ class HiveStorageService {
           if (userId != null && userId.trim().isNotEmpty) 'userId': userId.trim(),
         },
       );
-      final response = await _client
+      response = await _client
           .get(uri, headers: _headers(userId))
-          .timeout(const Duration(seconds: 4));
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body) as List<dynamic>;
@@ -56,8 +64,15 @@ class HiveStorageService {
         await saveHives(hives);
         return hives;
       }
+
+      // Real API rejection (401 expired token, 403 role, 422 schema, 5xx…):
+      // surface the backend's own message instead of masking it as a
+      // connection failure — the bug this service used to have.
+      _lastError = _extractErrorMessage(response.body) ??
+          'Backend rejected the hive list request (HTTP ${response.statusCode}).';
+      debugPrint('[HiveStorageService] Backend list rejected: ${response.statusCode} - ${response.body}');
     } catch (e) {
-      _lastError = 'Unable to load hives from the backend.';
+      _lastError = 'Unable to reach the backend. Please verify the API server is running.';
       debugPrint('[HiveStorageService] Backend fetch failed: $e. Loading from local cache.');
     }
 
@@ -77,7 +92,7 @@ class HiveStorageService {
 
       final response = await _client
           .post(url, headers: _headers(userId), body: jsonEncode(payload))
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -109,7 +124,7 @@ class HiveStorageService {
 
       final response = await _client
           .put(url, headers: _headers(userId), body: jsonEncode(payload))
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200) return true;
       _lastError = _extractErrorMessage(response.body) ??
@@ -130,7 +145,7 @@ class HiveStorageService {
       final url = Uri.parse('$_baseUrl/api/hives/$id');
       final response = await _client
           .delete(url, headers: _headers(userId))
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200) return true;
       _lastError = _extractErrorMessage(response.body) ??
@@ -150,7 +165,7 @@ class HiveStorageService {
       final url = Uri.parse('$_baseUrl/api/hives/code/generate');
       final response = await _client
           .get(url, headers: _headers())
-          .timeout(const Duration(seconds: 3));
+          .timeout(_requestTimeout);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['code'] != null) {

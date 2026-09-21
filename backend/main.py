@@ -287,9 +287,23 @@ _default_origins = ["http://localhost:3000", "http://localhost:5173", "http://lo
 if _public_app_url:
     _default_origins.append(_public_app_url)
 
+# `flutter run -d chrome` serves the app from a RANDOM localhost port each
+# session (e.g. http://localhost:57639), so a fixed-port allow-list silently
+# breaks every dev-web request with CORS 400 "Disallowed CORS origin" — which
+# the app surfaced as the false "Unable to connect to backend" message.
+# In development (non-production envs) any http(s) localhost/127.0.0.1 origin
+# is therefore trusted. CORS_ALLOW_ORIGINS always wins and is the supported
+# production lockdown knob; a wildcard is also honored for deployments that
+# want it (auth is header-JWT, so no cookies ride on cross-origin requests).
+_cors_env_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+_environment = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or "development").strip().lower()
+_is_production_env = _environment in ("production", "prod")
+_allow_local_dev_origins = not _is_production_env
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _cors_origins_env.split(",") if o.strip()] or _default_origins,
+    allow_origins=_cors_env_origins or ["*"],
+    allow_origin_regex=(r"https?://(localhost|127\.0\.0\.1)(:\d+)?" if _allow_local_dev_origins else None),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -4297,3 +4311,19 @@ def get_harvester_verification(verification_id: str, db: Session = Depends(get_d
             "harvester": {"name": u.name, "status": "VERIFIED", "beekeeperId": u.beekeeper_id},
         }
     return JSONResponse(status_code=404, content={"success": False, "found": False, "message": "Verification record not found"})
+
+
+# ── Direct execution entrypoint ──
+# Bind 0.0.0.0 so Android emulators (10.0.2.2) and physical devices on the LAN
+# can reach the API, not just the machine's own loopback. Web/desktop clients
+# use localhost, which 0.0.0.0 also serves. `python main.py` from backend/ or
+# `uvicorn backend.main:app --host 0.0.0.0 --port 8000` are equivalent.
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host=os.getenv("BACKEND_HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", "8000")),
+        reload=os.getenv("RELOAD", "false").lower() in ("1", "true", "yes"),
+    )

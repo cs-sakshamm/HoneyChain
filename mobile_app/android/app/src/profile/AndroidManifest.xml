@@ -1,7 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Profile builds only. The backend URL for Android emulator is the host-loopback
+  alias http://10.0.2.2:8000 (see AppConstants.backendBaseUrl), which is plain
+  HTTP. Android 9+ (targetSdk >= 28) blocks cleartext by default, so profiling
+  against a local HTTP backend needs this override too.
+-->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- The INTERNET permission is required for development. Specifically,
-         the Flutter tool needs it to communicate with the running application
-         to allow setting breakpoints, to provide hot reload, etc.
-    -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

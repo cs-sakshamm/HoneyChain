@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { PublicVerification } from './pages/PublicVerification';
 
+type ModalKey = 'Home' | 'About' | 'Traceability' | 'Technology' | 'Laboratory' | 'Contact' | null;
+
 export const App: React.FC = () => {
   const [currentBatchId, setCurrentBatchId] = useState<string>('');
   const [inputBatchId, setInputBatchId] = useState<string>('');
   
+  const [activeModal, setActiveModal] = useState<ModalKey>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Theme Management
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem('hc_theme');
@@ -49,8 +54,65 @@ export const App: React.FC = () => {
     setCurrentBatchId(cleanId);
   };
 
+  const navLinks: ModalKey[] = ['Home', 'About', 'Traceability', 'Technology', 'Laboratory', 'Contact'];
+
+  const getModalContent = (key: ModalKey) => {
+    switch(key) {
+      case 'Home':
+        return (
+          <>
+            <p>Welcome to the HoneyChain Public Verification Portal.</p>
+            <p>This platform allows consumers to independently verify the origin, handling, and purity of their honey products by scanning a QR code that is securely linked to immutable records.</p>
+          </>
+        );
+      case 'About':
+        return (
+          <>
+            <p>HoneyChain was created to solve the pervasive problem of honey adulteration and the lack of transparency in traditional supply chains.</p>
+            <p>By establishing an undeniable, cryptographically secure link between the apiary and the final packaged jar, our platform restores trust and ensures that you are consuming authentic honey.</p>
+          </>
+        );
+      case 'Traceability':
+        return (
+          <>
+            <p>Our traceability journey maps the complete lifecycle of the product:</p>
+            <p className="modal-journey">Harvester &rarr; Hive &rarr; Collection &amp; Processing &rarr; Laboratory Test &rarr; Packaging &rarr; Verification</p>
+            <p>Every single step is documented on an immutable ledger. By scanning the QR code, the complete history can be viewed instantly, guaranteeing end-to-end provenance.</p>
+          </>
+        );
+      case 'Technology':
+        return (
+          <>
+            <p>HoneyChain leverages a robust combination of enterprise technologies.</p>
+            <p>IoT sensors monitor hive conditions in real-time, Artificial Intelligence flags anomalies, and a secure API ties everything to a scalable Blockchain smart contract database.</p>
+            <p>This secure database-based traceability guarantees that historical data can never be silently altered.</p>
+          </>
+        );
+      case 'Laboratory':
+        return (
+          <>
+            <p>Independent laboratory testing is the cornerstone of HoneyChain's purity guarantee.</p>
+            <p>The lab report, detailing precise test values for adulterants, moisture, and quality parameters, becomes a permanent part of the traceability record. This ensures scientific proof of quality is accessible directly to the consumer.</p>
+          </>
+        );
+      case 'Contact':
+        return (
+          <>
+            <p>For project inquiries, technical support, or partnership opportunities, please reach out to the HoneyChain Project Team.</p>
+            <p className="modal-contact-info">
+              <strong>Project Lead:</strong> Team DataMineX<br />
+              <strong>System:</strong> HoneyChain Supply Node
+            </p>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="app-layout">
+      {/* Universal Simple Header */}
       <header className="app-header">
         <div className="header-logo-container" onClick={() => {
             window.history.pushState({}, '', `/`);
@@ -58,6 +120,15 @@ export const App: React.FC = () => {
           }} style={{cursor: 'pointer'}}>
           <span className="logo-text">HoneyChain</span>
         </div>
+        
+        {/* Desktop Nav */}
+        <nav className="desktop-nav">
+          {navLinks.map(link => (
+            <button key={link} className="nav-link" onClick={() => setActiveModal(link)}>
+              {link}
+            </button>
+          ))}
+        </nav>
 
         <div className="header-actions">
           <button 
@@ -65,10 +136,33 @@ export const App: React.FC = () => {
             onClick={() => setIsDark(!isDark)}
             aria-label="Toggle theme"
           >
+            {isDark ? 'Light' : 'Dark'}
             {isDark ? 'Light' : 'Dark'} Mode
+          </button>
+
+          {/* Mobile Menu Button */}
+          <button 
+            className="mobile-menu-btn"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? 'Close' : 'Menu'}
           </button>
         </div>
       </header>
+
+      {/* Mobile Nav Dropdown */}
+      {isMobileMenuOpen && (
+        <nav className="mobile-nav">
+          {navLinks.map(link => (
+            <button key={link} className="mobile-nav-link" onClick={() => {
+              setActiveModal(link);
+              setIsMobileMenuOpen(false);
+            }}>
+              {link}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <main className="app-main">
         {currentBatchId ? (
@@ -111,6 +205,21 @@ export const App: React.FC = () => {
           <span className="footer-tag">Immutable Provenance</span>
         </div>
       </footer>
+
+      {/* Modal Overlay */}
+      {activeModal && (
+        <div className="modal-overlay" onClick={() => setActiveModal(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">{activeModal}</h2>
+              <button className="modal-close" onClick={() => setActiveModal(null)}>Close</button>
+            </div>
+            <div className="modal-body">
+              {getModalContent(activeModal)}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

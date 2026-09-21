@@ -275,12 +275,17 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
 }
 
+.pv-sections {
 .pv-workflow {
   display: flex;
   flex-direction: column;
+  gap: 32px;
   gap: 16px;
 }
 
+.pv-section {
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color);
 .pv-workflow-node {
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
@@ -298,12 +303,23 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
 }
 
+.pv-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
 .pv-workflow-node::after {
   content: '→';
   color: var(--text-muted);
   font-size: 18px;
 }
 
+.pv-sub-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 16px 0 12px 0;
+  color: var(--text-primary);
+  text-transform: uppercase;
 .pv-workflow-node:hover {
   border-color: var(--accent-color);
   background-color: var(--surface-color);
