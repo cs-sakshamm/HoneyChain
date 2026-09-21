@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/controllers/workflow_controller.dart';
+import '../../../core/models/workflow_request.dart';
 import '../controllers/hive_controller.dart';
 import '../models/hive_model.dart';
 import '../widgets/failed_hive_card.dart';
@@ -25,7 +26,7 @@ class AllHivesScreen extends StatelessWidget {
   }
 
   /// Real backend status of the collection request attached to a hive.
-  String _requestStatusLabel(String? hiveId) {
+  String _requestStatusLabel(BuildContext context, String? hiveId) {
     if (hiveId == null || hiveId.isEmpty) return 'Request Not Sent';
     final workflowCtrl = context.read<WorkflowController>();
     final requests = workflowCtrl.harvesterRequests
@@ -123,7 +124,7 @@ class AllHivesScreen extends StatelessWidget {
                             );
                           }
                           final hive = hives[index - controller.failedSubmissions.length];
-                          return _buildFieldCard(context, hive, _requestStatusLabel(hive.id));
+                          return _buildFieldCard(context, hive, _requestStatusLabel(context, hive.id));
                         },
                       ),
               ),
@@ -136,7 +137,7 @@ class AllHivesScreen extends StatelessWidget {
 
   Widget _buildFieldCard(BuildContext context, Hive hive, String requestStatusLabel) {
     final healthy = hive.isHealthy;
-    final statusColor = _requestStatusColor(requestStatusLabel);
+    final statusColor = _requestStatusColor(context, requestStatusLabel);
 
     return Material(
       color: context.surfaceColor,
@@ -261,7 +262,7 @@ class AllHivesScreen extends StatelessWidget {
     );
   }
 
-  Color _requestStatusColor(String label) {
+  Color _requestStatusColor(BuildContext context, String label) {
     switch (label) {
       case 'Request Not Sent':
         return context.textMutedColor;

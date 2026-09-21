@@ -283,7 +283,7 @@ app = FastAPI(
 # origins down. Auth is header-JWT (no cookies), which limits wildcard exposure.
 _cors_origins_env = (os.getenv("CORS_ALLOW_ORIGINS") or "").strip()
 _public_app_url = (os.getenv("PUBLIC_APP_URL") or "").strip()
-_default_origins = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8000"]
+_default_origins = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8000", "https://YOUR-VERCEL-DOMAIN.vercel.app"]
 if _public_app_url:
     _default_origins.append(_public_app_url)
 

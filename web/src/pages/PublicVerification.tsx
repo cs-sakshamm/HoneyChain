@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { fetchVerificationData, VerificationResponse } from '../api/honeychainApi';
-import '../styles/PublicVerification.css';
 
 interface Props {
   batchId: string;
@@ -32,36 +31,24 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
 
   if (loading) {
     return (
-      <div className="pv-container">
-        <div className="pv-wrapper">
-          <div className="pv-center-msg">
-            <p className="pv-center-desc">Verifying record...</p>
-          </div>
-        </div>
+      <div className="pv-message-container">
+        <p className="pv-message">Verifying record...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="pv-container">
-        <div className="pv-wrapper">
-          <div className="pv-center-msg">
-            <h2 className="pv-center-title">{error}</h2>
-          </div>
-        </div>
+      <div className="pv-message-container">
+        <p className="pv-message error-text">{error}</p>
       </div>
     );
   }
 
   if (data && !data.found) {
     return (
-      <div className="pv-container">
-        <div className="pv-wrapper">
-          <div className="pv-center-msg">
-            <h2 className="pv-center-title">Record not found</h2>
-          </div>
-        </div>
+      <div className="pv-message-container">
+        <h2 className="pv-message-title">Record not found</h2>
       </div>
     );
   }
@@ -74,57 +61,30 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
   const hasLabTest = !!data.labVerification && data.labVerification.labName !== 'No data available yet.';
   const hasPackaging = !!data.packaging && data.packaging.facility !== 'No data available yet.';
   
-  const isFullyVerified = data.isFullyVerified;
-
   return (
     <div className="pv-container">
-      <div className="pv-wrapper">
-        
-        {/* Header */}
-        <header className="pv-header">
-          <h1 className="pv-header-title">HoneyChain</h1>
-          <p className="pv-header-subtitle">Honey Traceability & Verification</p>
-        </header>
-
-        <hr className="pv-divider" />
-
-        {/* Verification Status */}
-        <div className="pv-status-section">
-          <h2 className="pv-status-title">Product Verification</h2>
-          <div className="pv-status-badge">
-            VERIFIED
-          </div>
-          <div className="pv-status-trace">
-            Trace ID: {data.batchId || batchId}
-          </div>
+      
+      <div className="pv-header">
+        <h1 className="pv-title">Product Verification</h1>
+        <div className="pv-status-badge">
+          {data.isFullyVerified ? 'VERIFIED' : 'PENDING'}
         </div>
+        <p className="pv-trace-id">Trace ID: {data.batchId || batchId}</p>
+      </div>
 
-        <hr className="pv-divider" />
-
-        <h2 className="pv-main-heading">Traceability</h2>
-
-        {/* 01 Harvester */}
+      <div className="pv-sections">
         {hasHarvester && (
-          <div className="pv-step">
-            <div className="pv-step-header">
-              <span className="pv-step-number">01</span>
-              <h3 className="pv-step-title">Harvester</h3>
-            </div>
+          <section className="pv-section">
+            <h2 className="pv-section-title">01 Harvester</h2>
             <div className="pv-kv-list">
               <div className="pv-kv-row">
-                <span className="pv-kv-label">Full Name</span>
+                <span className="pv-kv-label">Name</span>
                 <span className="pv-kv-value">{data.harvester.name}</span>
               </div>
               <div className="pv-kv-row">
                 <span className="pv-kv-label">Harvester ID</span>
                 <span className="pv-kv-value">{data.harvester.beekeeperId}</span>
               </div>
-              {data.harvester.hiveCode !== 'No data available yet.' && (
-                <div className="pv-kv-row">
-                  <span className="pv-kv-label">Hive ID</span>
-                  <span className="pv-kv-value">{data.harvester.hiveCode}</span>
-                </div>
-              )}
               {data.harvester.apiaryLocation !== 'No data available yet.' && (
                 <div className="pv-kv-row">
                   <span className="pv-kv-label">Location</span>
@@ -132,24 +92,16 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* 02 Hive */}
         {hasHive && (
-          <div className="pv-step">
-            <div className="pv-step-header">
-              <span className="pv-step-number">02</span>
-              <h3 className="pv-step-title">Hive</h3>
-            </div>
+          <section className="pv-section">
+            <h2 className="pv-section-title">02 Hive</h2>
             <div className="pv-kv-list">
               <div className="pv-kv-row">
                 <span className="pv-kv-label">Hive ID</span>
                 <span className="pv-kv-value">{data.harvester.hiveCode}</span>
-              </div>
-              <div className="pv-kv-row">
-                <span className="pv-kv-label">Batch ID</span>
-                <span className="pv-kv-value">{data.batchId}</span>
               </div>
               {data.iotTelemetry && data.iotTelemetry.temperature !== 'No IoT telemetry available yet.' && (
                 <>
@@ -164,120 +116,93 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
                 </>
               )}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* 03 Collection */}
         {hasCollection && data.collectionProcessing && (
-          <div className="pv-step">
-            <div className="pv-step-header">
-              <span className="pv-step-number">03</span>
-              <h3 className="pv-step-title">Collection & Processing</h3>
-            </div>
+          <section className="pv-section">
+            <h2 className="pv-section-title">03 Collection & Processing</h2>
             <div className="pv-kv-list">
               <div className="pv-kv-row">
-                <span className="pv-kv-label">Center Name</span>
+                <span className="pv-kv-label">Center</span>
                 <span className="pv-kv-value">{data.collectionProcessing.processor}</span>
               </div>
               <div className="pv-kv-row">
-                <span className="pv-kv-label">Batch ID</span>
-                <span className="pv-kv-value">{data.batchId}</span>
+                <span className="pv-kv-label">Details</span>
+                <span className="pv-kv-value">{data.collectionProcessing.method}</span>
               </div>
-              {data.collectionProcessing.method !== 'No data available yet.' && (
+              {data.collectionProcessing.quantityReceivedKg !== 'No data available yet.' && (
                 <div className="pv-kv-row">
-                  <span className="pv-kv-label">Processing Details</span>
-                  <span className="pv-kv-value">{data.collectionProcessing.method}</span>
+                  <span className="pv-kv-label">Quantity Received</span>
+                  <span className="pv-kv-value">{data.collectionProcessing.quantityReceivedKg} kg</span>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* 04 Laboratory */}
         {hasLabTest && data.labVerification && (
-          <div className="pv-step">
-            <div className="pv-step-header">
-              <span className="pv-step-number">04</span>
-              <h3 className="pv-step-title">Laboratory Test</h3>
-            </div>
+          <section className="pv-section">
+            <h2 className="pv-section-title">04 Laboratory Test</h2>
             <div className="pv-kv-list">
               <div className="pv-kv-row">
-                <span className="pv-kv-label">Laboratory</span>
+                <span className="pv-kv-label">Lab Name</span>
                 <span className="pv-kv-value">{data.labVerification.labName}</span>
               </div>
-              {data.labVerification.reportId !== 'No data available yet.' && (
-                <div className="pv-kv-row">
-                  <span className="pv-kv-label">Report ID</span>
-                  <span className="pv-kv-value">{data.labVerification.reportId}</span>
-                </div>
-              )}
-              {data.labVerification.status !== 'No data available yet.' && (
-                <div className="pv-kv-row">
-                  <span className="pv-kv-label">Result</span>
-                  <span className="pv-kv-value">{data.labVerification.status}</span>
-                </div>
-              )}
+              <div className="pv-kv-row">
+                <span className="pv-kv-label">Report Number</span>
+                <span className="pv-kv-value">{data.labVerification.reportId}</span>
+              </div>
+              <div className="pv-kv-row">
+                <span className="pv-kv-label">Test Result</span>
+                <span className="pv-kv-value" style={{fontWeight: 700}}>{data.labVerification.status}</span>
+              </div>
             </div>
 
             {data.labVerification.parameters && data.labVerification.parameters.length > 0 && (
-              <div className="pv-sub-section">
-                <h4 className="pv-sub-heading">Lab Parameters</h4>
+              <div className="pv-lab-report">
+                <h3 className="pv-sub-title">Lab Report</h3>
                 <div className="pv-kv-list">
-                  {data.labVerification.parameters.map((param, idx) => (
-                    <div key={idx} className="pv-kv-row">
+                  {data.labVerification.parameters.map((param, i) => (
+                    <div className="pv-kv-row" key={i}>
                       <span className="pv-kv-label">{param.name}</span>
-                      <span className="pv-kv-value">{param.value}</span>
+                      <span className="pv-kv-value">{param.value} ({param.status})</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </div>
+          </section>
         )}
 
-        {/* 05 Packaging */}
         {hasPackaging && data.packaging && (
-          <div className="pv-step">
-            <div className="pv-step-header">
-              <span className="pv-step-number">05</span>
-              <h3 className="pv-step-title">Packaging</h3>
-            </div>
+          <section className="pv-section">
+            <h2 className="pv-section-title">05 Packaging</h2>
             <div className="pv-kv-list">
               <div className="pv-kv-row">
-                <span className="pv-kv-label">Packaging Facility</span>
+                <span className="pv-kv-label">Facility</span>
                 <span className="pv-kv-value">{data.packaging.facility}</span>
               </div>
               <div className="pv-kv-row">
                 <span className="pv-kv-label">Packaging Date</span>
-                <span className="pv-kv-value">{new Date(data.packaging.packagingDate).toLocaleDateString()}</span>
-              </div>
-              <div className="pv-kv-row">
-                <span className="pv-kv-label">Package Info</span>
-                <span className="pv-kv-value">{data.packaging.numberOfPackages} × {data.packaging.packageSize}</span>
+                <span className="pv-kv-value">
+                  {new Date(data.packaging.packagingDate).toLocaleDateString()}
+                </span>
               </div>
               <div className="pv-kv-row">
                 <span className="pv-kv-label">Status</span>
-                <span className="pv-kv-value">COMPLETED</span>
+                <span className="pv-kv-value">{data.packaging.sealStatus}</span>
               </div>
             </div>
-          </div>
+          </section>
         )}
-
-        <hr className="pv-divider" />
-
-        {/* Final Status */}
-        <div className="pv-footer-status">
-          <h3 className="pv-footer-title">
-            {isFullyVerified ? 'Complete Traceability' : 'Traceability Incomplete'}
-          </h3>
-          <p className="pv-footer-desc">
-            {isFullyVerified 
-              ? 'All available records have been verified.'
-              : 'Some stages of the traceability journey are missing or incomplete.'}
-          </p>
-        </div>
-
       </div>
+
+      <div className="pv-footer">
+        <h2 className="pv-section-title">Complete Traceability</h2>
+        <p className="pv-trace-status">{data.status}</p>
+      </div>
+
     </div>
   );
 };

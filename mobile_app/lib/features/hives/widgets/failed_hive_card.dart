@@ -131,7 +131,7 @@ class FailedHiveCard extends StatelessWidget {
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Retry', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+                label: Text('Retry', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
               ),
             ],
           ),

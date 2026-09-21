@@ -110,7 +110,7 @@ export interface VerificationResponse {
   events: BlockchainEvent[];
 }
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 export async function fetchVerificationData(batchId: string): Promise<VerificationResponse> {
   const url = `${API_BASE}/api/public/verify/${encodeURIComponent(batchId)}`;
