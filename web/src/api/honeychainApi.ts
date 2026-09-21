@@ -66,7 +66,22 @@ export interface LabParameter {
 export interface LabVerificationInfo {
   labName: string;
   reportId: string;
+  sampleId?: string | null;
+  sampleCode?: string | null;
+  sampleDate?: string | null;
+  testDate?: string | null;
+  reportDate?: string | null;
+  testType?: string | null;
   qualityScore: number | string;
+  purityGrade?: string | null;
+  contaminantsFound?: string | null;
+  pollenOrigin?: string | null;
+  overallResult?: string | null;
+  remarks?: string | null;
+  certificationInfo?: string | null;
+  documentId?: string | null;
+  documentHash?: string | null;
+  documentIntegrityStatus?: string | null;
   status: string;
   parameters: LabParameter[];
 }
@@ -200,8 +215,23 @@ export async function fetchVerificationData(batchId: string): Promise<Verificati
       labVerification: {
         labName: 'National Honey Testing Laboratory',
         reportId: 'REP-5555-89',
+        sampleId: 'SMP-2026-8901',
+        sampleCode: 'SMP-2026-8901',
+        sampleDate: new Date(Date.now() - 518400000).toISOString(),
+        testDate: new Date(Date.now() - 432000000).toISOString(),
+        reportDate: new Date(Date.now() - 345600000).toISOString(),
+        testType: 'Honey Purity & Quality Analysis',
         qualityScore: 98,
-        status: 'PASSED',
+        purityGrade: 'Grade A (99.2%)',
+        contaminantsFound: 'None Detected (< 0.01 ppm)',
+        pollenOrigin: 'Authentic Forest Flora (Apis mellifera)',
+        overallResult: 'PASS',
+        remarks: 'Sample complies with ISO 17025 and FSSAI standards for pure natural raw honey.',
+        certificationInfo: 'NABL / ISO 17025 Accredited Laboratory Verification',
+        documentId: 'REP-5555-89',
+        documentHash: '0x8f2d9c4b1e5a7039a48d612e4f019b85c7a2e310d54b8a91c',
+        documentIntegrityStatus: 'VERIFIED ON-CHAIN HASH MATCH',
+        status: 'CERTIFIED APPROVED (PASS)',
         parameters: [
           { name: 'Moisture', value: '17.5%', standard: '< 20%', status: 'Pass' },
           { name: 'HMF', value: '12 mg/kg', standard: '< 40 mg/kg', status: 'Pass' },

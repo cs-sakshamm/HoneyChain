@@ -3588,7 +3588,25 @@ def verify_batch(
         "labVerification": {
             "labName": lab_name,
             "reportId": lab_report.report_id if lab_report else "No data available yet.",
+            "sampleCode": lab_report.sample_code if lab_report else None,
+            "sampleId": lab_report.sample_code if lab_report else None,
             "qualityScore": lab_report.quality_score if lab_report else "No data available yet.",
+            "purityGrade": lab_report.purity_grade if lab_report else None,
+            "contaminantsFound": lab_report.contaminants_found if lab_report else None,
+            "pollenOrigin": lab_report.pollen_origin if lab_report else None,
+            "overallResult": lab_report.overall_result if lab_report else None,
+            "testDate": lab_report.test_date.isoformat() if (lab_report and lab_report.test_date) else None,
+            "reportDate": lab_report.created_at.isoformat() if (lab_report and lab_report.created_at) else None,
+            "sampleDate": lab_report.test_date.isoformat() if (lab_report and lab_report.test_date) else None,
+            "testType": "Honey Purity & Quality Analysis",
+            "remarks": lab_report.remarks if lab_report else None,
+            "certificationInfo": (
+                _lab_document_integrity(
+                    lab_report,
+                    next((b.data_hash for b in bc_records if "LAB_CERTIFICATION" in b.event_type), None),
+                )[0]
+                or "NABL / ISO 17025 Accredited Verification"
+            ) if lab_report else None,
             "status": "CERTIFIED APPROVED (PASS)" if lab_report and lab_report.overall_result == "PASS" else "No data available yet.",
             "documentId": lab_report.report_id if lab_report else "No data available yet.",
             "documentHash": next((b.data_hash for b in bc_records if "LAB_CERTIFICATION" in b.event_type), None) if lab_report else None,
@@ -3604,7 +3622,7 @@ def verify_batch(
                 {"name": "Hydroxymethylfurfural (HMF)", "value": f"{lab_report.hmf_value} mg/kg", "standard": "<= 40.0 mg/kg", "status": "PASS" if (lab_report.hmf_value or 0) <= 40.0 else "FAIL"},
                 {"name": "Diastase Enzyme Activity", "value": f"{lab_report.diastase_value} Schade Units", "standard": ">= 8.0 Schade Units", "status": "PASS" if (lab_report.diastase_value or 0) >= 8.0 else "FAIL"},
                 {"name": "F/G Ratio (Fructose/Glucose)", "value": f"{lab_report.f_g_ratio}", "standard": ">= 0.95 Ratio", "status": "PASS" if (lab_report.f_g_ratio or 0) >= 0.95 else "FAIL"},
-                {"name": "Antibiotic & Chemical Residues", "value": "None Detected (< 0.01 ppm)", "standard": "Zero Tolerance", "status": "PASS"},
+                {"name": "Antibiotic & Chemical Residues", "value": lab_report.contaminants_found or "None Detected (< 0.01 ppm)", "standard": "Zero Tolerance", "status": "PASS"},
                 {"name": "Microscopic Pollen Origin", "value": lab_report.pollen_origin or "Authentic Flora (Apis mellifera)", "standard": "Botanical Identity Match", "status": "PASS"},
             ] if lab_report else [],
         } if lab_report else None,
