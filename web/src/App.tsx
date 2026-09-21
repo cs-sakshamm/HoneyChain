@@ -98,6 +98,13 @@ export const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      <footer className="app-footer">
+        <p>
+          <span className="footer-text">Developed and Designed by</span> 
+          <span className="footer-signature">Team DataMineX</span>
+        </p>
+      </footer>
     </div>
   );
 };

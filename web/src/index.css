@@ -289,3 +289,29 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 18px;
   }
 }
+
+/* App Footer */
+.app-footer {
+  padding: 32px 24px;
+  text-align: center;
+  background-color: var(--surface-color);
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
+}
+
+.footer-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.footer-signature {
+  font-family: 'Dancing Script', cursive;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent-color);
+  margin-left: 8px;
+  display: inline-block;
+  transform: translateY(2px);
+}
+
