@@ -37,11 +37,23 @@ export interface AIAnalysisInfo {
   analyzedAt: string;
 }
 
+export interface CollectionInfo {
+  center: string;
+  collector: string;
+  receivedDate: string;
+  quantityKg: number | string;
+  status: string;
+}
+
 export interface ProcessingInfo {
   processor: string;
+  processingDate?: string;
   method: string;
-  quantityReceivedKg: number | string;
-  moistureAtReceipt: string;
+  inputQuantityKg?: number | string;
+  outputQuantityKg?: number | string;
+  quantityReceivedKg?: number | string;
+  moistureAtReceipt?: string;
+  status?: string;
 }
 
 export interface LabParameter {
@@ -102,7 +114,9 @@ export interface VerificationResponse {
   harvester: HarvesterInfo;
   iotTelemetry: IoTTelemetryInfo | null;
   aiAnalysis: AIAnalysisInfo | null;
-  collectionProcessing: ProcessingInfo | null;
+  collection: CollectionInfo | null;
+  processing: ProcessingInfo | null;
+  collectionProcessing: ProcessingInfo | null; // Keep for backward compatibility with real data
   labVerification: LabVerificationInfo | null;
   packaging: PackagingInfoData | null;
   blockchainVerification: BlockchainVerificationInfo;
@@ -160,11 +174,28 @@ export async function fetchVerificationData(batchId: string): Promise<Verificati
         acousticStatus: 'Normal',
         analyzedAt: new Date(Date.now() - 864000000).toISOString()
       },
+      collection: {
+        center: 'Nilgiris Collection Hub (Demo)',
+        collector: 'Ramesh K. (Demo)',
+        receivedDate: new Date(Date.now() - 777600000).toISOString(),
+        quantityKg: 100,
+        status: 'Quality Assured'
+      },
+      processing: {
+        processor: 'HoneyChain Central Processing (Demo)',
+        processingDate: new Date(Date.now() - 604800000).toISOString(),
+        method: 'Cold Filtration (Demo)',
+        inputQuantityKg: 100,
+        outputQuantityKg: 96,
+        status: 'Processed'
+      },
       collectionProcessing: {
         processor: 'HoneyChain Central Processing (Demo)',
+        processingDate: new Date(Date.now() - 604800000).toISOString(),
         method: 'Cold Filtration (Demo)',
-        quantityReceivedKg: 100,
-        moistureAtReceipt: '18.2%'
+        inputQuantityKg: 100,
+        outputQuantityKg: 96,
+        status: 'Processed'
       },
       labVerification: {
         labName: 'National Honey Testing Lab (DEMO)',
@@ -224,6 +255,8 @@ export async function fetchVerificationData(batchId: string): Promise<Verificati
       harvester: {} as any,
       iotTelemetry: null,
       aiAnalysis: null,
+      collection: null,
+      processing: null,
       collectionProcessing: null,
       labVerification: null,
       packaging: null,

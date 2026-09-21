@@ -62,7 +62,8 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
 
   const hasHarvester = !!data.harvester && data.harvester.name !== 'No data available yet.';
   const hasHive = !!data.harvester && data.harvester.hiveCode !== 'No data available yet.';
-  const hasCollection = !!data.collectionProcessing && data.collectionProcessing.processor !== 'No data available yet.';
+  const hasCollection = !!data.collection && data.collection.center !== 'No data available yet.' || !!data.collectionProcessing;
+  const hasProcessing = !!data.processing && data.processing.processor !== 'No data available yet.' || !!data.collectionProcessing;
   const hasLabTest = !!data.labVerification && data.labVerification.labName !== 'No data available yet.';
   const hasLabReport = hasLabTest && data.labVerification && data.labVerification.parameters && data.labVerification.parameters.length > 0;
   const hasPackaging = !!data.packaging && data.packaging.facility !== 'No data available yet.';
@@ -71,7 +72,8 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   const workflowNodes = [
     { id: 'harvester', title: t.nodes.harvester, active: hasHarvester },
     { id: 'hive', title: t.nodes.hive, active: hasHive },
-    { id: 'collection', title: t.nodes.collection, active: hasCollection },
+    { id: 'collection', title: 'COLLECTION', active: hasCollection },
+    { id: 'processing', title: 'PROCESSING', active: hasProcessing },
     { id: 'laboratory', title: t.nodes.laboratory, active: hasLabTest },
     { id: 'lab_report', title: t.nodes.lab_report, active: hasLabReport },
     { id: 'packaging', title: t.nodes.packaging, active: hasPackaging },
@@ -110,12 +112,22 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
       case 'collection':
         return (
           <div className="pv-kv-list">
-            <div className="pv-kv-row"><span className="pv-kv-label">Collection Center</span><span className="pv-kv-value">{data.collectionProcessing!.processor}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Processing Method</span><span className="pv-kv-value">{data.collectionProcessing!.method}</span></div>
-            {data.collectionProcessing!.quantityReceivedKg !== 'No data available yet.' && (
-              <div className="pv-kv-row"><span className="pv-kv-label">Quantity Received</span><span className="pv-kv-value">{data.collectionProcessing!.quantityReceivedKg} kg</span></div>
-            )}
-            <div className="pv-kv-row"><span className="pv-kv-label">Status</span><span className="pv-kv-value">Processed</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Collection Center</span><span className="pv-kv-value">{data.collection?.center || data.collectionProcessing!.processor}</span></div>
+            {data.collection?.collector && <div className="pv-kv-row"><span className="pv-kv-label">Collector</span><span className="pv-kv-value">{data.collection.collector}</span></div>}
+            <div className="pv-kv-row"><span className="pv-kv-label">Received Date</span><span className="pv-kv-value">{data.collection?.receivedDate ? new Date(data.collection.receivedDate).toLocaleDateString() : 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Quantity Received</span><span className="pv-kv-value">{data.collection?.quantityKg || data.collectionProcessing?.quantityReceivedKg} kg</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Status</span><span className="pv-kv-value">{data.collection?.status || 'Received'}</span></div>
+          </div>
+        );
+      case 'processing':
+        return (
+          <div className="pv-kv-list">
+            <div className="pv-kv-row"><span className="pv-kv-label">Processor</span><span className="pv-kv-value">{data.processing?.processor || data.collectionProcessing!.processor}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Processing Date</span><span className="pv-kv-value">{data.processing?.processingDate || data.collectionProcessing?.processingDate ? new Date((data.processing?.processingDate || data.collectionProcessing?.processingDate)!).toLocaleDateString() : 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Method</span><span className="pv-kv-value">{data.processing?.method || data.collectionProcessing!.method}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Input Quantity</span><span className="pv-kv-value">{data.processing?.inputQuantityKg || data.collectionProcessing?.inputQuantityKg} kg</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Output Quantity</span><span className="pv-kv-value">{data.processing?.outputQuantityKg || data.collectionProcessing?.outputQuantityKg} kg</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Status</span><span className="pv-kv-value">{data.processing?.status || data.collectionProcessing?.status || 'Processed'}</span></div>
           </div>
         );
       case 'laboratory':
