@@ -216,9 +216,9 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{node.title}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600 }}>Details</span>
-                <span style={{ fontSize: '18px' }}>→</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', background: 'var(--bg-color)', padding: '6px 14px', borderRadius: '9999px', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tap to view</span>
+                <span style={{ fontSize: '14px' }}>→</span>
               </div>
             </button>
           )
