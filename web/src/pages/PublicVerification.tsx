@@ -1,70 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { fetchVerificationData, VerificationResponse } from '../api/honeychainApi';
+import { i18nDict } from '../i18n';
 
 interface Props {
   batchId: string;
   language?: string;
 }
-
-const pvI18n: Record<string, any> = {
-  EN: {
-    loading: "Verifying record...",
-    error: "Verification service is temporarily unavailable.",
-    notFound: "Record not found",
-    title: "Product Verification",
-    pending: "PENDING",
-    verified: "VERIFIED",
-    traceId: "Trace ID",
-    nodes: {
-      harvester: "01 Harvester",
-      hive: "02 Hive",
-      collection: "03 Collection & Processing",
-      laboratory: "04 Laboratory Test",
-      lab_report: "05 Lab Report",
-      packaging: "06 Packaging"
-    },
-    traceability: "Complete Traceability",
-    close: "Close"
-  },
-  ES: {
-    loading: "Verificando registro...",
-    error: "El servicio de verificación no está disponible temporalmente.",
-    notFound: "Registro no encontrado",
-    title: "Verificación de Producto",
-    pending: "PENDIENTE",
-    verified: "VERIFICADO",
-    traceId: "ID de Rastreo",
-    nodes: {
-      harvester: "01 Cosechador",
-      hive: "02 Colmena",
-      collection: "03 Recolección y Procesamiento",
-      laboratory: "04 Prueba de Laboratorio",
-      lab_report: "05 Reporte de Laboratorio",
-      packaging: "06 Empaque"
-    },
-    traceability: "Trazabilidad Completa",
-    close: "Cerrar"
-  },
-  FR: {
-    loading: "Vérification du registre...",
-    error: "Le service de vérification est temporairement indisponible.",
-    notFound: "Registre introuvable",
-    title: "Vérification du Produit",
-    pending: "EN ATTENTE",
-    verified: "VÉRIFIÉ",
-    traceId: "ID de Trace",
-    nodes: {
-      harvester: "01 Récolteur",
-      hive: "02 Ruche",
-      collection: "03 Collecte & Traitement",
-      laboratory: "04 Test en Laboratoire",
-      lab_report: "05 Rapport de Laboratoire",
-      packaging: "06 Emballage"
-    },
-    traceability: "Traçabilité Complète",
-    close: "Fermer"
-  }
-};
 
 export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }) => {
   const [data, setData] = useState<VerificationResponse | null>(null);
@@ -72,7 +13,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   const [error, setError] = useState<string | null>(null);
   const [activeStage, setActiveStage] = useState<string | null>(null);
 
-  const t = pvI18n[language] || pvI18n['EN'];
+  const t = (i18nDict[language] || i18nDict['EN']).pv;
 
   const loadData = async () => {
     setLoading(true);

@@ -1,45 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { PublicVerification } from './pages/PublicVerification';
+import { languages, i18nDict } from './i18n';
 
-type ModalKey = 'Home' | 'About' | 'Traceability' | 'Technology' | 'Laboratory' | 'Contact' | null;
+type ModalKey = 'About' | 'Traceability' | 'Technology' | 'Laboratory' | 'Contact' | null;
 
-const i18n: Record<string, any> = {
-  EN: {
-    greeting: "Welcome to HoneyChain",
-    aboutIntro: "The world's first cryptographically secure provenance platform for authentic, unadulterated honey.",
-    verifyOrigin: "Verify Origin",
-    enterBatch: "Enter a batch identifier to inspect the tamper-evident provenance.",
-    batchIdLabel: "Batch ID",
-    verifyBtn: "VERIFY",
-    footerCopy: "HoneyChain. Team DataMineX.",
-    nav: { About: "About", Traceability: "Traceability", Technology: "Technology", Laboratory: "Laboratory", Contact: "Contact" },
-    close: "Close"
-  },
-  ES: {
-    greeting: "Bienvenido a HoneyChain",
-    aboutIntro: "La primera plataforma de procedencia criptográficamente segura del mundo para miel auténtica y sin adulterar.",
-    verifyOrigin: "Verificar Origen",
-    enterBatch: "Ingrese un identificador de lote para inspeccionar la procedencia a prueba de manipulaciones.",
-    batchIdLabel: "ID de Lote",
-    verifyBtn: "VERIFICAR",
-    footerCopy: "HoneyChain. Equipo DataMineX.",
-    nav: { About: "Acerca de", Traceability: "Trazabilidad", Technology: "Tecnología", Laboratory: "Laboratorio", Contact: "Contacto" },
-    close: "Cerrar"
-  },
-  FR: {
-    greeting: "Bienvenue sur HoneyChain",
-    aboutIntro: "La première plateforme de provenance cryptographiquement sécurisée au monde pour un miel authentique et non frelaté.",
-    verifyOrigin: "Vérifier l'Origine",
-    enterBatch: "Entrez un identifiant de lot pour inspecter la provenance inviolable.",
-    batchIdLabel: "ID du Lot",
-    verifyBtn: "VÉRIFIER",
-    footerCopy: "HoneyChain. Équipe DataMineX.",
-    nav: { About: "À propos", Traceability: "Traçabilité", Technology: "Technologie", Laboratory: "Laboratoire", Contact: "Contact" },
-    close: "Fermer"
-  }
-};
-
-const HoneyChainLogo = ({ size = 28, showWordmark = true }) => {
+const HoneyChainLogo = ({ size = 28, showWordmark = true, text = "HoneyChain" }) => {
   return (
     <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => {
       window.history.pushState({}, '', `/`);
@@ -61,7 +26,7 @@ const HoneyChainLogo = ({ size = 28, showWordmark = true }) => {
           letterSpacing: 0.5,
           lineHeight: 1
         }}>
-          HoneyChain
+          {text}
         </span>
       )}
     </div>
@@ -75,7 +40,7 @@ export const App: React.FC = () => {
   const [language, setLanguage] = useState<string>('EN');
   const [showLangMenu, setShowLangMenu] = useState(false);
   
-  const t = i18n[language] || i18n['EN'];
+  const t = i18nDict[language] || i18nDict['EN'];
 
   // Theme Management
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -201,10 +166,12 @@ export const App: React.FC = () => {
             </button>
             
             {showLangMenu && (
-              <div className="language-dropdown">
-                <button onClick={() => { setLanguage('EN'); setShowLangMenu(false); }}>English</button>
-                <button onClick={() => { setLanguage('ES'); setShowLangMenu(false); }}>Español</button>
-                <button onClick={() => { setLanguage('FR'); setShowLangMenu(false); }}>Français</button>
+              <div className="language-dropdown" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {languages.map(lang => (
+                  <button key={lang.code} onClick={() => { setLanguage(lang.code); setShowLangMenu(false); }}>
+                    {lang.name}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -215,7 +182,7 @@ export const App: React.FC = () => {
       <main className="app-main">
         {/* Centered Logo in the middle of the screen */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px', textAlign: 'center' }}>
-          <HoneyChainLogo size={42} showWordmark={true} />
+          <HoneyChainLogo size={42} showWordmark={true} text={t.logoText} />
           {!currentBatchId && (
             <div style={{ marginTop: '24px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: "'Manrope', sans-serif" }}>
