@@ -179,18 +179,25 @@ class _StartHarvestingScreenState extends State<StartHarvestingScreen> {
                 );
 
                 if (!mounted) return;
-                Navigator.pop(context);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? 'Harvest logged & sent to Collection & Processing!'
-                          : 'Harvest logged successfully.',
+                if (success) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Harvest logged & request sent to Collection & Processing!'),
+                      backgroundColor: AppConstants.success,
                     ),
-                    backgroundColor: AppConstants.success,
-                  ),
-                );
+                  );
+                } else {
+                  // Real failure (401/403/409/422/5xx/unreachable backend):
+                  // never claim success — surface the backend's own message.
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(workflowCtrl.errorMessage ??
+                          'Failed to send request. Please try again.'),
+                      backgroundColor: AppConstants.error,
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: context.colors.primary,

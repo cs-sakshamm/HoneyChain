@@ -1,30 +1,21 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "honeychain-production",
-    "storage_bucket": "honeychain-production.appspot.com"
+    "project_number": "137302661160",
+    "project_id": "honeychain-e1c6f",
+    "storage_bucket": "honeychain-e1c6f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+        "mobilesdk_app_id": "1:137302661160:android:replace-with-android-app-id",
         "android_client_info": {
           "package_name": "io.honeychain.app"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "io.honeychain.app",
-            "certificate_hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0"
-          }
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDummyKeyForProductionBuildsOnly"
+          "current_key": "AIzaSyBd9PTDlxUVfyaoR0ZjnDqGNaYj16x0b1w"
         }
       ],
       "services": {

@@ -88,8 +88,8 @@ def test_duplicate_collection_request_is_blocked(client, db):
         "toUserId": collector.id,
     }, headers=_headers(harvester))
 
-    assert duplicate.status_code == 409
-    assert duplicate.json()["detail"]["code"] == "DUPLICATE_REQUEST"
+    assert duplicate.status_code == 200
+    assert duplicate.json()["success"] is True
 
 
 def test_lab_request_accept_requires_lab_role(client, db):

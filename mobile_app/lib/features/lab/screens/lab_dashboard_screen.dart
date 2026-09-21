@@ -17,8 +17,6 @@ import '../../../core/widgets/workflow_pills_section.dart';
 import '../../collection/screens/batch_timeline_screen.dart';
 import '../../collection/screens/nearest_centres_screen.dart';
 import '../../profile/controllers/user_controller.dart';
-import '../../verification/controllers/verification_controller.dart';
-import '../../verification/screens/lab_verification_screen.dart';
 import 'lab_report_screen.dart';
 
 class LabDashboardScreen extends StatefulWidget {
@@ -39,11 +37,6 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = context.read<UserController>().user;
-      final userId = user.id ?? user.email;
-      if (userId.isNotEmpty) {
-        context.read<VerificationController>().loadLabVerification(userId);
-      }
       context.read<WorkflowController>().fetchAllData();
     });
   }
@@ -80,11 +73,21 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogCtx);
-              await context.read<WorkflowController>().rejectRequest(req.id, actorRole: 'LAB', reason: reasonCtrl.text.trim());
+              final wfCtrl = context.read<WorkflowController>();
+              final ok = await wfCtrl.rejectRequest(req.id, actorRole: 'LAB', reason: reasonCtrl.text.trim());
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sample rejected & recorded.'), backgroundColor: AppConstants.error),
-                );
+                if (ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sample rejected & recorded.'), backgroundColor: AppConstants.error),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(wfCtrl.errorMessage ?? 'Failed to reject sample. Please try again.'),
+                      backgroundColor: AppConstants.error,
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
@@ -371,9 +374,8 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> {
     bool showConductTest = false,
     bool isRejected = false,
   }) {
-    final verCtrl = context.watch<VerificationController>();
-    final userCtrl = context.watch<UserController>();
-    final isFullyVerified = verCtrl.labVerification.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
+    // Profile verification is still enforced via ProfileGuard before every
+    // privileged action; the home list no longer renders the banner.
     final formattedDate = DateFormat('MMM dd, yyyy • h:mm a').format(req.createdAt);
 
     return AppCard(
@@ -484,15 +486,25 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> {
                       child: ElevatedButton(
                         onPressed: () async {
                           if (!ProfileGuard.checkLabVerificationOrPrompt(context)) return;
-                          await context.read<WorkflowController>().acceptRequest(req.id, actorRole: 'LAB');
+                          final wfCtrl = context.read<WorkflowController>();
+                          final ok = await wfCtrl.acceptRequest(req.id, actorRole: 'LAB');
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Sample accepted! Ready to conduct chemical & purity test.')),
-                            );
+                            if (ok) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Sample accepted! Ready to conduct chemical & purity test.')),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(wfCtrl.errorMessage ?? 'Failed to accept sample. Please try again.'),
+                                  backgroundColor: AppConstants.error,
+                                ),
+                              );
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isFullyVerified ? context.colors.primary : context.textMutedColor,
+                          backgroundColor: context.colors.primary,
                           foregroundColor: context.colors.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -572,7 +584,7 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> {
                       icon: const Icon(Icons.biotech_rounded, size: 18),
                       label: const Text('Conduct 6-Parameter Test & Generate Report'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isFullyVerified ? context.colors.primary : context.textMutedColor,
+                        backgroundColor: context.colors.primary,
                         foregroundColor: context.colors.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -609,213 +621,5 @@ class _LabDashboardScreenState extends State<LabDashboardScreen> {
         );
   }
 
-  Widget _buildVerificationBanner(BuildContext context, int count, bool isVerified) {
-    final verCtrl = context.watch<VerificationController>();
-    final userCtrl = context.watch<UserController>();
-    final labVer = verCtrl.labVerification;
-    final isFullyVerified = labVer.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
-    final int completedCount = isFullyVerified ? 3 : labVer.completedStepsCount;
-    final double progress = (completedCount / 3.0).clamp(0.0, 1.0);
-    final int percentage = (progress * 100).round();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final String statusBadgeText;
-    final Color statusColor;
-    final Color statusBgColor;
-
-    if (isFullyVerified || completedCount == 3) {
-      statusBadgeText = 'Profile Verified (3 of 3)';
-      statusColor = context.successColor;
-      statusBgColor = context.successBgColor;
-    } else if (completedCount == 0) {
-      statusBadgeText = 'Profile Setup (0 of 3)';
-      statusColor = context.warningColor;
-      statusBgColor = context.warningBgColor;
-    } else {
-      statusBadgeText = 'Partially Verified ($completedCount of 3)';
-      statusColor = context.colors.primary;
-      statusBgColor = context.primarySoftColor;
-    }
-
-    final String supportingText;
-    if (isFullyVerified) {
-      supportingText = 'Profile Verified — Laboratory Testing access enabled.';
-    } else {
-      supportingText = 'Complete profile verification to accept and perform laboratory testing requests.';
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppConstants.space16),
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isFullyVerified
-              ? context.successColor.withValues(alpha: 0.5)
-              : (isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isFullyVerified
-                ? context.successColor.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(
-                      isFullyVerified ? Icons.verified_user_rounded : Icons.science_rounded,
-                      size: 20,
-                      color: statusColor,
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Lab Profile Verification',
-                        style: GoogleFonts.manrope(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: context.textPrimaryColor,
-                          letterSpacing: -0.2,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBgColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  statusBadgeText,
-                  style: GoogleFonts.manrope(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor.withValues(alpha: 0.5),
-                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '$percentage%',
-                style: GoogleFonts.manrope(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: statusColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              _buildMiniCheck(context, 'Lab Details', labVer.isStep2LabDetailsComplete),
-              _buildMiniCheck(context, 'KYC & Scope', labVer.isStep3KycComplete),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  supportingText,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: context.textSecondaryColor,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LabVerificationScreen()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isFullyVerified ? context.successBgColor : context.primarySoftColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isFullyVerified ? context.successColor.withValues(alpha: 0.4) : context.borderColor,
-                    ),
-                  ),
-                  child: Text(
-                    isFullyVerified ? 'View Badge ✓' : 'Verify Profile →',
-                    style: GoogleFonts.manrope(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isFullyVerified ? context.successColor : context.textPrimaryColor,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniCheck(BuildContext context, String title, bool isDone) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-          size: 14,
-          color: isDone ? context.successColor : context.textMutedColor,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: isDone ? FontWeight.w600 : FontWeight.w500,
-            color: isDone ? context.textPrimaryColor : context.textMutedColor,
-          ),
-        ),
-      ],
-    );
-  }
 }
 

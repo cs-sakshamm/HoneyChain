@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 import '../models/workflow_request.dart';
 import '../services/auth_token_store.dart';
+import '../services/workflow_realtime_service.dart';
 
 class WorkflowController extends ChangeNotifier {
   List<WorkflowRequest> _requests = [];
@@ -19,6 +20,11 @@ class WorkflowController extends ChangeNotifier {
   final String apiUrl;
   final http.Client _client;
 
+  /// Realtime request delivery: any server-pushed event triggers a REST
+  /// refetch (the database stays the source of truth). Reconnection after a
+  /// drop also refetches, so nothing created while offline is missed.
+  WorkflowRealtimeService? _realtime;
+
   WorkflowController({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
         apiUrl = baseUrl ?? _resolveApiUrl() {
@@ -26,9 +32,32 @@ class WorkflowController extends ChangeNotifier {
     // constructed at app startup, before login, and an unauthenticated call
     // would just produce a 401 ("Authentication token is required").
     // AuthRouter triggers a fresh fetch the moment a user signs in.
+    if (kDebugMode) {
+      debugPrint('[WorkflowController] API base URL: $apiUrl');
+    }
     if (AuthTokenStore.hasToken) {
       fetchAllData();
     }
+  }
+
+  /// Start listening for realtime workflow events (call after login).
+  void startRealtime() {
+    if (!AuthTokenStore.hasToken) return;
+    _realtime ??= WorkflowRealtimeService(onEvent: () {
+      // Fire-and-forget refresh — never blocks the event loop.
+      fetchAllData();
+    });
+    _realtime!.connect();
+  }
+
+  void stopRealtime() {
+    _realtime?.disconnect();
+  }
+
+  @override
+  void dispose() {
+    _realtime?.dispose();
+    super.dispose();
   }
 
   static String _resolveApiUrl() {
@@ -47,6 +76,39 @@ class WorkflowController extends ChangeNotifier {
     errorMessage = null;
     lastErrorCode = null;
     notifyListeners();
+  }
+
+  /// Maps a low-level HTTP client failure to a precise user-facing message.
+  /// The generic "Unable to reach the backend" is reserved for genuine
+  /// connection failures (SocketException / Connection refused) — NOT for
+  /// timeouts, which are distinguished, and NOT for HTTP errors (which carry
+  /// their own status codes and are handled before this runs).
+  static String _describeNetworkError(Object e) {
+    final s = e.toString();
+    if (s.contains('TimeoutException')) {
+      return 'The backend did not respond in time (request timed out after 15s). '
+          'Please try again.';
+    }
+    if (s.contains('Connection refused') ||
+        s.contains('SocketException') ||
+        s.contains('Failed host lookup') ||
+        s.contains('Network is unreachable')) {
+      return 'Unable to reach the backend. Please verify the API server is running.';
+    }
+    // Unknown transport failure (e.g. handshake error): keep the original
+    // message visible in debug builds to aid diagnosis.
+    return kDebugMode
+        ? 'Request failed: $s'
+        : 'Unable to reach the backend. Please verify the API server is running.';
+  }
+
+  void _logRequest(String method, Uri uri, {http.Response? res, Object? error}) {
+    if (!kDebugMode) return;
+    if (error != null) {
+      debugPrint('[API] $method ${uri.path} -> ERROR ${error.runtimeType}');
+    } else {
+      debugPrint('[API] $method ${uri.path} -> HTTP ${res!.statusCode} (${res.reasonPhrase})');
+    }
   }
 
   void _handleErrorResponse(http.Response res, String defaultMessage) {
@@ -286,49 +348,59 @@ class WorkflowController extends ChangeNotifier {
     return 'HARVESTER';
   }
 
+  /// Request timeout for workflow API calls.
+  ///
+  /// Backend calls include bcrypt-verified JWT round-trips and cloud
+  /// PostgreSQL latency (~2s measured locally). Budgets below that aborted
+  /// legitimate requests and surfaced them as false failures. 15s matches
+  /// HiveStorageService and the auth controller's budget.
+  static const Duration _requestTimeout = Duration(seconds: 15);
+
   // ── Fetch all requests from backend ──
+  // Single source of truth: GET /api/requests (role-scoped server-side).
+  // There is deliberately NO local fallback or secondary endpoint — a failed
+  // fetch must surface its real error instead of silently showing stale or
+  // empty request data (this previously hid ACCEPTED updates from the
+  // harvester behind a call to /api/batches, which does not exist).
   Future<void> fetchAllData() async {
     isLoading = true;
     errorMessage = null;
+    lastErrorCode = null;
     notifyListeners();
 
     try {
-      final reqResponse = await _client
-          .get(Uri.parse('$apiUrl/requests'), headers: _headers)
-          .timeout(const Duration(seconds: 4));
+      final reqUri = Uri.parse('$apiUrl/requests');
+      final reqResponse = await _client.get(reqUri, headers: _headers).timeout(_requestTimeout);
+      _logRequest('GET', reqUri, res: reqResponse);
 
       if (reqResponse.statusCode == 200) {
         final List<dynamic> data = json.decode(reqResponse.body);
         _requests = data.map((json) => WorkflowRequest.fromJson(json)).toList();
       } else {
-        await _fetchBatchesFallback();
+        // Real API rejection (401 expired token, 403 role, 404/422/409/500):
+        // surface the backend's own message instead of masking it.
+        _handleErrorResponse(
+          reqResponse,
+          'Failed to load requests (HTTP ${reqResponse.statusCode}).',
+        );
       }
     } catch (e) {
-      debugPrint('[WorkflowController] Error fetching requests: $e. Using fallback.');
-      await _fetchBatchesFallback();
+      debugPrint('[WorkflowController] Error fetching requests: $e');
+      errorMessage = _describeNetworkError(e);
+      lastErrorCode = null;
+      notifyListeners();
     } finally {
       isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> _fetchBatchesFallback() async {
-    try {
-      final response = await _client
-          .get(Uri.parse('$apiUrl/batches'), headers: _headers)
-          .timeout(const Duration(seconds: 4));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        _requests = data.map((json) => WorkflowRequest.fromJson(json)).toList();
-      }
-    } catch (e) {
-      debugPrint('[WorkflowController] Batches fallback error: $e');
-    }
-  }
-
   Future<void> fetchBatches() async => fetchAllData();
 
   // ── 0. Fetch Nearest Verified Centres with Distance (KM) ──
+  /// Returns the backend's facility records for the requested centre type.
+  /// Empty on failure — callers must show an error/retry state, never fake
+  /// centres. `lat`/`lng` enable server-side haversine distance.
   Future<List<Map<String, dynamic>>> fetchNearestCenters({
     required String targetRole,
     double? lat,
@@ -350,17 +422,41 @@ class WorkflowController extends ChangeNotifier {
       };
 
       final uri = Uri.parse('$apiUrl/centers/nearest').replace(queryParameters: queryParams);
-      final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 5));
+      final res = await _client.get(uri, headers: _headers).timeout(_requestTimeout);
+      _logRequest('GET', uri, res: res);
 
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final List<dynamic> centers = data['centers'] ?? [];
         return centers.map((c) => Map<String, dynamic>.from(c)).toList();
       }
+      // Non-200: report failure through the exception path below so screens
+      // show an error state instead of an empty "no centres" list.
+      throw Exception('HTTP ${res.statusCode} loading centers');
     } catch (e) {
       debugPrint('[WorkflowController] fetchNearestCenters error: $e');
+      rethrow;
     }
-    return [];
+  }
+
+  /// Full center + license details for the "View Details" sheet.
+  Future<Map<String, dynamic>?> fetchCenterDetails(String centerId, {double? lat, double? lng}) async {
+    try {
+      final queryParams = <String, String>{
+        if (lat != null) 'lat': lat.toString(),
+        if (lng != null) 'lng': lng.toString(),
+      };
+      final uri = Uri.parse('$apiUrl/centers/$centerId').replace(queryParameters: queryParams);
+      final res = await _client.get(uri, headers: _headers).timeout(_requestTimeout);
+      _logRequest('GET', uri, res: res);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        return data['center'] is Map<String, dynamic> ? data['center'] as Map<String, dynamic> : null;
+      }
+    } catch (e) {
+      debugPrint('[WorkflowController] fetchCenterDetails error: $e');
+    }
+    return null;
   }
 
   // ── 1. Create Harvest & Send Request to Target Collection Centre ──
@@ -386,7 +482,7 @@ class WorkflowController extends ChangeNotifier {
               'notes': notes,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (harvestRes.statusCode == 200 || harvestRes.statusCode == 201) {
         final data = json.decode(harvestRes.body);
@@ -401,6 +497,7 @@ class WorkflowController extends ChangeNotifier {
                 body: json.encode({
                   'batchId': batchId,
                   'harvesterId': harvesterName,
+                  if (hiveId != null) 'hiveId': hiveId,
                   'toUserId': targetCollectorId,
                   'fromRole': 'HARVESTER',
                   'toRole': 'COLLECTOR_PROCESSOR',
@@ -409,7 +506,7 @@ class WorkflowController extends ChangeNotifier {
                   'notes': notes.isNotEmpty ? notes : 'Harvested honey sent to nearest collection center',
                 }),
               )
-              .timeout(const Duration(seconds: 5));
+              .timeout(_requestTimeout);
 
           if (reqRes.statusCode == 200 || reqRes.statusCode == 201) {
             await fetchAllData();
@@ -425,6 +522,11 @@ class WorkflowController extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('createHarvestAndRequest error: $e');
+      // Surface the real failure (timeout/unreachable backend) so no screen
+      // can show a success message when nothing was persisted.
+      errorMessage = _describeNetworkError(e);
+      lastErrorCode = null;
+      notifyListeners();
     }
     return false;
   }
@@ -447,7 +549,7 @@ class WorkflowController extends ChangeNotifier {
               if (notes != null) 'notes': notes,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         _updateLocalStatus(requestId, RequestStatus.accepted);
@@ -483,7 +585,7 @@ class WorkflowController extends ChangeNotifier {
               'reason': reason ?? 'Rejected by reviewer',
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         _updateLocalStatus(requestId, RequestStatus.denied);
@@ -529,7 +631,7 @@ class WorkflowController extends ChangeNotifier {
               'notes': notes,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200) {
         await fetchAllData();
@@ -582,7 +684,7 @@ class WorkflowController extends ChangeNotifier {
               'notes': notes ?? 'Certified laboratory report',
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200) {
         try {
@@ -620,7 +722,7 @@ class WorkflowController extends ChangeNotifier {
               'notes': notes ?? 'Lab approved; forwarded to packaging facility',
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200) {
         await fetchAllData();
@@ -660,7 +762,7 @@ class WorkflowController extends ChangeNotifier {
               'notes': notes ?? 'Bottled in sterile ISO facility with tamper-evident seal',
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200) {
         await fetchAllData();
@@ -684,7 +786,7 @@ class WorkflowController extends ChangeNotifier {
             headers: _headers,
             body: json.encode({'status': newStatus.name}),
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(_requestTimeout);
       if (res.statusCode == 200 || res.statusCode == 201) {
         _updateLocalStatus(requestId, newStatus);
         await fetchAllData();
@@ -701,7 +803,7 @@ class WorkflowController extends ChangeNotifier {
     try {
       final res = await _client
           .get(Uri.parse('$apiUrl/verify?batch=$batchId'), headers: _headers)
-          .timeout(const Duration(seconds: 5));
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200) {
         return json.decode(res.body);

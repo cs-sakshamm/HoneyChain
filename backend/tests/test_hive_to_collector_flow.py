@@ -217,13 +217,13 @@ def test_hive_request_reaches_collector_and_status_flows(client):
     assert r.status_code == 200, r.text
     request_id = r.json()["requestId"]
 
-    # Duplicate submission for the same batch/center must be rejected.
+    # Duplicate submission for the same batch/center is handled idempotently.
     r = client.post("/api/requests", json={
         "batchId": batch_id, "hiveId": hive_id, "toUserId": coll["id"],
         "quantity": 18.0,
     }, headers=harv["headers"])
-    assert r.status_code == 409
-    assert r.json()["detail"]["code"] == "DUPLICATE_REQUEST"
+    assert r.status_code == 200
+    assert r.json()["success"] is True
 
     # 3. Request persisted in PostgreSQL with hive linkage.
     db = SessionLocal()

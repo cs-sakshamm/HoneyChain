@@ -104,19 +104,24 @@ class _LabReportScreenState extends State<LabReportScreen> {
     }
 
     final reportRes = workflowCtrl.lastLabReportResult;
-    final reportId = (reportRes?['reportId'] as String?) ?? 'LAB-RPT-2026-${widget.request.batchId.replaceAll('BATCH-', '').replaceAll('HC-', '')}';
+    // The backend response is the ONLY source for the report id and hash.
+    // A missing value stays blank — fabricating one here would put a fake
+    // id on an official-looking certificate.
+    final reportId = (reportRes?['reportId'] as String?) ?? '';
     final blockchain = reportRes?['blockchain'] as Map<String, dynamic>?;
     final sigHash = (blockchain?['tx_hash'] as String?) ??
         (blockchain?['data_hash'] as String?) ??
         (widget.request.txHash != null && widget.request.txHash!.isNotEmpty
             ? widget.request.txHash!
-            : '0x${(reportId + widget.request.batchId).hashCode.abs().toRadixString(16).padLeft(16, '0')}');
+            : '');
 
     setState(() {
       _isReportGenerated = true;
       _generatedReport = {
         'reportId': reportId,
-        'qrTraceabilityId': 'QR-TRC-2026-${widget.request.batchId.replaceAll('BATCH-', '').replaceAll('HC-', '')}',
+        // Traceability id comes from the backend certification code when
+        // provided; otherwise show the real batch id — no invented ids.
+        'qrTraceabilityId': (reportRes?['certificationCode'] as String?) ?? widget.request.batchId,
         'overallResult': isOverallPass ? 'PASS' : 'FAIL',
         'qualityScore': calculatedScore,
         'moisture': moisture,
@@ -349,10 +354,10 @@ class _LabReportScreenState extends State<LabReportScreen> {
             children: [
               Text('Official Report Metadata', style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimaryColor)),
               const SizedBox(height: 12),
-              _buildReportRow('Report ID', rep['reportId']),
+              _buildReportRow('Report ID', (rep['reportId'] as String).isEmpty ? 'Not Provided' : rep['reportId'] as String),
               _buildReportRow('QR Traceability ID', rep['qrTraceabilityId']),
               _buildReportRow('Batch ID', widget.request.batchId),
-              _buildReportRow('Tester Signature Hash', (rep['testerSignatureHash'] as String).substring(0, 24) + '...'),
+              _buildReportRow('Tester Signature Hash', (rep['testerSignatureHash'] as String).isEmpty ? 'Pending On-Chain' : (rep['testerSignatureHash'] as String).substring(0, 24) + '...'),
             ],
           ),
         ),
@@ -375,27 +380,25 @@ class _LabReportScreenState extends State<LabReportScreen> {
         const SizedBox(height: 24),
 
         if (isPass) ...[
-          SizedBox(
+          Container(
             width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: () {
-                if (!ProfileGuard.checkLabVerificationOrPrompt(context)) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => NearestCentresScreen(
-                      targetRole: 'PACKAGING',
-                      batchId: widget.request.batchId,
-                      requestId: widget.request.id,
-                      quantity: widget.request.estimatedQuantityKg,
-                      originLocation: widget.request.location,
-                    ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: context.successBgColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.successColor.withValues(alpha: 0.4)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.verified_rounded, size: 20, color: context.successColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Certified & Automatically Dispatched to DataMineX Packaging',
+                    style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w700, color: context.successColor),
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: context.colors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-              child: Text('Forward to Packaging Manager', style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.onPrimary)),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),

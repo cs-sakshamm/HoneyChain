@@ -76,6 +76,9 @@ class _AuthRouterState extends State<AuthRouter> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         userController.reloadProfile();
         workflowController.fetchAllData();
+        // Realtime request delivery: opens the authenticated WebSocket so
+        // incoming/outgoing workflow events refresh dashboards instantly.
+        workflowController.startRealtime();
         // Hives are PostgreSQL-backed and need the fresh session token;
         // without this the dashboard can show a stale/other-user list.
         hiveController.setActiveBeekeeper(userController.user.id);

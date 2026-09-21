@@ -76,6 +76,11 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
       if (userId.isNotEmpty) {
         context.read<TelemetryAlertController>().startMonitoring(userId: userId);
       }
+      // Re-fetch requests from the backend so statuses updated elsewhere
+      // (e.g. Collection & Processing accepting a request) are shown when the
+      // harvester opens the dashboard. Without this the dashboard only ever
+      // saw the state captured at login.
+      context.read<WorkflowController>().fetchAllData();
     });
   }
 
@@ -140,8 +145,12 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
       children: [
         SafeArea(
           bottom: false,
-          child: CustomScrollView(
-            slivers: [
+          child: RefreshIndicator(
+            onRefresh: () => context.read<WorkflowController>().fetchAllData(),
+            color: context.primaryDarkColor,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(AppConstants.space24),
@@ -378,9 +387,10 @@ class _HarvesterDashboardScreenState extends State<HarvesterDashboardScreen> {
           const SliverToBoxAdapter(
             child: SizedBox(height: 120), // clear the floating bottom nav
           ),
-        ],
-      ),
-    ),
+              ],
+            ),
+          ),
+        ),
 
     // Unignorable Critical Alert Modal Overlay
     if (criticalAlert != null)

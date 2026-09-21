@@ -220,7 +220,27 @@ class HiveAlert(Base):
     )
 
 
-class CollectionCentre(Base):
+class CenterLicenseMixin:
+    """Shared license/registration detail columns for facility tables.
+
+    SQLAlchemy declarative mixin: adds identical columns to collection
+    centres, labs and packaging facilities without altering __tablename__ or
+    the existing column order. All fields are nullable: when an official
+    license has not been provided/verified yet, the API reports that honestly
+    ("Pending Verification") instead of inventing data.
+    """
+
+    license_type = Column(String(128), nullable=True)
+    issuing_authority = Column(String(128), nullable=True)
+    license_issue_date = Column(DateTime, nullable=True)
+    license_expiry_date = Column(DateTime, nullable=True)
+    # verification_status: Pending Verification | Verified (only ever set to
+    # Verified by an authoritative check, never assumed).
+    verification_status = Column(String(64), default="Pending Verification")
+    verification_source = Column(String(128), nullable=True)
+
+
+class CollectionCentre(Base, CenterLicenseMixin):
     __tablename__ = "collection_centres"
 
     id = Column(String(64), primary_key=True, default=generate_uuid)
@@ -306,7 +326,7 @@ class ProcessingBatch(Base):
     created_at = Column(DateTime, default=utcnow_naive)
 
 
-class Lab(Base):
+class Lab(Base, CenterLicenseMixin):
     __tablename__ = "labs"
 
     id = Column(String(64), primary_key=True, default=generate_uuid)
@@ -323,7 +343,7 @@ class Lab(Base):
     created_at = Column(DateTime, default=utcnow_naive)
 
 
-class PackagingFacility(Base):
+class PackagingFacility(Base, CenterLicenseMixin):
     __tablename__ = "packaging_facilities"
 
     id = Column(String(64), primary_key=True, default=generate_uuid)

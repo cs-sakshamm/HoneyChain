@@ -68,6 +68,23 @@ UserRole userRoleFromString(String? roleStr) {
   return UserRole.harvester;
 }
 
+/// Human-readable role name (used by the DEMO ONLY Google bypass to name the
+/// demo account; harmless elsewhere).
+extension UserRoleDisplayName on UserRole {
+  String get displayName {
+    switch (this) {
+      case UserRole.harvester:
+        return 'Harvester';
+      case UserRole.collectionProcessing:
+        return 'Collection & Processing';
+      case UserRole.labTesting:
+        return 'Lab Testing';
+      case UserRole.packaging:
+        return 'Packaging';
+    }
+  }
+}
+
 /// Production Controller managing business authentication & session state backed by PostgreSQL API
 class AuthController extends ChangeNotifier {
   final AuthService _authService;
@@ -131,6 +148,40 @@ class AuthController extends ChangeNotifier {
   /// signs out based on the result.
   Future<void> _restoreSession() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // DEMO ONLY: Google Auth temporarily bypassed.
+      // A demo (bypass) session is a pure backend JWT with no Firebase
+      // identity behind it, so it cannot be re-exchanged. Instead it is
+      // re-validated by fetching the profile with the stored token and kept
+      // unless the backend rejects it (expired/revoked).
+      if (prefs.getString(_SessionKeys.profileAuthProvider) == 'local') {
+        final checkRes = await _client
+            .get(Uri.parse('$_baseUrl/api/profile'), headers: _headers)
+            .timeout(_authTimeout);
+        if (checkRes.statusCode == 200) {
+          final data = jsonDecode(checkRes.body);
+          final u = data['user'] is Map<String, dynamic>
+              ? data['user'] as Map<String, dynamic>
+              : null;
+          if (u != null) {
+            if (u['id'] != null) await prefs.setString(_SessionKeys.profileId, u['id']);
+            if (u['name'] != null) await prefs.setString(_SessionKeys.profileName, u['name']);
+            if (u['email'] != null) await prefs.setString(_SessionKeys.profileEmail, u['email']);
+            if (u['phone'] != null) await prefs.setString(_SessionKeys.profilePhone, u['phone']);
+            if (u['role'] != null) {
+              await prefs.setString(_SessionKeys.profileRole, u['role']);
+              _selectedRole = userRoleFromString(u['role']);
+            }
+          }
+          notifyListeners();
+          return;
+        }
+        // Token rejected/expired: fall through to a normal sign-out below.
+        await signOut();
+        return;
+      }
+
       final idToken = await _authService.getIdToken();
       if (idToken == null || idToken.isEmpty) {
         // No live Firebase session behind the stored token — it cannot be
@@ -138,7 +189,6 @@ class AuthController extends ChangeNotifier {
         await signOut();
         return;
       }
-      final prefs = await SharedPreferences.getInstance();
 
       // Restore through the SAME provider the session was created with.
       // Phone-OTP sessions re-exchange via /api/auth/phone. Google sessions
@@ -155,10 +205,12 @@ class AuthController extends ChangeNotifier {
           : (_authService.currentUser?.phoneNumber ?? '').isNotEmpty;
 
       final savedRole = prefs.getString(_SessionKeys.profileRole);
+      final restoreUrl =
+          Uri.parse('$_baseUrl${isPhoneSession ? '/api/auth/phone' : '/api/auth/google'}');
       final response = await _client
           .post(
-            Uri.parse('$_baseUrl${isPhoneSession ? '/api/auth/phone' : '/api/auth/google'}'),
-            headers: _headers,
+            restoreUrl,
+            headers: isPhoneSession ? _headers : _firebaseBearerHeaders(idToken),
             body: jsonEncode(
               isPhoneSession
                   // No role: the backend falls back to the existing account
@@ -168,7 +220,6 @@ class AuthController extends ChangeNotifier {
                   // the SAME (email, role) account row — omitting it would
                   // default to HARVESTER and fork duplicates for other roles.
                   : {
-                      'idToken': idToken,
                       if (savedRole != null && savedRole.isNotEmpty) 'role': savedRole,
                     },
             ),
@@ -228,6 +279,11 @@ class AuthController extends ChangeNotifier {
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+      };
+
+  Map<String, String> _firebaseBearerHeaders(String firebaseIdToken) => {
+        ..._headers,
+        'Authorization': 'Bearer $firebaseIdToken',
       };
 
   /// Auth calls run bcrypt(12) hashing + cloud PostgreSQL round-trips server
@@ -524,7 +580,138 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Google Sign-In (secondary provider, preserved from the existing flow)
+  // DEMO ONLY: Google Auth temporarily bypassed.
+  // When [kGoogleAuthBypassEnabled] is true, tapping "Continue with Google"
+  // skips the Google Sign-In / Firebase identity flow entirely and instead
+  // signs in through the app's EXISTING backend auth system
+  // (/api/auth/register + /api/auth/login) with a deterministic demo account
+  // for the selected role. This creates a REAL HoneyChain backend session
+  // (JWT) — no fake Google account, no fake Firebase token, no second auth
+  // system — so dashboards, requests and profile all work against real data.
+  // TO RESTORE: set kGoogleAuthBypassEnabled to false. The original Google
+  // implementation below is preserved verbatim.
+  static const bool kGoogleAuthBypassEnabled = true;
+
   Future<void> signInWithGoogle([UserRole? role]) async {
+    if (kGoogleAuthBypassEnabled) {
+      await _demoOnlyBypassedGoogleSignIn(role);
+      return;
+    }
+    return _signInWithGoogleOriginal(role);
+  }
+
+  /// DEMO ONLY: Google Auth temporarily bypassed.
+  ///
+  /// Signs in via the existing backend email/password auth using a fixed demo
+  /// identity per selected role (e.g. demo.harvester@demo.honeychain.local).
+  /// The account is created on first use (idempotent — an existing account
+  /// for (email, role) is detected by the backend's ROLE_ACCOUNT_EXISTS check)
+  /// and then logged in normally, so the app lands in the exact same
+  /// post-login flow as any other backend-authenticated session.
+  Future<void> _demoOnlyBypassedGoogleSignIn(UserRole? role) async {
+    final activeRole = role ?? _selectedRole ?? UserRole.harvester;
+    final roleStr = userRoleToString(activeRole);
+
+    // Deterministic per-role demo identity. Not presented as a Google
+    // account anywhere — the profile screen will simply show a normal
+    // (email/password) HoneyChain account.
+    final demoEmailSuffix = roleStr.toLowerCase();
+    final demoEmail = 'demo.$demoEmailSuffix@demo.honeychain.local';
+    const demoPassword = 'Demo-2026-HoneyChain';
+
+    _status = AuthStateStatus.authenticating;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // 1. Ensure the demo account exists (existing backend register).
+      final registerRes = await _client
+          .post(
+            Uri.parse('$_baseUrl/api/auth/register'),
+            headers: _headers,
+            body: jsonEncode({
+              'name': 'Demo ${activeRole.displayName}',
+              'email': demoEmail,
+              'password': demoPassword,
+              'role': roleStr,
+            }),
+          )
+          .timeout(_authTimeout);
+
+      // 409 ROLE_ACCOUNT_EXISTS is expected on every run after the first —
+      // anything else is a real failure.
+      if (registerRes.statusCode != 200 && registerRes.statusCode != 409) {
+        _status = AuthStateStatus.error;
+        _errorMessage = _extractErrorMessage(
+          _decodeBody(registerRes),
+          'Could not create the demo session. Please try again.',
+        );
+        notifyListeners();
+        return;
+      }
+
+      // 2. Log in through the EXISTING backend login (same as email/password).
+      final loginRes = await _client
+          .post(
+            Uri.parse('$_baseUrl/api/auth/login'),
+            headers: _headers,
+            body: jsonEncode({
+              'emailOrPhone': demoEmail,
+              'password': demoPassword,
+              'role': roleStr,
+            }),
+          )
+          .timeout(_authTimeout);
+
+      if (loginRes.statusCode != 200) {
+        _status = AuthStateStatus.error;
+        _errorMessage = _extractErrorMessage(
+          _decodeBody(loginRes),
+          'Demo sign-in failed. Please try again.',
+        );
+        notifyListeners();
+        return;
+      }
+
+      // 3. Persist the session exactly like the other auth methods do
+      //    (same keys, same JWT, same post-login flow).
+      final data = jsonDecode(loginRes.body) as Map<String, dynamic>;
+      final prefs = await SharedPreferences.getInstance();
+      if (data['token'] != null) {
+        await prefs.setString('auth_token', data['token']);
+        AuthTokenStore.set(token: data['token']);
+      }
+      if (data['user'] != null) {
+        final u = data['user'] as Map<String, dynamic>;
+        if (u['id'] != null) {
+          await prefs.setString('user_profile_id', u['id']);
+          await prefs.setString('auth_user_id', u['id']);
+          AuthTokenStore.set(userId: u['id']);
+        }
+        if (u['name'] != null) await prefs.setString('user_profile_name', u['name']);
+        if (u['email'] != null) await prefs.setString('user_profile_email', u['email']);
+        if (u['role'] != null) {
+          await prefs.setString('user_profile_role', u['role']);
+          _selectedRole = userRoleFromString(u['role']);
+        }
+        if (u['beekeeperId'] != null) await prefs.setString('user_profile_beekeeper_id', u['beekeeperId']);
+      }
+      await prefs.setString('user_profile_auth_provider', 'local');
+      _currentUser = null; // no Firebase user exists in this mode
+      _status = AuthStateStatus.authenticated;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[AuthController] DEMO ONLY Google bypass sign-in failed: $e');
+      _status = AuthStateStatus.error;
+      _errorMessage = 'Could not reach HoneyChain servers. Check your connection and try again.';
+    }
+    notifyListeners();
+  }
+
+  /// Original Google Sign-In flow (Firebase + backend exchange).
+  /// DEMO ONLY: unreachable while [kGoogleAuthBypassEnabled] is true — kept
+  /// verbatim for restoration.
+  Future<void> _signInWithGoogleOriginal([UserRole? role]) async {
     final activeRole = role ?? _selectedRole ?? UserRole.harvester;
     final roleStr = userRoleToString(activeRole);
 
@@ -537,26 +724,28 @@ class AuthController extends ChangeNotifier {
       if (credential == null) {
         _status = AuthStateStatus.idle;
       } else {
-        _currentUser = credential.user;
-        _status = AuthStateStatus.authenticated;
-        if (_currentUser != null) {
+        final firebaseUser = credential.user;
+        if (firebaseUser == null) {
+          _status = AuthStateStatus.error;
+          _errorMessage = 'Google sign-in did not return a Firebase user. Please try again.';
+        } else {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user_profile_auth_provider', 'google');
-          if (_currentUser!.uid.isNotEmpty) {
-            await prefs.setString('user_profile_id', _currentUser!.uid);
+          if (firebaseUser.uid.isNotEmpty) {
+            await prefs.setString('user_profile_id', firebaseUser.uid);
           }
-          if (_currentUser!.displayName != null && _currentUser!.displayName!.isNotEmpty) {
-            await prefs.setString('user_profile_name', _currentUser!.displayName!);
+          if (firebaseUser.displayName != null && firebaseUser.displayName!.isNotEmpty) {
+            await prefs.setString('user_profile_name', firebaseUser.displayName!);
           }
-          if (_currentUser!.email != null && _currentUser!.email!.isNotEmpty) {
-            await prefs.setString('user_profile_email', _currentUser!.email!);
+          if (firebaseUser.email != null && firebaseUser.email!.isNotEmpty) {
+            await prefs.setString('user_profile_email', firebaseUser.email!);
           }
-          if (_currentUser!.photoURL != null && _currentUser!.photoURL!.isNotEmpty) {
-            await prefs.setString('user_profile_google_photo_url', _currentUser!.photoURL!);
-            await prefs.setString('user_profile_photo_url', _currentUser!.photoURL!);
+          if (firebaseUser.photoURL != null && firebaseUser.photoURL!.isNotEmpty) {
+            await prefs.setString('user_profile_google_photo_url', firebaseUser.photoURL!);
+            await prefs.setString('user_profile_photo_url', firebaseUser.photoURL!);
           }
-          if (_currentUser!.phoneNumber != null && _currentUser!.phoneNumber!.isNotEmpty) {
-            await prefs.setString('user_profile_phone', _currentUser!.phoneNumber!);
+          if (firebaseUser.phoneNumber != null && firebaseUser.phoneNumber!.isNotEmpty) {
+            await prefs.setString('user_profile_phone', firebaseUser.phoneNumber!);
           }
 
           // Exchange the Firebase session for a real backend JWT. The backend
@@ -567,24 +756,33 @@ class AuthController extends ChangeNotifier {
           try {
             final syncUrl = Uri.parse('$_baseUrl/api/auth/google');
             final idToken = await _authService.getIdToken();
+            if (idToken == null || idToken.isEmpty) {
+              _status = AuthStateStatus.error;
+              _errorMessage = 'Firebase signed in with Google, but no ID token was returned.';
+              await _authService.signOut();
+              notifyListeners();
+              return;
+            }
+
             final response = await _client.post(
               syncUrl,
-              headers: _headers,
+              headers: _firebaseBearerHeaders(idToken),
               body: jsonEncode({
-                if (idToken != null && idToken.isNotEmpty) 'idToken': idToken,
-                'name': _currentUser!.displayName,
-                'email': _currentUser!.email,
-                'phone': _currentUser!.phoneNumber,
+                'name': firebaseUser.displayName,
+                'email': firebaseUser.email,
+                'phone': firebaseUser.phoneNumber,
                 'role': roleStr,
-                'photoUrl': _currentUser!.photoURL,
+                'photoUrl': firebaseUser.photoURL,
               }),
             ).timeout(_authTimeout);
 
+            var exchangedBackendToken = false;
             if (response.statusCode == 200) {
               final data = jsonDecode(response.body);
               if (data['token'] != null) {
                 await prefs.setString('auth_token', data['token']);
                 AuthTokenStore.set(token: data['token']);
+                exchangedBackendToken = true;
               }
               if (data['user'] != null) {
                 final u = data['user'];
@@ -594,8 +792,13 @@ class AuthController extends ChangeNotifier {
                   AuthTokenStore.set(userId: u['id']);
                 }
                 if (u['beekeeperId'] != null) await prefs.setString('user_profile_beekeeper_id', u['beekeeperId']);
-                if (u['role'] != null) await prefs.setString('user_profile_role', u['role']);
+                if (u['role'] != null) {
+                  await prefs.setString('user_profile_role', u['role']);
+                  _selectedRole = userRoleFromString(u['role']);
+                }
               }
+              _currentUser = firebaseUser;
+              _status = AuthStateStatus.authenticated;
             }
 
             // No backend session = the workflow cannot run. Surface it instead
@@ -603,22 +806,32 @@ class AuthController extends ChangeNotifier {
             // _currentUser must be cleared too: isAuthenticated() is true
             // while it is set, so the error state would still route to the
             // (tokenless) dashboard instead of back to the login screen.
-            if (!AuthTokenStore.hasToken) {
+            if (!exchangedBackendToken) {
               _currentUser = null;
               _status = AuthStateStatus.error;
-              _errorMessage = 'Signed in with Google, but the server session could not be created. Please try again.';
+              await _authService.signOut();
+              // Surface the backend's actual reason (e.g. an invalid Google ID
+              // token) instead of a generic message that hides the cause.
+              _errorMessage = _extractErrorMessage(
+                _decodeBody(response),
+                'Signed in with Google, but the server session could not be created. Please try again.',
+              );
             }
           } catch (e) {
             debugPrint('[AuthController] Google backend session exchange failed: $e');
-            if (!AuthTokenStore.hasToken) {
-              _currentUser = null;
-              _status = AuthStateStatus.error;
-              _errorMessage = 'Could not reach HoneyChain servers. Check your connection and try again.';
-            }
+            _currentUser = null;
+            _status = AuthStateStatus.error;
+            await _authService.signOut();
+            _errorMessage = 'Could not reach HoneyChain servers. Check your connection and try again.';
           }
         }
       }
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[AuthController] Google Firebase auth failed: ${e.code} ${e.message}');
+      _status = AuthStateStatus.error;
+      _errorMessage = e.message ?? 'Unable to complete Google authentication.';
     } catch (e) {
+      debugPrint('[AuthController] Google authentication failed: $e');
       _status = AuthStateStatus.error;
       _errorMessage = 'Unable to complete Google authentication.';
     }

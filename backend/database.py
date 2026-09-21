@@ -205,4 +205,51 @@ def init_db():
         except ImportError:
             import models  # noqa
     Base.metadata.create_all(bind=engine)
+    _ensure_new_columns()
     logger.info("Database tables initialized successfully.")
+
+
+# Columns added to facility models after the initial schema shipped.create_all
+# only ADDS missing tables, never missing columns, so existing PostgreSQL
+# databases need these ALTERs. Each is applied idempotently and tolerated if
+# the DB user lacks ALTER rights (alembic remains the canonical migration
+# path; this only prevents a crashed startup on older databases).
+_ADDED_FACILITY_COLUMNS: list[tuple[str, str, str]] = [
+    ("collection_centres", "license_type", "VARCHAR(128)"),
+    ("collection_centres", "issuing_authority", "VARCHAR(128)"),
+    ("collection_centres", "license_issue_date", "TIMESTAMP"),
+    ("collection_centres", "license_expiry_date", "TIMESTAMP"),
+    ("collection_centres", "verification_status", "VARCHAR(64)"),
+    ("collection_centres", "verification_source", "VARCHAR(128)"),
+    ("labs", "license_type", "VARCHAR(128)"),
+    ("labs", "issuing_authority", "VARCHAR(128)"),
+    ("labs", "license_issue_date", "TIMESTAMP"),
+    ("labs", "license_expiry_date", "TIMESTAMP"),
+    ("labs", "verification_status", "VARCHAR(64)"),
+    ("labs", "verification_source", "VARCHAR(128)"),
+    ("packaging_facilities", "license_type", "VARCHAR(128)"),
+    ("packaging_facilities", "issuing_authority", "VARCHAR(128)"),
+    ("packaging_facilities", "license_issue_date", "TIMESTAMP"),
+    ("packaging_facilities", "license_expiry_date", "TIMESTAMP"),
+    ("packaging_facilities", "verification_status", "VARCHAR(64)"),
+    ("packaging_facilities", "verification_source", "VARCHAR(128)"),
+]
+
+
+def _ensure_new_columns() -> None:
+    """Add facility license columns if they are missing (idempotent)."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    try:
+        with engine.connect() as conn:
+            for table, column, col_type in _ADDED_FACILITY_COLUMNS:
+                try:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                except SQLAlchemyError:
+                    # Column already exists or the driver rejects the ALTER —
+                    # both are fine, the canonical schema must win elsewhere.
+                    pass
+            conn.commit()
+    except Exception as err:  # noqa: BLE001 - startup must not die on this
+        logger.warning("Facility column sync skipped: %s", _mask_driver_error(err))

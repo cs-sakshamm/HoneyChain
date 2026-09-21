@@ -606,6 +606,15 @@ class _MyRequestsViewState extends State<MyRequestsView> {
       );
     } else if (wfCtrl.isProfileIncompleteError) {
       ProfileGuard.showIncompleteProfileDialog(context);
+    } else {
+      // Real failure (403 role, 409 already accepted, 404, network):
+      // surface the backend's own message instead of silently doing nothing.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(wfCtrl.errorMessage ?? 'Failed to accept request. Please try again.'),
+          backgroundColor: AppConstants.error,
+        ),
+      );
     }
   }
 
@@ -657,6 +666,15 @@ class _MyRequestsViewState extends State<MyRequestsView> {
                 );
               } else if (wfCtrl.isProfileIncompleteError) {
                 ProfileGuard.showIncompleteProfileDialog(context);
+              } else {
+                // Real failure (403 role, 409 reject-after-accept, network):
+                // surface the backend's own message.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(wfCtrl.errorMessage ?? 'Failed to reject request. Please try again.'),
+                    backgroundColor: AppConstants.error,
+                  ),
+                );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error),

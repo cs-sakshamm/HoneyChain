@@ -36,41 +36,41 @@ class DefaultFirebaseOptions {
 
   /// Web — used by the verifier React app and Flutter Web builds.
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDJFOj7F7I7-NIqclH4JLBhDZzvqb9_uIU',
-    appId: '1:314717495726:web:d71b1db1dd5c01dbc0a83f',
-    messagingSenderId: '314717495726',
-    projectId: 'honeychain-40065',
-    authDomain: 'honeychain-40065.firebaseapp.com',
-    storageBucket: 'honeychain-40065.firebasestorage.app',
-    measurementId: 'G-SVJJXDM34B',
+    apiKey: 'AIzaSyBd9PTDlxUVfyaoR0ZjnDqGNaYj16x0b1w',
+    appId: '1:137302661160:web:74b2745865e4ea23aebd1d',
+    messagingSenderId: '137302661160',
+    projectId: 'honeychain-e1c6f',
+    authDomain: 'honeychain-e1c6f.firebaseapp.com',
+    storageBucket: 'honeychain-e1c6f.firebasestorage.app',
+    measurementId: 'G-6NBDFM2M7L',
   );
 
   /// Android — register an Android app in Firebase Console and replace
   /// appId with the value from Project Settings → Your apps → Android app.
   /// Also download google-services.json and place it in android/app/.
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDJFOj7F7I7-NIqclH4JLBhDZzvqb9_uIU',
+    apiKey: 'AIzaSyBd9PTDlxUVfyaoR0ZjnDqGNaYj16x0b1w',
     // TODO: Replace with real Android appId from Firebase Console
     // Format: 1:<project_number>:android:<sha256_hash>
-    appId: '1:314717495726:android:d71b1db1dd5c01dbc0a83f',
-    messagingSenderId: '314717495726',
-    projectId: 'honeychain-40065',
-    authDomain: 'honeychain-40065.firebaseapp.com',
-    storageBucket: 'honeychain-40065.firebasestorage.app',
+    appId: '1:137302661160:android:replace-with-android-app-id',
+    messagingSenderId: '137302661160',
+    projectId: 'honeychain-e1c6f',
+    authDomain: 'honeychain-e1c6f.firebaseapp.com',
+    storageBucket: 'honeychain-e1c6f.firebasestorage.app',
   );
 
   /// iOS — register an iOS app in Firebase Console and replace appId with
   /// the value from Project Settings → Your apps → iOS app.
   /// Also download GoogleService-Info.plist and add to the iOS Runner target.
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDJFOj7F7I7-NIqclH4JLBhDZzvqb9_uIU',
+    apiKey: 'AIzaSyBd9PTDlxUVfyaoR0ZjnDqGNaYj16x0b1w',
     // TODO: Replace with real iOS appId from Firebase Console
     // Format: 1:<project_number>:ios:<sha256_hash>
-    appId: '1:314717495726:ios:d71b1db1dd5c01dbc0a83f',
-    messagingSenderId: '314717495726',
-    projectId: 'honeychain-40065',
-    authDomain: 'honeychain-40065.firebaseapp.com',
-    storageBucket: 'honeychain-40065.firebasestorage.app',
+    appId: '1:137302661160:ios:replace-with-ios-app-id',
+    messagingSenderId: '137302661160',
+    projectId: 'honeychain-e1c6f',
+    authDomain: 'honeychain-e1c6f.firebaseapp.com',
+    storageBucket: 'honeychain-e1c6f.firebasestorage.app',
     iosBundleId: 'com.honeychain.app',
   );
 }

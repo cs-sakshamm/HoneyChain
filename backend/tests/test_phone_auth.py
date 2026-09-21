@@ -1,10 +1,10 @@
 """Tests for POST /api/auth/phone (Firebase Phone-Auth session exchange).
 
-These tests stub `google.auth.jwt.decode` (the Firebase ID-token verifier) so
-no real Firebase project, network, or SMS is required. Everything downstream —
-phone extraction from token claims, E.164 enforcement, user creation/dedup,
-JWT session issuance — runs against the real code paths on the isolated SQLite
-test database (forced by the repo-root conftest).
+These tests stub `google.oauth2.id_token.verify_firebase_token` (the Firebase
+ID-token verifier) so no real Firebase project, network, or SMS is required.
+Everything downstream — phone extraction from token claims, E.164 enforcement,
+user creation/dedup, JWT session issuance — runs against the real code paths
+on the isolated SQLite test database (forced by the repo-root conftest).
 """
 from __future__ import annotations
 
@@ -20,13 +20,13 @@ FAKE_ISS = "https://securetoken.google.com/honeychain-40065"
 
 def _stub_firebase_token(monkeypatch, *, phone: str, uid: str = "fb-uid-test"):
     """Make /api/auth/phone accept a fake Firebase ID token for `phone`."""
-    import google.auth.jwt as gjwt
+    import google.oauth2.id_token as google_id_token
 
-    def fake_decode(id_token, **kwargs):
+    def fake_verify(id_token, request, audience=None, clock_skew_in_seconds=0):
         assert id_token, "endpoint must post an idToken"
         return {"sub": uid, "phone_number": phone, "iss": FAKE_ISS, "aud": "honeychain-40065"}
 
-    monkeypatch.setattr(gjwt, "decode", fake_decode)
+    monkeypatch.setattr(google_id_token, "verify_firebase_token", fake_verify)
 
 
 @pytest.fixture(scope="module")

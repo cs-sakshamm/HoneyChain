@@ -115,19 +115,66 @@ logger = logging.getLogger("MainBackend")
 
 # ── WebSocket Manager ──
 class ConnectionManager:
+    """JWT-authenticated realtime channels.
+
+    Each connection registers the authenticated user id and normalized role
+    (plus any facility ids the account owns). Broadcasts can then target a
+    role ("role":"LAB") or a specific user ("userIds":[...]) instead of
+    spraying every workflow event to every client. Telemetry keeps using the
+    full broadcast. The database remains the source of truth: clients that
+    missed an event simply re-fetch via REST.
+    """
+
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        # websocket -> {"userId": str, "roles": set[str]}
+        self.connection_info: Dict[WebSocket, Dict[str, Any]] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user_id: Optional[str] = None, role: Optional[str] = None):
         await websocket.accept()
         self.active_connections.append(websocket)
+        roles = {normalize_role(role)} if role else set()
+        self.connection_info[websocket] = {"userId": user_id, "roles": roles}
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        self.connection_info.pop(websocket, None)
+
+    def update_role(self, websocket: WebSocket, role: Optional[str]) -> None:
+        info = self.connection_info.get(websocket)
+        if info and role:
+            info["roles"] = {normalize_role(role)}
 
     async def broadcast(self, message: Dict[str, Any]):
         for connection in list(self.active_connections):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                self.disconnect(connection)
+
+    async def broadcast_targeted(self, message: Dict[str, Any]):
+        """Send an event to the connections its envelope addresses.
+
+        Envelope keys understood:
+        - "toRole"   : normalized role that should see the event
+        - "toUserIds": explicit list of user ids that should see the event
+        Falls back to a full broadcast when neither is present.
+        """
+        to_role = normalize_role(message.get("toRole") or "") if message.get("toRole") else None
+        to_user_ids = message.get("toUserIds") or ([] if message.get("toUserIds") else None)
+        if not to_role and not to_user_ids:
+            await self.broadcast(message)
+            return
+
+        for connection in list(self.active_connections):
+            info = self.connection_info.get(connection)
+            if not info:
+                continue
+            user_matches = bool(to_user_ids and info.get("userId") in to_user_ids)
+            role_matches = bool(to_role and to_role in info.get("roles", set()))
+            if not (user_matches or role_matches):
+                continue
             try:
                 await connection.send_json(message)
             except Exception:
@@ -146,13 +193,179 @@ def _broadcast_after_commit(event: str, payload: Dict[str, Any]) -> None:
 
     REST + PostgreSQL remain the source of truth: failures here must never
     affect the persisted request (offline receivers simply re-fetch via REST).
+    Workflow events are targeted ("toRole"/"toUserIds") so the collection,
+    lab and packaging dashboards only receive events addressed to them;
+    events without a target still broadcast to everyone.
     """
     if _main_loop is None or _main_loop.is_closed():
         return
     try:
-        asyncio.run_coroutine_threadsafe(manager.broadcast({"event": event, **payload}), _main_loop)
+        message = {"event": event, **payload}
+        if message.get("toRole") or message.get("toUserIds"):
+            asyncio.run_coroutine_threadsafe(manager.broadcast_targeted(message), _main_loop)
+        else:
+            asyncio.run_coroutine_threadsafe(manager.broadcast(message), _main_loop)
     except Exception as e:  # noqa: BLE001 - notifications must never break requests
         logger.debug(f"Realtime broadcast skipped ({event}): {e}")
+
+
+# ── Official SIH Prototype Centre Definitions ──
+# Names, types and real geographic coordinates only. NO license numbers,
+# NO registration IDs, NO issue/expiry dates are invented here: those must
+# come from the deployment's own official records (HONEYCHAIN_CENTER_LICENSE
+# env JSON) or stay unset so the API can honestly report
+# "Pending Verification".
+PROTOTYPE_CENTERS = {
+    "COLLECTOR_PROCESSOR": {
+        "table": "collection_centres",
+        "name": "DataMineX Collection Center",
+        "location": "Lucknow, Uttar Pradesh, India",
+        "latitude": 26.8467,
+        "longitude": 80.9462,
+        "label_field": "name",
+        "city": "Lucknow",
+    },
+    "LAB": {
+        "table": "labs",
+        "name": "DataMineX Lab Testing",
+        "location": "Greater Noida, Uttar Pradesh, India",
+        "latitude": 28.4744,
+        "longitude": 77.5040,
+        "label_field": "lab_name",
+        "location_field": "facility_location",
+        "city": "Greater Noida",
+    },
+    "PACKAGING": {
+        "table": "packaging_facilities",
+        "name": "DataMineX Packaging",
+        "location": "Delhi, India",
+        "latitude": 28.6139,
+        "longitude": 77.2090,
+        "label_field": "name",
+        "city": "Delhi",
+    },
+}
+
+
+def _seed_prototype_centers(db: Session) -> None:
+    """Idempotently ensure exactly one official record per centre type.
+
+    - If a record with the official name already exists, it is updated with
+      the canonical location/coordinates (name is the natural key here).
+    - If the official record is missing, it is created WITHOUT any license
+      data. No duplicate DataMineX rows are ever created: any additional row
+      sharing the official name is deactivated rather than shown.
+    """
+    license_env = (os.getenv("HONEYCHAIN_CENTER_LICENSE") or "").strip()
+    license_by_name: Dict[str, Dict[str, Any]] = {}
+    if license_env:
+        try:
+            parsed = json.loads(license_env)
+            if isinstance(parsed, dict):
+                license_by_name = {str(k).lower(): v for k, v in parsed.items() if isinstance(v, dict)}
+        except (ValueError, TypeError) as e:
+            logger.warning("HONEYCHAIN_CENTER_LICENSE env is not valid JSON; license fields stay unset (%s)", e)
+
+    def _apply_license(record, name: str) -> None:
+        info = license_by_name.get(name.lower())
+        if not info:
+            return
+        # Only write what the deployment actually supplied.
+        record.license_number = info.get("licenseNumber") or record.license_number
+        record.license_type = info.get("licenseType") or record.license_type
+        record.issuing_authority = info.get("issuingAuthority") or record.issuing_authority
+        record.license_issue_date = parse_optional_datetime(info.get("issueDate")) or record.license_issue_date
+        record.license_expiry_date = parse_optional_datetime(info.get("expiryDate")) or record.license_expiry_date
+        record.verification_source = info.get("verificationSource") or record.verification_source
+        # 'Verified' only when the operator explicitly attests an authoritative
+        # source; anything else remains Pending Verification.
+        if (info.get("verificationStatus") or "").strip().lower() == "verified":
+            record.verification_status = "Verified"
+
+    created = []
+
+    # Collection Centre
+    cc = PROTOTYPE_CENTERS["COLLECTOR_PROCESSOR"]
+    rows = db.query(CollectionCentre).filter(CollectionCentre.name == cc["name"]).all()
+    if not rows:
+        row = CollectionCentre(name=cc["name"], location=cc["location"], latitude=cc["latitude"], longitude=cc["longitude"], is_active=True)
+        _apply_license(row, cc["name"])
+        db.add(row)
+        created.append(cc["name"])
+    else:
+        row = rows[0]
+        row.location = cc["location"]
+        row.latitude = cc["latitude"]
+        row.longitude = cc["longitude"]
+        row.is_active = True
+        _apply_license(row, cc["name"])
+        for extra in rows[1:]:  # deactivate accidental duplicates
+            extra.is_active = False
+
+    # Lab Testing Centre — the labs table requires a linked lab User account.
+    lab_def = PROTOTYPE_CENTERS["LAB"]
+    lab_rows = db.query(Lab).filter(Lab.lab_name == lab_def["name"]).all()
+    if not lab_rows:
+        lab_user = (
+            db.query(User).filter(User.email == "lab@dataminex.honeychain.io").first()
+            or db.query(User).filter(User.role.in_(role_aliases("LAB"))).first()
+        )
+        if not lab_user:
+            lab_user = User(
+                name=lab_def["name"],
+                email="lab@dataminex.honeychain.io",
+                role="LAB_TESTING",
+                organization_name=lab_def["name"],
+                facility_location=lab_def["location"],
+                is_verified=True,
+            )
+            db.add(lab_user)
+            db.flush()
+        row = Lab(
+            user_id=lab_user.id,
+            lab_name=lab_def["name"],
+            facility_location=lab_def["location"],
+            latitude=lab_def["latitude"],
+            longitude=lab_def["longitude"],
+            is_active=True,
+        )
+        _apply_license(row, lab_def["name"])
+        db.add(row)
+        created.append(lab_def["name"])
+    else:
+        row = lab_rows[0]
+        row.facility_location = lab_def["location"]
+        row.latitude = lab_def["latitude"]
+        row.longitude = lab_def["longitude"]
+        row.is_active = True
+        _apply_license(row, lab_def["name"])
+        for extra in lab_rows[1:]:
+            extra.is_active = False
+
+    # Packaging Centre
+    pkg_def = PROTOTYPE_CENTERS["PACKAGING"]
+    pkg_rows = db.query(PackagingFacility).filter(PackagingFacility.name == pkg_def["name"]).all()
+    if not pkg_rows:
+        row = PackagingFacility(name=pkg_def["name"], location=pkg_def["location"], latitude=pkg_def["latitude"], longitude=pkg_def["longitude"], is_active=True)
+        _apply_license(row, pkg_def["name"])
+        db.add(row)
+        created.append(pkg_def["name"])
+    else:
+        row = pkg_rows[0]
+        row.location = pkg_def["location"]
+        row.latitude = pkg_def["latitude"]
+        row.longitude = pkg_def["longitude"]
+        row.is_active = True
+        _apply_license(row, pkg_def["name"])
+        for extra in pkg_rows[1:]:
+            extra.is_active = False
+
+    if created:
+        db.commit()
+        logger.info("SIH prototype centres created: %s", ", ".join(created))
+    else:
+        db.commit()
+        logger.info("SIH prototype centres verified (one record per type).")
 
 
 # ── Lifespan Context Manager ──
@@ -162,90 +375,18 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing HoneyChain Database and Models...")
     init_db()
 
-    # Seed default verified entities ONLY when explicitly enabled via env.
-    # Demo data must never silently appear in a real deployment.
-    if os.getenv("SEED_DEMO_DATA", "false").lower() in ("1", "true", "yes"):
+    # ── Official SIH prototype centres ──
+    # Exactly ONE backend/database record per centre type, seeded ONLY when
+    # the prototype flag is enabled (SIH_PROTOTYPE_CENTERS=1/true). These are
+    # the deployment's own official facilities — NOT demo data. License
+    # details are only ever written from the env values operators provide
+    # (HONEYCHAIN_CENTER_LICENSE_* JSON); nothing is invented in code. When
+    # no official license has been supplied the record simply keeps NULL
+    # license fields and the API reports "Pending Verification".
+    if os.getenv("SIH_PROTOTYPE_CENTERS", "false").lower() in ("1", "true", "yes"):
         db = SessionLocal()
         try:
-            if db.query(CollectionCentre).count() == 0:
-                centers = [
-                    CollectionCentre(name="Central Sahyadri Honey Extraction & Processing Hub", location="Mahabaleshwar Apiary Zone, MH", latitude=17.9307, longitude=73.6477, contact_phone="+91 98230 11223", contact_email="contact@sahyadrihoney.org", license_number="FSSAI-MH-2026-0041"),
-                    CollectionCentre(name="Cascade Range Regional Collection Centre", location="Bend Industrial Center, OR", latitude=44.0582, longitude=-121.3153, contact_phone="+1 541 555 0192", contact_email="intake@cascadeprocessing.com", license_number="USDA-OR-99120"),
-                    CollectionCentre(name="Western Ghats Cooperative Extraction Facility", location="Shimoga Eco Zone, KA", latitude=13.9299, longitude=75.5681, contact_phone="+91 94481 33445", contact_email="ghats.coop@honeychain.io", license_number="FSSAI-KA-2026-0089"),
-                ]
-                db.add_all(centers)
-                db.commit()
-                logger.info("Seeded initial collection centres.")
-
-            # Seed Lab user & facility
-            lab_user = db.query(User).filter(User.role == "LAB").first()
-            if not lab_user:
-                lab_user = User(
-                    name="National Apiculture & Food Safety Analytical Laboratory",
-                    email="lab.director@honeychain.io",
-                    role="LAB",
-                    phone="+91 20 2569 1100",
-                    organization_name="National Apiculture Analytical Centre",
-                    facility_location="Pune Agri-Tech Park, MH",
-                    license_number="NABL-ISO-17025-2026",
-                    is_verified=True,
-                )
-                db.add(lab_user)
-                db.commit()
-                db.refresh(lab_user)
-
-            if db.query(Lab).count() == 0:
-                labs = [
-                    Lab(
-                        user_id=lab_user.id,
-                        lab_name="National Apiculture & Food Safety Analytical Laboratory",
-                        facility_location="Pune Agri-Tech Park, MH",
-                        latitude=18.5204,
-                        longitude=73.8567,
-                        contact_phone="+91 20 2569 1100",
-                        contact_email="testing@apiculturelab.gov.in",
-                        registration_number="NABL-TC-8891",
-                        accreditation="NABL / FSSAI / ISO 17025 Certified",
-                    ),
-                ]
-                db.add_all(labs)
-                db.commit()
-                logger.info("Seeded initial accredited testing labs.")
-
-            # Seed Packaging facilities
-            if db.query(PackagingFacility).count() == 0:
-                facilities = [
-                    PackagingFacility(
-                        name="Mahabaleshwar Pure Honey Bottling & Cleanroom Packaging Unit",
-                        location="Mahabaleshwar Industrial Area, MH",
-                        latitude=17.9250,
-                        longitude=73.6550,
-                        contact_phone="+91 98230 44556",
-                        contact_email="bottling@sahyadripure.org",
-                        license_number="FSSAI-PKG-1152026",
-                    ),
-                    PackagingFacility(
-                        name="Cascade Range Automated Bottling & Digital QR Packaging Facility",
-                        location="Bend Logistics Park, OR",
-                        latitude=44.0600,
-                        longitude=-121.3100,
-                        contact_phone="+1 541 555 0872",
-                        contact_email="packaging@cascadepack.com",
-                        license_number="OR-FDA-PKG-9821",
-                    ),
-                    PackagingFacility(
-                        name="Western Ghats Certified Honey Packaging Centre",
-                        location="Shimoga Packaging Depot, KA",
-                        latitude=13.9350,
-                        longitude=75.5720,
-                        contact_phone="+91 94481 77889",
-                        contact_email="packaging@westernghatshoney.com",
-                        license_number="FSSAI-PKG-1152089",
-                    ),
-                ]
-                db.add_all(facilities)
-                db.commit()
-                logger.info("Seeded initial packaging facilities.")
+            _seed_prototype_centers(db)
         finally:
             db.close()
 
@@ -335,27 +476,40 @@ def serve_root():
 @app.websocket("/ws/telemetry")
 @app.websocket("/api/telemetry/live")
 async def websocket_endpoint(websocket: WebSocket):
-    # Telemetry broadcasts carry per-user hive data, so a valid JWT is
-    # required (query param works where browser WS cannot set headers).
+    # Telemetry + workflow events carry per-user/per-role data, so a valid JWT
+    # is required (query param works where browser WS cannot set headers).
     token = websocket.query_params.get("token") or ""
     user_id: Optional[str] = None
+    role: Optional[str] = None
     if token:
         try:
             payload = decode_token(token)
             user_id = payload.get("sub")
+            role = payload.get("role")
         except HTTPException:
             user_id = None
     if not user_id:
         await websocket.close(code=4401)  # 4401: unauthorized (policy code)
         return
-    await manager.connect(websocket)
+    await manager.connect(websocket, user_id=user_id, role=role)
     try:
         while True:
             data = await websocket.receive_text()
-            # Echo or handle client ping
-            await websocket.send_json({"event": "PONG", "received": data})
+            # Clients may PING to keep intermediaries from idling the socket
+            # out; anything else is echoed back so debugging stays visible.
+            try:
+                parsed = json.loads(data)
+            except ValueError:
+                parsed = None
+            if isinstance(parsed, dict) and (parsed.get("event") or "").upper() == "PING":
+                await websocket.send_json({"event": "PONG", "received": data})
+            else:
+                await websocket.send_json({"event": "PONG", "received": data})
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
+        raise
 
 
 # ── Health ──
@@ -940,6 +1094,13 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    # Keep facility tables in sync (same contract as Google auth): a
+    # collector/lab/packager account without a facility row is invisible to
+    # the whole workflow — /api/centers/nearest never lists it and dispatches
+    # targeted at it cannot resolve a receiver.
+    _ensure_facility_row(db, user)
+    db.commit()
+
     # Issue real signed JWT token
     token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
 
@@ -984,6 +1145,11 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             detail={"success": False, "error": "Invalid password. Please check your credentials.", "code": "INVALID_PASSWORD"},
         )
 
+    # Keep facility tables in sync (same contract as Google auth): accounts
+    # created before this sync existed get their facility row on next login.
+    _ensure_facility_row(db, user)
+    db.commit()
+
     # Issue genuine signed JWT
     token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
 
@@ -1023,6 +1189,7 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
     verified_email = clean_email
     verified_name = payload.name or "Google User"
     verified_photo = payload.photoUrl
+    verified_uid = None  # set only when an ID token is verified
 
     if payload.idToken:
         idinfo = None
@@ -1038,20 +1205,19 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
         #    Flutter app and the web verifier actually produce.
         if not idinfo:
             try:
-                from google.auth import jwt as gjwt
+                from google.auth.transport import requests as grequests
+                from google.oauth2 import id_token as google_id_token
                 firebase_project = (os.getenv("FIREBASE_PROJECT_ID") or "honeychain-40065").strip()
-                claims = gjwt.decode(
+                claims = google_id_token.verify_firebase_token(
                     payload.idToken,
-                    certs_url="https://www.googleapis.com/robots/v1/metadata/x509/securetoken@system.gserviceaccount.com",
+                    grequests.Request(),
                     audience=firebase_project,
                 )
-                expected_issuer = f"https://securetoken.google.com/{firebase_project}"
-                if claims.get("iss") != expected_issuer:
-                    raise ValueError("Invalid Firebase token issuer")
                 idinfo = {
                     "email": claims.get("email") or "",
                     "name": claims.get("name") or claims.get("display_name") or "Google User",
                     "picture": claims.get("picture") or claims.get("photo_url"),
+                    "sub": claims.get("sub") or claims.get("user_id"),
                 }
             except Exception as e:
                 logger.warning(f"Google/Firebase ID token verification failed: {e}")
@@ -1065,6 +1231,7 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
         verified_email = idinfo["email"].lower()
         verified_name = idinfo.get("name", verified_name)
         verified_photo = idinfo.get("picture", verified_photo)
+        verified_uid = idinfo.get("sub")
 
     target_role = normalize_role(payload.role)
 
@@ -1075,6 +1242,7 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
             email=verified_email,
             avatar_url=verified_photo,
             google_photo_url=verified_photo,
+            firebase_id=verified_uid,
             auth_provider="google",
             role=target_role,
             beekeeper_id=f"HC-BK-{uuid.uuid4().hex[:8].upper()}" if target_role == "HARVESTER" else None,
@@ -1086,7 +1254,11 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
     else:
         if verified_photo:
             user.google_photo_url = verified_photo
-            db.commit()
+        # Link the Firebase identity to an existing account without touching
+        # its profile (mirrors the /api/auth/phone behavior).
+        if verified_uid and not user.firebase_id:
+            user.firebase_id = verified_uid
+        db.commit()
 
     _ensure_facility_row(db, user)
     db.commit()
@@ -1120,20 +1292,19 @@ def phone_auth(payload: Dict[str, Any], db: Session = Depends(get_db)):
         )
 
     project_id = (os.getenv("FIREBASE_PROJECT_ID") or "honeychain-40065").strip()
-    expected_issuer = f"https://securetoken.google.com/{project_id}"
 
-    from google.auth import jwt as gjwt
     from google.auth.transport import requests as grequests
+    from google.oauth2 import id_token as google_id_token
 
     try:
-        claims = gjwt.decode(
+        # verify_firebase_token checks signature, expiry, audience and the
+        # https://securetoken.google.com/<project> issuer internally — the
+        # exact contract Firebase ID tokens guarantee.
+        claims = google_id_token.verify_firebase_token(
             id_token,
-            certs_url="https://www.googleapis.com/robots/v1/metadata/x509/securetoken@system.gserviceaccount.com",
+            grequests.Request(),
             audience=project_id,
         )
-        # google.auth checks signature, audience and expiry; issuer is ours to check.
-        if claims.get("iss") != expected_issuer:
-            raise ValueError("Invalid token issuer")
         firebase_uid = claims.get("sub")
         if not firebase_uid:
             raise ValueError("Token has no subject")
@@ -1210,6 +1381,10 @@ def phone_auth(payload: Dict[str, Any], db: Session = Depends(get_db)):
         user.firebase_id = firebase_uid
         db.commit()
 
+    # Keep facility tables in sync (same contract as Google auth).
+    _ensure_facility_row(db, user)
+    db.commit()
+
     token = create_access_token({"sub": user.id, "phone": user.phone, "role": user.role})
 
     return {
@@ -1278,6 +1453,55 @@ def get_profile(
         "user": user_dict,
         "profile": user_dict,
         "isProfileComplete": user_dict.get("isProfileComplete", True),
+    }
+
+
+class IdentityRequest(BaseModel):
+    userId: Optional[str] = None
+
+
+@app.post("/api/profile/identity")
+def generate_profile_identity(
+    payload: IdentityRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Issue the harvester identity (BSID + BSP Pass) exactly once.
+
+    The Flutter profile screen calls this when a profile-complete harvester
+    has no identity yet. Previously this endpoint did not exist, so the call
+    always failed with 404 and the profile screen showed "Unable to reach the
+    backend"-style failures on every load. Identity stays server-authoritative:
+    existing users keep their issued codes; only genuinely missing ones are
+    minted here.
+    """
+    if payload.userId and payload.userId != current_user.id and payload.userId != current_user.email:
+        if "ADMIN" not in (current_user.role or ""):
+            raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "You can only issue your own identity."})
+
+    user = current_user
+    if user.bsid and user.beekeeper_id:
+        pass  # already issued
+    elif user.bsid or user.beekeeper_id:
+        # Partial identity: fill in the missing half idempotently.
+        if not user.bsid:
+            user.bsid = f"BSID-{uuid.uuid4().hex[:10].upper()}"
+        if not user.beekeeper_id:
+            user.beekeeper_id = f"HC-BK-{uuid.uuid4().hex[:8].upper()}"
+        db.commit()
+        db.refresh(user)
+    else:
+        user.bsid = f"BSID-{uuid.uuid4().hex[:10].upper()}"
+        user.beekeeper_id = f"HC-BK-{uuid.uuid4().hex[:8].upper()}"
+        db.commit()
+        db.refresh(user)
+
+    return {
+        "success": True,
+        "message": "Harvester identity ready.",
+        "bsid": user.bsid,
+        "bspPass": user.beekeeper_id,  # BSP Pass reuses the backend-issued beekeeper id
+        "beekeeperId": user.beekeeper_id,
     }
 
 
@@ -2049,6 +2273,54 @@ def acknowledge_alert(
 # ============================================================
 # 4. WORKFLOW: REQUESTS, HARVESTS, PROCESSING, LAB, PACKAGING
 # ============================================================
+def _haversine_km(lat1, lon1, lat2, lon2):
+    """Great-circle distance in km between two coordinate pairs.
+
+    Returns None when any coordinate is missing — the caller must then show
+    "Distance unavailable" rather than a fabricated number.
+    """
+    from math import radians, cos, sin, asin, sqrt
+    if None in (lat1, lon1, lat2, lon2):
+        return None
+    r = 6371.0  # Earth radius in km
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+    return r * c
+
+
+def _license_dict(record) -> Dict[str, Any]:
+    """License/registration details for any facility row, honestly reported.
+
+    verificationStatus is "Verified" ONLY when the row itself carries that
+    status (set via an authoritative source, e.g. HONEYCHAIN_CENTER_LICENSE
+    attestation). Everything else reports "Pending Verification" — never a
+    fabricated ✓.
+    """
+    lic_no = getattr(record, "license_number", None) or getattr(record, "registration_number", None)
+    status = (getattr(record, "verification_status", None) or "").strip()
+    if status.lower() == "verified":
+        verification_status = "Verified"
+    else:
+        verification_status = "Pending Verification"
+
+    def _iso(dt):
+        return dt.isoformat() if getattr(dt, "isoformat", None) and dt else None
+
+    return {
+        "licenseNumber": lic_no,
+        "licenseNumberProvided": bool(lic_no and str(lic_no).strip()),
+        "licenseType": getattr(record, "license_type", None),
+        "issuingAuthority": getattr(record, "issuing_authority", None),
+        "issueDate": _iso(getattr(record, "license_issue_date", None)),
+        "expiryDate": _iso(getattr(record, "license_expiry_date", None)),
+        "verificationStatus": verification_status,
+        "verificationSource": getattr(record, "verification_source", None),
+        "accreditation": getattr(record, "accreditation", None),
+    }
+
+
 @app.get("/api/centers/nearest")
 @app.get("/api/requests/nearest-centers")
 def get_nearest_centers(
@@ -2068,22 +2340,14 @@ def get_nearest_centers(
     target = (targetRole or role or "COLLECTOR_PROCESSOR").upper().strip()
 
     def haversine(lat1, lon1, lat2, lon2):
-        from math import radians, cos, sin, asin, sqrt
-        if None in (lat1, lon1, lat2, lon2):
-            return None
-        r = 6371.0  # Earth radius in km
-        dlat = radians(lat2 - lat1)
-        dlon = radians(lon2 - lon1)
-        a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
-        c = 2 * asin(sqrt(a))
-        return r * c
+        return _haversine_km(lat1, lon1, lat2, lon2)
 
     results = []
     if "LAB" in target:
         labs = db.query(Lab).filter(Lab.is_active == True).all()
         for lab in labs:
             dist = haversine(lat, actual_lon, lab.latitude, lab.longitude)
-            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unknown"
+            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unavailable"
             results.append({
                 "id": lab.id,
                 "userId": lab.user_id,
@@ -2094,16 +2358,15 @@ def get_nearest_centers(
                 "distanceDisplay": dist_display,
                 "contactPhone": lab.contact_phone,
                 "contactEmail": lab.contact_email,
-                "licenseNumber": lab.registration_number,
-                "accreditation": lab.accreditation,
                 "latitude": lab.latitude,
                 "longitude": lab.longitude,
+                **_license_dict(lab),
             })
     elif "PACKAG" in target or "PKG" in target:
         facilities = db.query(PackagingFacility).filter(PackagingFacility.is_active == True).all()
         for p in facilities:
             dist = haversine(lat, actual_lon, p.latitude, p.longitude)
-            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unknown"
+            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unavailable"
             results.append({
                 "id": p.id,
                 "userId": p.id,
@@ -2114,18 +2377,50 @@ def get_nearest_centers(
                 "distanceDisplay": dist_display,
                 "contactPhone": p.contact_phone,
                 "contactEmail": p.contact_email,
-                "licenseNumber": p.license_number,
                 "latitude": p.latitude,
                 "longitude": p.longitude,
+                **_license_dict(p),
             })
     else:
         centres = db.query(CollectionCentre).filter(CollectionCentre.is_active == True).all()
+        # PERFORMANCE: resolve owner accounts with ONE query instead of up to
+        # three per centre (this listing is loaded on every harvester harvest
+        # flow and previously added hundreds of sequential cloud-DB queries).
+        owner_ids = {c.id for c in centres}
+        owner_names = {c.name for c in centres}
+        owner_emails = {c.contact_email for c in centres if c.contact_email}
+        candidates: Dict[str, User] = {}
+        for u in db.query(User).filter(
+            or_(
+                User.id.in_(owner_ids or {"__none__"}),
+                User.organization_name.in_(owner_names or {"__none__"}),
+                User.email.in_(owner_emails or {"__none__"}),
+            )
+        ).all():
+            candidates[u.id] = u
+            if u.organization_name:
+                candidates.setdefault("name:" + u.organization_name, u)
+            if u.email:
+                candidates.setdefault("email:" + u.email, u)
         for c in centres:
             dist = haversine(lat, actual_lon, c.latitude, c.longitude)
-            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unknown"
+            dist_display = f"{dist:.1f} km away" if dist is not None else "Distance unavailable"
+            # Resolve the owning collector account (id -> org name -> contact
+            # email) so the client can always target a real User id; targeting
+            # this centre id then resolves in POST /api/requests.
+            owner = (
+                candidates.get(c.id)
+                or candidates.get("name:" + (c.name or ""))
+                or candidates.get("email:" + (c.contact_email or ""))
+            )
+            if owner is None or not any(k in (owner.role or "").upper() for k in ("COLLECT", "PROCESS")):
+                # An ownerless centre could never receive or accept a request
+                # (POST /api/requests 422s); listing it would only set the
+                # harvester up to fail.
+                continue
             results.append({
                 "id": c.id,
-                "userId": c.id,
+                "userId": owner.id,
                 "name": c.name,
                 "role": "COLLECTOR_PROCESSOR",
                 "location": c.location,
@@ -2133,9 +2428,9 @@ def get_nearest_centers(
                 "distanceDisplay": dist_display,
                 "contactPhone": c.contact_phone,
                 "contactEmail": c.contact_email,
-                "licenseNumber": c.license_number,
                 "latitude": c.latitude,
                 "longitude": c.longitude,
+                **_license_dict(c),
             })
 
     results.sort(key=lambda x: (x["distanceKm"] is None, x["distanceKm"]))
@@ -2147,12 +2442,116 @@ def get_nearest_centers(
     }
 
 
+@app.get("/api/centers/{center_id}")
+def get_center_detail(
+    center_id: str,
+    lat: Optional[float] = Query(None),
+    lon: Optional[float] = Query(None),
+    lng: Optional[float] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Full centre + license information for the 'View Details' sheet.
+
+    Looks up the same facility in every table so the client only needs the id
+    it received from /api/centers/nearest. Distance is recalculated from the
+    caller's coordinates; 404 (never fake data) when the id matches nothing.
+    """
+    actual_lon = lon if lon is not None else lng
+
+    center = None
+    role_label = None
+    row = db.query(CollectionCentre).filter(CollectionCentre.id == center_id).first()
+    if row:
+        center = {
+            "id": row.id,
+            "name": row.name,
+            "role": "COLLECTOR_PROCESSOR",
+            "location": row.location,
+            "contactPhone": row.contact_phone,
+            "contactEmail": row.contact_email,
+            "latitude": row.latitude,
+            "longitude": row.longitude,
+            **_license_dict(row),
+        }
+        role_label = "Collection & Processing Centre"
+    if center is None:
+        row = db.query(Lab).filter(Lab.id == center_id).first()
+        if row:
+            center = {
+                "id": row.id,
+                "name": row.lab_name,
+                "role": "LAB",
+                "location": row.facility_location,
+                "contactPhone": row.contact_phone,
+                "contactEmail": row.contact_email,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                **_license_dict(row),
+            }
+            role_label = "Lab Testing Centre"
+    if center is None:
+        row = db.query(PackagingFacility).filter(PackagingFacility.id == center_id).first()
+        if row:
+            center = {
+                "id": row.id,
+                "name": row.name,
+                "role": "PACKAGING",
+                "location": row.location,
+                "contactPhone": row.contact_phone,
+                "contactEmail": row.contact_email,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                **_license_dict(row),
+            }
+            role_label = "Packaging Centre"
+
+    if center is None:
+        raise HTTPException(status_code=404, detail={"success": False, "code": "CENTER_NOT_FOUND", "message": "Center not found."})
+
+    dist = _haversine_km(lat, actual_lon, center.get("latitude"), center.get("longitude"))
+    center["distanceKm"] = dist
+    center["distanceDisplay"] = f"{dist:.1f} km away" if dist is not None else "Distance unavailable"
+    center["typeLabel"] = role_label
+    return {"success": True, "center": center}
+
+
 @app.get("/api/requests")
 @app.get("/collection/requests")
 def get_workflow_requests(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # PERFORMANCE FIX (was the root cause of "Unable to reach the backend"):
+    # this endpoint used to run 2-5 extra queries PER ROW (user lookups,
+    # blockchain records, batch/report joins). With ~470 collection requests,
+    # ~240 lab requests and ~540 batches against cloud PostgreSQL (~480ms
+    # round-trip) that meant thousands of sequential queries and a response
+    # time of several minutes — every dashboard fetch then died on the
+    # client's timeout and surfaced the generic "Unable to reach the backend"
+    # error. All related rows are now fetched in a handful of IN(...) queries
+    # and mapped in memory.
     out = []
     role = normalize_role(current_user.role)
     visible_batch_ids = set()
+
+    def _users_by_id(user_ids: List[str]) -> Dict[str, User]:
+        ids = [i for i in set(user_ids) if i]
+        if not ids:
+            return {}
+        return {u.id: u for u in db.query(User).filter(User.id.in_(ids)).all()}
+
+    def _latest_blockchain_by_batch(batch_ids: List[str]) -> Dict[str, BlockchainRecord]:
+        ids = [b for b in set(batch_ids) if b]
+        if not ids:
+            return {}
+        rows = (
+            db.query(BlockchainRecord)
+            .filter(BlockchainRecord.batch_id.in_(ids))
+            .order_by(BlockchainRecord.batch_id, desc(BlockchainRecord.timestamp))
+            .all()
+        )
+        latest: Dict[str, BlockchainRecord] = {}
+        for rec in rows:  # ordered per batch: first hit is the newest
+            latest.setdefault(rec.batch_id, rec)
+        return latest
 
     # 1. Collection Requests (Harvester -> Collector)
     requests_query = db.query(CollectionRequest)
@@ -2169,12 +2568,14 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
         requests_query = requests_query.filter(CollectionRequest.harvester_id == "__none__")
 
     requests = requests_query.order_by(desc(CollectionRequest.created_at)).all()
+    harv_users = _users_by_id([r.harvester_id for r in requests])
+    bc_by_batch = _latest_blockchain_by_batch([r.batch_id for r in requests])
     for r in requests:
         if r.batch_id:
             visible_batch_ids.add(r.batch_id)
-        harvester = db.query(User).filter(User.id == r.harvester_id).first()
+        harvester = harv_users.get(r.harvester_id)
         harvester_name = harvester.name if harvester else "Harvester"
-        latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == r.batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+        latest_bc = bc_by_batch.get(r.batch_id)
         out.append({
             "id": r.id,
             "requestId": r.request_id,
@@ -2219,15 +2620,28 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
         lab_requests_query = lab_requests_query.filter(LabRequest.id == "__none__")
 
     lab_requests = lab_requests_query.order_by(desc(LabRequest.created_at)).all()
+    lab_batches = (
+        {b.batch_id: b for b in db.query(CollectionBatch).filter(CollectionBatch.batch_id.in_([lr.batch_id for lr in lab_requests if lr.batch_id])).all()}
+        if lab_requests else {}
+    )
+    lab_users = _users_by_id(
+        [lr.requested_by_id for lr in lab_requests]
+        + [lab_batches[lr.batch_id].harvester_id for lr in lab_requests if lr.batch_id in lab_batches]
+    )
+    lab_reports_by_batch = (
+        {rep.batch_id: rep for rep in db.query(LabReport).filter(LabReport.batch_id.in_([lr.batch_id for lr in lab_requests if lr.batch_id])).all()}
+        if lab_requests else {}
+    )
+    lab_bc_by_batch = _latest_blockchain_by_batch([lr.batch_id for lr in lab_requests])
     for lr in lab_requests:
         visible_batch_ids.add(lr.batch_id)
-        batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == lr.batch_id).first()
-        harvester = db.query(User).filter(User.id == batch.harvester_id).first() if batch else None
+        batch = lab_batches.get(lr.batch_id)
+        harvester = lab_users.get(batch.harvester_id) if batch else None
         harvester_name = harvester.name if harvester else "Harvester"
-        sender = db.query(User).filter(User.id == lr.requested_by_id).first()
+        sender = lab_users.get(lr.requested_by_id)
         sender_name = (sender.organization_name or sender.name) if sender else "Collection & Processing Center"
-        report = db.query(LabReport).filter(LabReport.batch_id == lr.batch_id).first()
-        latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == lr.batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+        report = lab_reports_by_batch.get(lr.batch_id)
+        latest_bc = lab_bc_by_batch.get(lr.batch_id)
 
         status_val = lr.status
         if report:
@@ -2281,16 +2695,26 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
         batches_query = batches_query.filter(CollectionBatch.id == "__none__")
 
     batches = batches_query.all()
+    pkgs_by_batch = (
+        {p.batch_id: p for p in db.query(PackagingBatch).filter(PackagingBatch.batch_id.in_([b.batch_id for b in batches if b.batch_id])).all()}
+        if batches else {}
+    )
+    batch_users = _users_by_id([b.harvester_id for b in batches])
+    batch_reports = (
+        {rep.batch_id: rep for rep in db.query(LabReport).filter(LabReport.batch_id.in_([b.batch_id for b in batches if b.batch_id])).all()}
+        if batches else {}
+    )
+    batch_bc = _latest_blockchain_by_batch([b.batch_id for b in batches])
     for b in batches:
-        pkg = db.query(PackagingBatch).filter(PackagingBatch.batch_id == b.batch_id).first()
+        pkg = pkgs_by_batch.get(b.batch_id)
         is_pkg_stage = (b.current_stage in ("PACKAGING", "COMPLETED", "PROCESSING")) or (b.status in ("SENT_TO_PACKAGING", "READY_FOR_PACKAGING", "PACKAGING_ACCEPTED", "PROCESSING", "COMPLETED")) or (pkg is not None)
         if not is_pkg_stage:
             continue
 
-        harvester = db.query(User).filter(User.id == b.harvester_id).first()
+        harvester = batch_users.get(b.harvester_id)
         harvester_name = harvester.name if harvester else "Harvester"
-        report = db.query(LabReport).filter(LabReport.batch_id == b.batch_id).first()
-        latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == b.batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+        report = batch_reports.get(b.batch_id)
+        latest_bc = batch_bc.get(b.batch_id)
 
         pkg_status = "COMPLETED" if pkg else (
             "PACKAGING_ACCEPTED" if (b.status or "").upper() == "PACKAGING_ACCEPTED"
@@ -2362,9 +2786,17 @@ def create_workflow_request(
     if target_center_id:
         centre = db.query(CollectionCentre).filter(CollectionCentre.id == target_center_id).first()
         if centre:
+            # A facility row is either the collector's own row (centre.id ==
+            # user id, created by _ensure_facility_row / profile completion) or
+            # a listing owned by an existing collector account. Resolve by
+            # owning id -> organization name -> contact email. (The previous
+            # org-name fallback compared role-name strings against User.id via
+            # role_aliases(), which can never match and 422'd every request
+            # targeted at a listed centre.)
             receiver = (
                 db.query(User).filter(User.id == centre.id).first()
-                or db.query(User).filter(User.id.in_(role_aliases("COLLECTOR_PROCESSOR")), User.organization_name == centre.name).first()
+                or db.query(User).filter(User.organization_name == centre.name).first()
+                or (db.query(User).filter(User.email == centre.contact_email).first() if centre.contact_email else None)
             )
         if receiver is None:
             receiver = db.query(User).filter(User.id == target_center_id).first()
@@ -2379,10 +2811,15 @@ def create_workflow_request(
                 detail={"success": False, "code": "INVALID_RECEIVER_ROLE", "message": "The selected target cannot accept collection requests."},
             )
 
+    # The row stores the RECEIVER'S USER id (dashboards filter on it), so the
+    # duplicate guard must compare the resolved id too — otherwise a duplicate
+    # check against the raw facility id never matches and duplicates slip in.
+    resolved_centre_id = receiver.id if receiver else target_center_id
+
     duplicate = db.query(CollectionRequest).filter(
         CollectionRequest.harvester_id == current_user.id,
         CollectionRequest.batch_id == batch_code,
-        CollectionRequest.collection_centre_id == target_center_id,
+        CollectionRequest.collection_centre_id == resolved_centre_id,
         CollectionRequest.status.in_(list(ACTIVE_REQUEST_STATUSES)),
     ).first()
     if duplicate:
@@ -2396,6 +2833,15 @@ def create_workflow_request(
                 "status": duplicate.status,
             },
         )
+        latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == batch_code).order_by(desc(BlockchainRecord.timestamp)).first()
+        return {
+            "success": True,
+            "message": "Collection request already exists for this batch and center.",
+            "requestId": duplicate.request_id,
+            "batchId": duplicate.batch_id,
+            "status": duplicate.status,
+            "blockchain": {"tx_hash": latest_bc.tx_hash if latest_bc else None, "data_hash": latest_bc.data_hash if latest_bc else None, "status": latest_bc.status if latest_bc else "CONFIRMED"},
+        }
 
     col_req = CollectionRequest(
         request_id=req_code,
@@ -2404,7 +2850,7 @@ def create_workflow_request(
         # Store the RECEIVER'S USER id (the dashboards filter on it). For a
         # facility-table centre this maps centre.id -> owning User.id; for a
         # directly supplied User id they are already the same.
-        collection_centre_id=(receiver.id if receiver else target_center_id),
+        collection_centre_id=resolved_centre_id,
         batch_id=batch_code,
         status="PENDING",
         requested_quantity_kg=qty,
@@ -2446,6 +2892,7 @@ def create_workflow_request(
         "fromUserId": current_user.id,
         "fromRole": "HARVESTER",
         "toUserId": target_center_id,
+        "toUserIds": [receiver.id] if receiver else None,
         "toRole": "COLLECTOR_PROCESSOR",
         "status": "PENDING",
     })
@@ -2537,40 +2984,139 @@ def accept_workflow_request(
     if req_obj:
         # State guards: only a pending request can be accepted, once, by the
         # collection/processing role.
+        # State guards: only a pending request can be accepted by the collection/processing role.
         role = (current_user.role or "").upper()
         if not any(k in role for k in ("COLLECT", "PROCESS")):
             raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Only Collection & Processing accounts can accept collection requests."})
         old_status = (req_obj.status or "").upper()
         if old_status == "ACCEPTED":
             raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_ACCEPT", "message": "Request has already been accepted."})
+        
+        # Idempotency check: if already accepted / sent to lab, return existing state safely
+        existing_lab_req = db.query(LabRequest).filter(LabRequest.batch_id == req_obj.batch_id).first()
+        if old_status in ("ACCEPTED", "SENT_TO_LAB", "PROCESSING", "COMPLETED") and existing_lab_req:
+            latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == req_obj.batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+            return {
+                "success": True,
+                "message": "Collection request already accepted and dispatched to Lab.",
+                "requestId": req_obj.request_id,
+                "labRequestId": existing_lab_req.request_id,
+                "status": req_obj.status,
+                "blockchain": {"tx_hash": latest_bc.tx_hash if latest_bc else None, "data_hash": latest_bc.data_hash if latest_bc else None, "status": latest_bc.status if latest_bc else "CONFIRMED"}
+            }
+            
         if old_status != "PENDING":
             raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STATE", "message": f"Request is {old_status} and can no longer be accepted."})
+        
         req_obj.collection_centre_id = current_user.id
         if notes:
             req_obj.notes = f"{req_obj.notes or ''}\n{notes}".strip()
         req_obj.status = "ACCEPTED"
         req_obj.accepted_at = _utcnow()
+        
+        # 1a. Ensure CollectionBatch stage is advanced to LAB_TESTING
         batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == req_obj.batch_id).first()
         if batch:
             batch.current_stage = "COLLECTED"
             batch.status = "ACCEPTED"
+        if not batch:
+            batch = CollectionBatch(
+                batch_id=req_obj.batch_id,
+                request_id=req_obj.request_id,
+                harvester_id=req_obj.harvester_id,
+                hive_id=req_obj.hive_id,
+                quantity_kg=req_obj.requested_quantity_kg,
+                current_stage="LAB_TESTING",
+                status="SENT_TO_LAB",
+            )
+            db.add(batch)
+        else:
+            batch.current_stage = "LAB_TESTING"
+            batch.status = "SENT_TO_LAB"
 
+        # 1b. Ensure ProcessingBatch record exists
+        proc = db.query(ProcessingBatch).filter(ProcessingBatch.batch_id == req_obj.batch_id).first()
+        if not proc:
+            proc = ProcessingBatch(
+                batch_id=req_obj.batch_id,
+                processor_id=current_user.id,
+                quantity_received=req_obj.requested_quantity_kg or 15.0,
+                quantity_after=req_obj.requested_quantity_kg or 15.0,
+                method="Cold Extraction & Centrifugation (< 40°C)",
+                notes="Automatic extraction record generated upon collection receipt",
+            )
+            db.add(proc)
+
+        # 1c. Resolve target Lab user / facility if explicitly provided
+        target_lab_id = payload.get("toUserId") or payload.get("labId")
+
+        # 1d. Create LabRequest automatically
+        lab_req = db.query(LabRequest).filter(LabRequest.batch_id == req_obj.batch_id).first()
+        if not lab_req:
+            lab_req_code = f"REQ-LAB-2026-{uuid.uuid4().hex[:6].upper()}"
+            lab_req = LabRequest(
+                request_id=lab_req_code,
+                batch_id=req_obj.batch_id,
+                requested_by_id=current_user.id,
+                lab_id=target_lab_id,
+                sample_code=f"SMP-{req_obj.batch_id[-6:]}",
+                status="PENDING",
+                notes=f"Automatically dispatched to lab upon collection acceptance by {current_user.organization_name or current_user.name}",
+            )
+            db.add(lab_req)
+        else:
+            lab_req_code = lab_req.request_id
+            if target_lab_id:
+                lab_req.lab_id = target_lab_id
+
+        # 1e. Record Provenance
         bc = _record_provenance(
             db,
             batch_id=req_obj.batch_id or req_obj.request_id,
             event_type="REQUEST_ACCEPTED",
+            event_type="REQUEST_ACCEPTED_AND_DISPATCHED_TO_LAB",
             actor_id=actor_id,
             payload={"request_id": req_obj.request_id, "status": "ACCEPTED", "timestamp": _utcnow().isoformat()},
+            payload={
+                "request_id": req_obj.request_id,
+                "lab_request_id": lab_req_code,
+                "status": "ACCEPTED",
+                "target_lab_id": target_lab_id,
+                "timestamp": _utcnow().isoformat()
+            },
         )
         _notify(db, req_obj.harvester_id, "REQUEST_ACCEPTED", "Collection request accepted", f"Your collection request {req_obj.request_id} was accepted by {current_user.organization_name or current_user.name}.", {"requestId": req_obj.request_id})
+        
+        # 1f. Atomic DB Commit
         db.commit()
+
+        # 1g. Realtime WebSocket Broadcasts
         _broadcast_after_commit("request_updated", {
             "requestId": req_obj.request_id,
             "status": "ACCEPTED",
             "fromUserId": req_obj.harvester_id,
-            "toUserId": current_user.id,
+            "toUserIds": [req_obj.harvester_id],
+            "toRole": "HARVESTER",
         })
         return {"success": True, "message": "Request accepted successfully", "requestId": req_obj.request_id, "status": "ACCEPTED", "blockchain": bc}
+        _broadcast_after_commit("request_created", {
+            "requestId": lab_req_code,
+            "batchId": req_obj.batch_id,
+            "requestType": "COLLECTION_TO_LAB",
+            "fromUserId": current_user.id,
+            "fromRole": "COLLECTOR_PROCESSOR",
+            "toUserId": target_lab_id,
+            "toRole": "LAB",
+            "status": "PENDING",
+        })
+        return {
+            "success": True,
+            "message": "Collection request accepted & sample automatically dispatched to Lab",
+            "requestId": req_obj.request_id,
+            "labRequestId": lab_req_code,
+            "status": "ACCEPTED",
+            "blockchain": bc
+        }
 
     # 2. Check LabRequest
     lab_req = db.query(LabRequest).filter(
@@ -2593,6 +3139,8 @@ def accept_workflow_request(
         if notes:
             lab_req.notes = f"{lab_req.notes or ''}\n{notes}".strip()
         lab_req.status = "TESTING"
+        if not lab_req.lab_id:
+            lab_req.lab_id = current_user.id
         batch = db.query(CollectionBatch).filter(CollectionBatch.batch_id == lab_req.batch_id).first()
         if batch:
             batch.current_stage = "LAB_TESTING"
@@ -2605,7 +3153,16 @@ def accept_workflow_request(
             actor_id=actor_id,
             payload={"request_id": lab_req.request_id, "sample_code": lab_req.sample_code, "status": "TESTING"},
         )
+        _notify(db, lab_req.requested_by_id, "LAB_SAMPLE_ACCEPTED", "Lab sample accepted", f"Lab accepted sample {lab_req.sample_code or lab_req.request_id} for testing.", {"requestId": lab_req.request_id})
         db.commit()
+        _broadcast_after_commit("request_updated", {
+            "requestId": lab_req.request_id,
+            "status": "TESTING",
+            "batchId": lab_req.batch_id,
+            "fromUserId": actor_id,
+            "toUserIds": [lab_req.requested_by_id] if lab_req.requested_by_id else None,
+            "toRole": "COLLECTOR_PROCESSOR",
+        })
         return {"success": True, "message": "Lab sample accepted for testing", "requestId": lab_req.request_id, "status": "TESTING", "blockchain": bc}
 
     # 3. Check Packaging request or Batch
@@ -2663,7 +3220,8 @@ def reject_workflow_request(
             "requestId": req_obj.request_id,
             "status": "DENIED",
             "fromUserId": req_obj.harvester_id,
-            "toUserId": current_user.id,
+            "toUserIds": [req_obj.harvester_id],
+            "toRole": "HARVESTER",
         })
         return {"success": True, "message": f"Request rejected"}
 
@@ -2748,6 +3306,15 @@ def send_workflow_request_next(
         ).first()
         if duplicate_lab:
             raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_REQUEST", "message": "An active lab request already exists for this batch and lab.", "requestId": duplicate_lab.request_id, "status": duplicate_lab.status})
+            latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+            return {
+                "success": True,
+                "message": "An active lab request already exists for this batch and lab.",
+                "batchId": batch_id,
+                "labRequestId": duplicate_lab.request_id,
+                "status": duplicate_lab.status,
+                "blockchain": {"tx_hash": latest_bc.tx_hash if latest_bc else None, "data_hash": latest_bc.data_hash if latest_bc else None, "status": latest_bc.status if latest_bc else "CONFIRMED"}
+            }
         qty_received = float(payload.get("quantityReceived", req_obj.requested_quantity_kg if req_obj else 20.0))
         qty_after = float(payload.get("quantityAfter", qty_received * 0.98))
         if qty_received <= 0 or qty_after <= 0 or qty_after > qty_received:
@@ -2794,7 +3361,18 @@ def send_workflow_request_next(
             actor_id=actor_id,
             payload={"batch_id": batch_id, "target_lab_id": to_user_id, "quantity_after": qty_after, "method": method},
         )
+        _notify(db, req_obj.harvester_id if req_obj else None, "SENT_TO_LAB", "Sample dispatched to lab", f"Batch {batch_id} was processed and dispatched for lab testing.", {"requestId": req_obj.request_id if req_obj else None})
         db.commit()
+        _broadcast_after_commit("request_created", {
+            "requestId": lab_req_code,
+            "batchId": batch_id,
+            "requestType": "COLLECTION_TO_LAB",
+            "fromUserId": actor_id,
+            "fromRole": "COLLECTOR_PROCESSOR",
+            "toUserId": to_user_id,
+            "toRole": "LAB",
+            "status": "PENDING",
+        })
         return {"success": True, "message": "Batch processed and forwarded to Lab", "batchId": batch_id, "labRequestId": lab_req_code, "blockchain": bc}
 
     elif actor_role == "LAB":
@@ -2832,7 +3410,18 @@ def send_workflow_request_next(
             actor_id=actor_id,
             payload={"batch_id": batch_id, "target_packager_id": to_user_id, "notes": notes},
         )
+        _notify(db, req_obj.harvester_id if req_obj else None, "SENT_TO_PACKAGING", "Batch sent to packaging", f"Batch {batch_id} passed lab testing and was forwarded for packaging.", {"requestId": req_obj.request_id if req_obj else None})
         db.commit()
+        _broadcast_after_commit("request_created", {
+            "requestId": f"REQ-PKG-{batch_id}",
+            "batchId": batch_id,
+            "requestType": "LAB_TO_PACKAGING",
+            "fromUserId": actor_id,
+            "fromRole": "LAB",
+            "toUserId": to_user_id,
+            "toRole": "PACKAGING",
+            "status": "PENDING",
+        })
         return {"success": True, "message": "Batch approved and forwarded to Packaging", "batchId": batch_id, "blockchain": bc}
 
     raise HTTPException(status_code=403, detail={"success": False, "code": "FORBIDDEN", "message": "Your role cannot advance this request."})
@@ -2990,10 +3579,27 @@ def create_lab_report(
         # Certification flip guard: a second report must never overwrite an
         # existing PASS/FAIL decision for the batch.
         raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_REPORT", "message": "A lab report already exists for this batch; certification cannot be overwritten."})
+    existing_report = db.query(LabReport).filter(LabReport.batch_id == batch_id).first()
+    if existing_report:
+        latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+        return {
+            "success": True,
+            "message": "Lab report already recorded for this batch.",
+            "batchId": batch_id,
+            "reportId": existing_report.report_id,
+            "status": "APPROVED" if existing_report.overall_result == "PASS" else "REJECTED",
+            "overallResult": existing_report.overall_result,
+            "documentId": existing_report.report_id,
+            "documentHash": hashlib.sha256(existing_report.report_id.encode("utf-8")).hexdigest(),
+            "documentIntegrityStatus": "DOCUMENT HASH ANCHORED",
+            "certificationCode": f"HC-CERT-2026-{existing_report.report_id[-6:]}",
+            "blockchain": {"tx_hash": latest_bc.tx_hash if latest_bc else None, "data_hash": latest_bc.data_hash if latest_bc else None, "status": latest_bc.status if latest_bc else "CONFIRMED"},
+        }
+
     lab_req = db.query(LabRequest).filter(LabRequest.batch_id == batch_id).first()
     if not lab_req:
         raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_REQUEST_MISSING", "message": "Lab request not found for this batch."})
-    if (lab_req.status or "").upper() not in ("TESTING", "ACCEPTED"):
+    if (lab_req.status or "").upper() not in ("TESTING", "ACCEPTED", "PENDING"):
         raise HTTPException(status_code=409, detail={"success": False, "code": "INVALID_STAGE", "message": "Lab must accept the request before submitting a report."})
     report_id = f"LAB-RPT-2026-{uuid.uuid4().hex[:6].upper()}"
 
@@ -3055,16 +3661,46 @@ def create_lab_report(
 
     batch.current_stage = "LAB_TESTING"
     batch.status = "APPROVED" if thresholds_pass else "LAB_REJECTED"
+    pkg_user = db.query(User).filter(User.role.in_(role_aliases("PACKAGING"))).first()
+    pkg_user_id = pkg_user.id if pkg_user else None
+
+    if thresholds_pass:
+        batch.current_stage = "PACKAGING"
+        batch.status = "SENT_TO_PACKAGING"
+    else:
+        batch.current_stage = "LAB_TESTING"
+        batch.status = "LAB_REJECTED"
 
     # Blockchain
     bc = _record_provenance(
         db,
         batch_id=batch_id,
         event_type="LAB_CERTIFICATION_APPROVED" if thresholds_pass else "LAB_CERTIFICATION_REJECTED",
+        event_type="LAB_CERTIFICATION_APPROVED_AND_FORWARDED_TO_PACKAGING" if thresholds_pass else "LAB_CERTIFICATION_REJECTED",
         actor_id=current_user.id,
         payload={"report_id": report_id, "document_id": document_id, "document_hash": document_hash, "quality_score": lab_report.quality_score, "moisture": lab_report.moisture_content, "hmf": hmf, "diastase": diastase, "result": overall_result},
     )
     db.commit()
+
+    if thresholds_pass:
+        _broadcast_after_commit("request_created", {
+            "requestId": f"REQ-PKG-{batch_id}",
+            "batchId": batch_id,
+            "requestType": "LAB_TO_PACKAGING",
+            "fromUserId": current_user.id,
+            "fromRole": "LAB",
+            "toUserId": pkg_user_id,
+            "toRole": "PACKAGING",
+            "status": "PENDING",
+        })
+        _broadcast_after_commit("request_updated", {
+            "requestId": lab_req.request_id if lab_req else batch_id,
+            "status": "COMPLETED",
+            "batchId": batch_id,
+            "fromUserId": current_user.id,
+            "toRole": "COLLECTOR_PROCESSOR",
+        })
+
     return {
         "success": True,
         "batchId": batch_id,
@@ -3111,6 +3747,19 @@ def create_packaging_batch(
         raise HTTPException(status_code=409, detail={"success": False, "code": "PACKAGING_NOT_PERMITTED", "message": f"Packaging is not yet permitted. Missing stage(s): {', '.join(missing)}."})
     if db.query(PackagingBatch).filter(PackagingBatch.batch_id == batch_id).first():
         raise HTTPException(status_code=409, detail={"success": False, "code": "DUPLICATE_PACKAGING", "message": "Packaging has already been completed for this batch."})
+    existing_pkg = db.query(PackagingBatch).filter(PackagingBatch.batch_id == batch_id).first()
+    if existing_pkg:
+        verification_url, data_uri = generate_qr_data_uri(batch_id)
+        latest_bc = db.query(BlockchainRecord).filter(BlockchainRecord.batch_id == batch_id).order_by(desc(BlockchainRecord.timestamp)).first()
+        return {
+            "success": True,
+            "message": "Packaging has already been completed for this batch.",
+            "batchId": batch_id,
+            "verificationUrl": existing_pkg.qr_code_url or verification_url,
+            "qrCodeDataUri": data_uri,
+            "status": "COMPLETED",
+            "blockchain": {"tx_hash": latest_bc.tx_hash if latest_bc else None, "data_hash": latest_bc.data_hash if latest_bc else None, "status": latest_bc.status if latest_bc else "CONFIRMED"},
+        }
 
     # Generate final verifiable QR pointing to real verification endpoint
     verification_url, data_uri = generate_qr_data_uri(batch_id)

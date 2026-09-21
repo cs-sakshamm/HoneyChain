@@ -19,8 +19,6 @@ import '../../../core/controllers/workflow_controller.dart';
 import '../../../core/models/workflow_request.dart';
 import '../../../core/localization/localization_service.dart';
 import '../../profile/controllers/user_controller.dart';
-import '../../verification/controllers/verification_controller.dart';
-import '../../verification/screens/collector_verification_screen.dart';
 
 class CollectionDashboardScreen extends StatefulWidget {
   const CollectionDashboardScreen({super.key});
@@ -40,11 +38,6 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = context.read<UserController>().user;
-      final userId = user.id ?? user.email;
-      if (userId.isNotEmpty) {
-        context.read<VerificationController>().loadCollectorVerification(userId);
-      }
       context.read<WorkflowController>().fetchAllData();
     });
   }
@@ -81,11 +74,23 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogCtx);
-              await context.read<WorkflowController>().rejectRequest(req.id, actorRole: 'COLLECTOR_PROCESSOR', reason: reasonCtrl.text.trim());
+              final wfCtrl = context.read<WorkflowController>();
+              final success = await wfCtrl.rejectRequest(req.id, actorRole: 'COLLECTOR_PROCESSOR', reason: reasonCtrl.text.trim());
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Request rejected & recorded.'), backgroundColor: AppConstants.error),
-                );
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Request rejected & recorded.'), backgroundColor: AppConstants.error),
+                  );
+                } else {
+                  // Real failure: the backend rejected the transition (e.g.
+                  // reject-after-accept → 409) or the call never landed.
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(wfCtrl.errorMessage ?? 'Failed to reject request. Please try again.'),
+                      backgroundColor: AppConstants.error,
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.error, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
@@ -265,9 +270,6 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
                   children: [
-                    _buildVerificationBanner(context),
-                    const SizedBox(height: AppConstants.space16),
-
                     if (isInitialLoad)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 48),
@@ -507,222 +509,6 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
     );
   }
 
-  Widget _buildVerificationBanner(BuildContext context) {
-    final verCtrl = context.watch<VerificationController>();
-    final userCtrl = context.watch<UserController>();
-    final collectorVer = verCtrl.collectorVerification;
-    final isFullyVerified = collectorVer.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
-    final count = isFullyVerified ? 3 : collectorVer.completedStepsCount;
-    final double progress = (count / 3.0).clamp(0.0, 1.0);
-    final int percentage = (progress * 100).round();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final String statusBadgeText;
-    final Color statusColor;
-    final Color statusBgColor;
-
-    if (isFullyVerified || count == 3) {
-      statusBadgeText = 'Profile Verified (3 of 3)';
-      statusColor = context.successColor;
-      statusBgColor = context.successBgColor;
-    } else if (count == 0) {
-      statusBadgeText = 'Profile Setup (0 of 3)';
-      statusColor = context.warningColor;
-      statusBgColor = context.warningBgColor;
-    } else {
-      statusBadgeText = 'Partially Verified ($count of 3)';
-      statusColor = context.colors.primary;
-      statusBgColor = context.primarySoftColor;
-    }
-
-    final String supportingText;
-    if (isFullyVerified) {
-      supportingText = 'Profile Verified — Collection & Processing access enabled.';
-    } else {
-      supportingText = 'Complete profile verification to start collection & processing activities.';
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppConstants.space16),
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isFullyVerified
-              ? context.successColor.withValues(alpha: 0.5)
-              : (isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isFullyVerified
-                ? context.successColor.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(
-                      isFullyVerified ? Icons.verified_user_rounded : Icons.shield_outlined,
-                      size: 20,
-                      color: statusColor,
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Profile Verification',
-                        style: GoogleFonts.manrope(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: context.textPrimaryColor,
-                          letterSpacing: -0.2,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBgColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  statusBadgeText,
-                  style: GoogleFonts.manrope(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : context.borderColor.withValues(alpha: 0.5),
-                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '$percentage%',
-                style: GoogleFonts.manrope(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: statusColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              _buildMiniCheck(context, 'Business', collectorVer.isStep2BusinessComplete),
-              _buildMiniCheck(context, 'License & KYC', collectorVer.isStep3KycComplete),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  supportingText,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: context.textSecondaryColor,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CollectorVerificationScreen()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isFullyVerified ? context.successBgColor : context.primarySoftColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isFullyVerified ? context.successColor.withValues(alpha: 0.4) : context.borderColor,
-                    ),
-                  ),
-                  child: Text(
-                    isFullyVerified ? 'View Badge ✓' : 'Verify Profile →',
-                    style: GoogleFonts.manrope(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isFullyVerified ? context.successColor : context.textPrimaryColor,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniCheck(BuildContext context, String title, bool isDone) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-          size: 14,
-          color: isDone ? context.successColor : context.textMutedColor,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: isDone ? FontWeight.w600 : FontWeight.w400,
-            color: isDone ? context.successColor : context.textSecondaryColor,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context, String title, String subtitle) {
-    return EmptyStateWidget(
-      title: title,
-      subtitle: subtitle,
-    );
-  }
-
   Widget _buildRequestCard(
     BuildContext context,
     WorkflowRequest req, {
@@ -731,9 +517,6 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
     bool isRejectedTab = false,
     bool isCompletedTab = false,
   }) {
-    final verCtrl = context.watch<VerificationController>();
-    final userCtrl = context.watch<UserController>();
-    final isCollectorVerified = verCtrl.collectorVerification.isFullyVerified || userCtrl.user.isVerified || userCtrl.user.isProfileComplete;
 
     return AppCard(
       onTap: () {
@@ -885,33 +668,8 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
           ],
           if (showAcceptReject) ...[
             const SizedBox(height: AppConstants.space16),
-            if (!isCollectorVerified) ...[
-              Container(
-                margin: const EdgeInsets.only(bottom: AppConstants.space12),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: context.warningBgColor,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: context.warningColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock_person_outlined, size: 16, color: context.warningColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Complete your profile verification to accept requests.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: context.warningColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            // Accept/reject gates itself through ProfileGuard when pressed,
+            // so no static lock banner is needed on the card.
             Row(
               children: [
                 Expanded(
@@ -938,16 +696,31 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
                   child: ElevatedButton(
                     onPressed: () async {
                       if (!ProfileGuard.checkCollectorVerificationOrPrompt(context)) return;
-                      await context.read<WorkflowController>().acceptRequest(req.id);
+                      final wfCtrl = context.read<WorkflowController>();
+                      final success = await wfCtrl.acceptRequest(req.id);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Harvest batch accepted! You can now extract and send to Lab.')),
-                        );
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Harvest batch accepted! You can now extract and send to Lab.'),
+                              backgroundColor: AppConstants.success,
+                            ),
+                          );
+                        } else {
+                          // Real failure (403 role, 409 already accepted/not
+                          // pending, 404, network): show the backend message.
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(wfCtrl.errorMessage ?? 'Failed to accept request. Please try again.'),
+                              backgroundColor: AppConstants.error,
+                            ),
+                          );
+                        }
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isCollectorVerified ? context.colors.primary : context.borderColor,
-                      foregroundColor: isCollectorVerified ? context.colors.onPrimary : context.textMutedColor,
+                      backgroundColor: context.colors.primary,
+                      foregroundColor: context.colors.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -958,7 +731,7 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
                       'Accept Request',
                       style: GoogleFonts.manrope(
                         fontWeight: FontWeight.w700,
-                        color: isCollectorVerified ? context.colors.onPrimary : context.textMutedColor,
+                        color: context.colors.onPrimary,
                       ),
                     ),
                   ),
@@ -967,52 +740,43 @@ class _CollectionDashboardScreenState extends State<CollectionDashboardScreen> {
             ),
           ] else if (showSendToLab) ...[
             const SizedBox(height: AppConstants.space16),
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      if (!ProfileGuard.checkCollectorVerificationOrPrompt(context)) return;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => NearestCentresScreen(
-                            targetRole: 'LAB',
-                            batchId: req.batchId,
-                            requestId: req.id,
-                            quantity: req.estimatedQuantityKg,
-                            originLocation: req.location,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.near_me_rounded, size: 18),
-                    label: const Text('Nearest Lab Testing'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.colors.primary,
-                      foregroundColor: context.colors.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: context.successBgColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: context.successColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, size: 18, color: context.successColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Accepted & Automatically Dispatched to DataMineX Lab Testing',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: context.successColor),
                     ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => BatchTimelineScreen(batchId: req.batchId)),
+                  );
+                },
+                icon: const Icon(Icons.timeline_rounded, size: 16),
+                label: const Text('View Batch Lifecycle & Trace'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      _showSendToLabDialog(context, req);
-                    },
-                    icon: const Icon(Icons.edit_note_rounded, size: 18),
-                    label: const Text('Custom'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ] else if (isCompletedTab) ...[
             const SizedBox(height: AppConstants.space12),
