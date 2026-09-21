@@ -247,8 +247,8 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
         <div className="modal-overlay" onClick={() => setActiveStage(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-color)', width: '100%', maxWidth: '600px', maxHeight: '90vh', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.3s ease-out' }}>
             <div className="modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-color)' }}>
-              <button onClick={() => setActiveStage(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '14px', cursor: 'pointer', padding: '8px 0' }}>
-                <span style={{ fontSize: '18px' }}>←</span> Back
+              <button onClick={() => setActiveStage(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '9999px', color: 'var(--text-primary)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', padding: '6px 14px', transition: 'all 0.2s ease' }} onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--text-secondary)'} onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}>
+                <span style={{ fontSize: '16px' }}>←</span> Back
               </button>
               <h2 className="modal-title" style={{ fontSize: '16px', fontWeight: 800, margin: 0, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
                 {workflowNodes.find(n => n.id === activeStage)?.title.replace(/^[^\w\s]+/, '').trim()}
