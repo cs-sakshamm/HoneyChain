@@ -275,30 +275,38 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
 }
 
-.pv-sections {
+.pv-workflow {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 16px;
 }
 
-.pv-section {
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.pv-section-title {
+.pv-workflow-node {
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 16px 20px;
+  font-family: 'Inter', sans-serif;
   font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: var(--text-primary);
+  font-weight: 600;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.pv-sub-title {
-  font-size: 14px;
-  font-weight: 700;
-  margin: 16px 0 12px 0;
-  color: var(--text-primary);
-  text-transform: uppercase;
+.pv-workflow-node::after {
+  content: '→';
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.pv-workflow-node:hover {
+  border-color: var(--accent-color);
+  background-color: var(--surface-color);
 }
 
 .pv-kv-list {
@@ -326,6 +334,13 @@ h1, h2, h3, h4, h5, h6 {
   text-align: right;
   flex: 1;
   word-break: break-word;
+}
+
+.pv-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
 }
 
 .pv-footer {
