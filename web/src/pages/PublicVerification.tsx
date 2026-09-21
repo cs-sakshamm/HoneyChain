@@ -18,7 +18,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
       const res = await fetchVerificationData(batchId);
       setData(res);
     } catch (err: any) {
-      setError('Verification service is temporarily unavailable. Please try again.');
+      setError('Verification service is temporarily unavailable.');
     } finally {
       setLoading(false);
     }
@@ -47,8 +47,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
       <div className="pv-container">
         <div className="pv-wrapper">
           <div className="pv-center-msg">
-            <h2 className="pv-center-title">Error</h2>
-            <p className="pv-center-desc">{error}</p>
+            <h2 className="pv-center-title">{error}</h2>
           </div>
         </div>
       </div>
@@ -60,8 +59,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId }) => {
       <div className="pv-container">
         <div className="pv-wrapper">
           <div className="pv-center-msg">
-            <h2 className="pv-center-title">Traceability Record Not Found</h2>
-            <p className="pv-center-desc">Invalid Traceability Code.</p>
+            <h2 className="pv-center-title">Record not found</h2>
           </div>
         </div>
       </div>

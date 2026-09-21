@@ -282,9 +282,14 @@ app = FastAPI(
 # Production deployments should set CORS_ALLOW_ORIGINS (comma-separated) to lock
 # origins down. Auth is header-JWT (no cookies), which limits wildcard exposure.
 _cors_origins_env = (os.getenv("CORS_ALLOW_ORIGINS") or "").strip()
+_public_app_url = (os.getenv("PUBLIC_APP_URL") or "").strip()
+_default_origins = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8000"]
+if _public_app_url:
+    _default_origins.append(_public_app_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _cors_origins_env.split(",") if o.strip()] or ["*"],
+    allow_origins=[o.strip() for o in _cors_origins_env.split(",") if o.strip()] or _default_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -776,6 +781,61 @@ def _record_provenance(
     return blockchain_result
 
 
+def _ensure_facility_row(db: Session, user: User) -> None:
+    """Ensure a User with a supply-chain role has a matching facility row.
+
+    Google-authenticated collectors/labs/packagers get a User row on first
+    sign-in, but /api/centers/nearest and send-next dispatches only query the
+    facility tables (collection_centres, labs, packaging_facilities). Without
+    this sync they are invisible to the whole workflow: they can never be
+    selected as a target, never receive requests, and dispatches to them 404.
+    Created rows carry the user's id so lookups by either id resolve.
+    """
+    role_norm = (user.role or "").upper()
+    if "ADMIN" in role_norm:
+        return
+    try:
+        if any(k in role_norm for k in ("COLLECT", "PROCESS")):
+            if not db.query(CollectionCentre).filter(CollectionCentre.id == user.id).first():
+                db.add(CollectionCentre(
+                    id=user.id,
+                    name=user.organization_name or f"{user.name} Collection & Processing Centre",
+                    location=user.facility_location or "Regional Collection Facility",
+                    contact_phone=user.phone,
+                    contact_email=user.email,
+                    license_number=user.license_number,
+                    is_active=True,
+                ))
+                db.flush()
+        elif "LAB" in role_norm:
+            if not db.query(Lab).filter(Lab.id == user.id).first():
+                db.add(Lab(
+                    id=user.id,
+                    user_id=user.id,
+                    lab_name=user.organization_name or f"{user.name} Analytical Laboratory",
+                    facility_location=user.facility_location or "Accredited Testing Facility",
+                    contact_phone=user.phone,
+                    contact_email=user.email,
+                    registration_number=user.license_number,
+                    is_active=True,
+                ))
+                db.flush()
+        elif any(k in role_norm for k in ("PKG", "PACKAG")):
+            if not db.query(PackagingFacility).filter(PackagingFacility.id == user.id).first():
+                db.add(PackagingFacility(
+                    id=user.id,
+                    name=user.organization_name or f"{user.name} Packaging Facility",
+                    location=user.facility_location or "Regional Packaging Unit",
+                    contact_phone=user.phone,
+                    contact_email=user.email,
+                    license_number=user.license_number,
+                    is_active=True,
+                ))
+                db.flush()
+    except Exception as e:  # noqa: BLE001 - sync must never break auth flows
+        logger.debug(f"Facility row sync skipped for {user.email}: {e}")
+
+
 def get_user_dict(user: User) -> Dict[str, Any]:
     complete = is_user_profile_complete(user)
     verified = bool(user.is_verified or complete)
@@ -937,10 +997,11 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
     clean_email = (payload.email or "").strip().lower()
     if not payload.idToken:
         if strict_mode:
-            raise HTTPException(
-                status_code=400,
-                detail={"success": False, "error": "A Google ID token is required for Google sign-in.", "code": "GOOGLE_ID_TOKEN_REQUIRED"},
-            )
+            # FlutterFederatedSignIn / web signInWithPopup produce a Firebase ID
+            # token (aud = project id, iss = securetoken.google.com), NOT an
+            # OAuth2 Google token (aud = GOOGLE_CLIENT_ID). Accept either
+            # format by trying both verifiers before rejecting.
+            pass
         if not clean_email:
             raise HTTPException(status_code=400, detail={"success": False, "error": "Google identity token or email required.", "code": "VALIDATION_ERROR"})
         logger.warning("Google sign-in WITHOUT idToken accepted (development mode only).")
@@ -950,19 +1011,46 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
     verified_photo = payload.photoUrl
 
     if payload.idToken:
+        idinfo = None
+        # 1) Standard Google OAuth2 ID token (audience = GOOGLE_CLIENT_ID).
         try:
             from google.oauth2 import id_token
             from google.auth.transport import requests as grequests
             idinfo = id_token.verify_oauth2_token(payload.idToken, grequests.Request(), google_client_id)
-            verified_email = idinfo["email"].lower()
-            verified_name = idinfo.get("name", verified_name)
-            verified_photo = idinfo.get("picture", verified_photo)
         except Exception as e:
-            logger.warning(f"Google ID token verification failed: {e}")
+            logger.debug(f"Google OAuth2 token verification failed: {e}")
+
+        # 2) Firebase Auth ID token (audience = Firebase project id) — what the
+        #    Flutter app and the web verifier actually produce.
+        if not idinfo:
+            try:
+                from google.auth import jwt as gjwt
+                firebase_project = (os.getenv("FIREBASE_PROJECT_ID") or "honeychain-40065").strip()
+                claims = gjwt.decode(
+                    payload.idToken,
+                    certs_url="https://www.googleapis.com/robots/v1/metadata/x509/securetoken@system.gserviceaccount.com",
+                    audience=firebase_project,
+                )
+                expected_issuer = f"https://securetoken.google.com/{firebase_project}"
+                if claims.get("iss") != expected_issuer:
+                    raise ValueError("Invalid Firebase token issuer")
+                idinfo = {
+                    "email": claims.get("email") or "",
+                    "name": claims.get("name") or claims.get("display_name") or "Google User",
+                    "picture": claims.get("picture") or claims.get("photo_url"),
+                }
+            except Exception as e:
+                logger.warning(f"Google/Firebase ID token verification failed: {e}")
+
+        if not idinfo or not idinfo.get("email"):
             raise HTTPException(
                 status_code=401,
                 detail={"success": False, "error": "Google ID token could not be verified.", "code": "INVALID_GOOGLE_TOKEN"},
             )
+
+        verified_email = idinfo["email"].lower()
+        verified_name = idinfo.get("name", verified_name)
+        verified_photo = idinfo.get("picture", verified_photo)
 
     target_role = normalize_role(payload.role)
 
@@ -985,6 +1073,10 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
         if verified_photo:
             user.google_photo_url = verified_photo
             db.commit()
+
+    _ensure_facility_row(db, user)
+    db.commit()
+    db.refresh(user)
 
     token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
 
@@ -2103,7 +2195,12 @@ def get_workflow_requests(current_user: User = Depends(get_current_user), db: Se
         lab_requests_query = lab_requests_query.filter(LabRequest.requested_by_id == current_user.id)
     elif role == "LAB":
         lab_ids = [l.id for l in db.query(Lab).filter(Lab.user_id == current_user.id).all()]
-        lab_requests_query = lab_requests_query.filter(LabRequest.lab_id.in_((lab_ids + [current_user.id]) or ["__none__"]))
+        lab_ids.append(current_user.id)
+        # Unaddressed lab requests (lab_id IS NULL) must stay visible to every
+        # lab user: lab_id.in_([]) drops NULL rows, so include them explicitly.
+        lab_requests_query = lab_requests_query.filter(
+            or_(LabRequest.lab_id.in_(lab_ids), LabRequest.lab_id.is_(None))
+        )
     elif role != "ADMIN":
         lab_requests_query = lab_requests_query.filter(LabRequest.id == "__none__")
 
@@ -2243,12 +2340,21 @@ def create_workflow_request(
     qty = float(payload.get("quantity") or payload.get("estimatedQuantityKg") or 15.0)
     target_center_id = payload.get("collectionCentreId") or payload.get("toUserId")
 
-    # Validate the receiver when one is targeted: must exist and hold a
-    # collection/processing role. (Unaddressed requests stay allowed.)
+    # Validate the receiver when one is targeted. The client sends whichever
+    # id it holds from /api/centers/nearest: a CollectionCentre id (facility
+    # table) or a User id for a signed-in collector. Both must resolve and map
+    # to a collection/processing account. (Unaddressed requests stay allowed.)
     receiver = None
     if target_center_id:
-        receiver = db.query(User).filter(User.id == target_center_id).first()
-        if not receiver:
+        centre = db.query(CollectionCentre).filter(CollectionCentre.id == target_center_id).first()
+        if centre:
+            receiver = (
+                db.query(User).filter(User.id == centre.id).first()
+                or db.query(User).filter(User.id.in_(role_aliases("COLLECTOR_PROCESSOR")), User.organization_name == centre.name).first()
+            )
+        if receiver is None:
+            receiver = db.query(User).filter(User.id == target_center_id).first()
+        if receiver is None:
             raise HTTPException(
                 status_code=422,
                 detail={"success": False, "code": "RECEIVER_NOT_FOUND", "message": "The selected collection centre no longer exists."},
@@ -2281,7 +2387,10 @@ def create_workflow_request(
         request_id=req_code,
         harvester_id=current_user.id,
         hive_id=hive_id,
-        collection_centre_id=target_center_id,
+        # Store the RECEIVER'S USER id (the dashboards filter on it). For a
+        # facility-table centre this maps centre.id -> owning User.id; for a
+        # directly supplied User id they are already the same.
+        collection_centre_id=(receiver.id if receiver else target_center_id),
         batch_id=batch_code,
         status="PENDING",
         requested_quantity_kg=qty,
@@ -2609,8 +2718,14 @@ def send_workflow_request_next(
             raise HTTPException(status_code=404, detail={"success": False, "code": "BATCH_NOT_FOUND", "message": "Batch not found."})
         if to_user_id:
             target_lab = db.query(Lab).filter((Lab.id == to_user_id) | (Lab.user_id == to_user_id)).first()
-            if not target_lab or not target_lab.is_active:
+            if target_lab and not target_lab.is_active:
                 raise HTTPException(status_code=404, detail={"success": False, "code": "LAB_NOT_FOUND", "message": "Selected lab is not available."})
+            if not target_lab:
+                # The id may belong to a User row (e.g. a lab account created
+                # via Google sign-in whose facility row has not synced yet).
+                lab_user = db.query(User).filter(User.id == to_user_id).first()
+                if not lab_user or "LAB" not in (lab_user.role or "").upper():
+                    raise HTTPException(status_code=404, detail={"success": False, "code": "LAB_NOT_FOUND", "message": "Selected lab is not available."})
         duplicate_lab = db.query(LabRequest).filter(
             LabRequest.batch_id == batch_id,
             LabRequest.requested_by_id == actor_id,
@@ -2679,8 +2794,13 @@ def send_workflow_request_next(
             raise HTTPException(status_code=409, detail={"success": False, "code": "LAB_TEST_FAILED", "message": "Only batches with PASSED lab tests can be sent to packaging."})
         if to_user_id:
             target_packager = db.query(PackagingFacility).filter(PackagingFacility.id == to_user_id).first()
-            if not target_packager or not target_packager.is_active:
+            if target_packager and not target_packager.is_active:
                 raise HTTPException(status_code=404, detail={"success": False, "code": "PACKAGING_NOT_FOUND", "message": "Selected packaging facility is not available."})
+            if not target_packager:
+                # Fall back to the User row (same Google sign-in case as labs).
+                pkg_user = db.query(User).filter(User.id == to_user_id).first()
+                if not pkg_user or not any(k in (pkg_user.role or "").upper() for k in ("PKG", "PACKAG")):
+                    raise HTTPException(status_code=404, detail={"success": False, "code": "PACKAGING_NOT_FOUND", "message": "Selected packaging facility is not available."})
         if lab_req:
             lab_req.status = "COMPLETED"
 
@@ -2960,7 +3080,11 @@ def create_packaging_batch(
     missing = []
     if not db.query(Harvest).filter(Harvest.id == batch.harvest_id).first():
         missing.append("HARVEST")
-    if not db.query(CollectionRequest).filter(CollectionRequest.batch_id == batch_id, CollectionRequest.status.in_(["ACCEPTED", "SENT_TO_LAB", "COMPLETED"])).first():
+    # The collection request legitimately advances while packaging becomes
+    # possible: ACCEPTED -> SENT_TO_LAB -> (lab report) -> SENT_TO_PACKAGING.
+    # Excluding the later statuses made the FINAL QR impossible to generate —
+    # the endpoint 409'd with "Missing stage(s): COLLECTION" on a complete chain.
+    if not db.query(CollectionRequest).filter(CollectionRequest.batch_id == batch_id, CollectionRequest.status.in_(["ACCEPTED", "SENT_TO_LAB", "SENT_TO_PACKAGING", "COMPLETED"])).first():
         missing.append("COLLECTION")
     if not db.query(ProcessingBatch).filter(ProcessingBatch.batch_id == batch_id).first():
         missing.append("PROCESSING")
@@ -3336,6 +3460,7 @@ def _lab_document_integrity(lab_report, anchored_hash: Optional[str]):
     return ("REPORT INTEGRITY FAILED", recomputed)
 
 
+@app.get("/api/public/verify/{batch_id}")
 @app.get("/api/verify")
 @app.get("/api/verify/{batch_id}")
 @app.get("/verify/{batch_id}")

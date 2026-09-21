@@ -523,13 +523,19 @@ class AuthController extends ChangeNotifier {
             await prefs.setString('user_profile_phone', _currentUser!.phoneNumber!);
           }
 
-          // Sync Google Account details to backend PostgreSQL for this role
+          // Exchange the Firebase session for a real backend JWT. The backend
+          // accepts either a Google OAuth2 ID token or a Firebase ID token —
+          // this is a session exchange, not an optional profile sync: without
+          // the returned token every subsequent API call (Add Hive, requests)
+          // fails with 401 while the app looks logged in.
           try {
             final syncUrl = Uri.parse('$_baseUrl/api/auth/google');
+            final idToken = await _authService.getIdToken();
             final response = await _client.post(
               syncUrl,
               headers: _headers,
               body: jsonEncode({
+                if (idToken != null && idToken.isNotEmpty) 'idToken': idToken,
                 'name': _currentUser!.displayName,
                 'email': _currentUser!.email,
                 'phone': _currentUser!.phoneNumber,
@@ -555,8 +561,19 @@ class AuthController extends ChangeNotifier {
                 if (u['role'] != null) await prefs.setString('user_profile_role', u['role']);
               }
             }
+
+            // No backend session = the workflow cannot run. Surface it instead
+            // of silently continuing to a dashboard where every call 401s.
+            if (!AuthTokenStore.hasToken) {
+              _status = AuthStateStatus.error;
+              _errorMessage = 'Signed in with Google, but the server session could not be created. Please try again.';
+            }
           } catch (e) {
-            debugPrint('[AuthController] Google backend sync warning: $e');
+            debugPrint('[AuthController] Google backend session exchange failed: $e');
+            if (!AuthTokenStore.hasToken) {
+              _status = AuthStateStatus.error;
+              _errorMessage = 'Could not reach HoneyChain servers. Check your connection and try again.';
+            }
           }
         }
       }

@@ -113,7 +113,7 @@ export interface VerificationResponse {
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 export async function fetchVerificationData(batchId: string): Promise<VerificationResponse> {
-  const url = `${API_BASE}/api/verify/${encodeURIComponent(batchId)}`;
+  const url = `${API_BASE}/api/public/verify/${encodeURIComponent(batchId)}`;
   const res = await fetch(url, {
     headers: {
       'Accept': 'application/json',
