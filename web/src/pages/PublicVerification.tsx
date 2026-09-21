@@ -66,6 +66,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   const hasLabTest = !!data.labVerification && data.labVerification.labName !== 'No data available yet.';
   const hasLabReport = hasLabTest && data.labVerification && data.labVerification.parameters && data.labVerification.parameters.length > 0;
   const hasPackaging = !!data.packaging && data.packaging.facility !== 'No data available yet.';
+  const hasBlockchain = !!data.blockchainVerification && data.blockchainVerification.onChainConfigured;
 
   const workflowNodes = [
     { id: 'harvester', title: t.nodes.harvester, active: hasHarvester },
@@ -73,7 +74,8 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
     { id: 'collection', title: t.nodes.collection, active: hasCollection },
     { id: 'laboratory', title: t.nodes.laboratory, active: hasLabTest },
     { id: 'lab_report', title: t.nodes.lab_report, active: hasLabReport },
-    { id: 'packaging', title: t.nodes.packaging, active: hasPackaging }
+    { id: 'packaging', title: t.nodes.packaging, active: hasPackaging },
+    { id: 'blockchain', title: 'BLOCKCHAIN INTEGRITY', active: hasBlockchain }
   ];
 
   const renderModalContent = () => {
@@ -158,6 +160,18 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
             <div className="pv-kv-row"><span className="pv-kv-label">Batch ID</span><span className="pv-kv-value">{data.batchId}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Packaging Date</span><span className="pv-kv-value">{new Date(data.packaging!.packagingDate).toLocaleDateString()}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Seal Status</span><span className="pv-kv-value">{data.packaging!.sealStatus}</span></div>
+          </div>
+        );
+      case 'blockchain':
+        return (
+          <div className="pv-kv-list">
+            <div className="pv-kv-row"><span className="pv-kv-label">Network</span><span className="pv-kv-value">{data.blockchainVerification!.network}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Contract</span><span className="pv-kv-value" style={{fontFamily: 'monospace', fontSize: '12px'}}>{data.blockchainVerification!.contractAddress}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Integrity Status</span><span className="pv-kv-value" style={{fontWeight: 700, color: '#10b981'}}>{data.blockchainVerification!.ledgerStatus}</span></div>
+            {data.blockchainVerification!.latestTxHash && (
+               <div className="pv-kv-row"><span className="pv-kv-label">Latest Hash</span><span className="pv-kv-value" style={{fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all'}}>{data.blockchainVerification!.latestTxHash}</span></div>
+            )}
+            <div className="pv-kv-row"><span className="pv-kv-label">Total Validated Events</span><span className="pv-kv-value">{data.blockchainVerification!.totalConfirmedEvents}</span></div>
           </div>
         );
       default:
