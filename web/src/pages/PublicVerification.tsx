@@ -14,6 +14,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   const [activeStage, setActiveStage] = useState<string | null>(null);
 
   const t = (i18nDict[language] || i18nDict['EN']).pv;
+  const isDemo = data?.batchId === 'HC-DEMO-2026';
 
   const loadData = async () => {
     setLoading(true);
@@ -22,7 +23,7 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
       const res = await fetchVerificationData(batchId);
       setData(res);
     } catch (err: any) {
-      setError(t.error);
+      setError("Verification temporarily unavailable");
     } finally {
       setLoading(false);
     }
@@ -36,24 +37,27 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
 
   if (loading) {
     return (
-      <div className="pv-message-container">
-        <p className="pv-message">{t.loading}</p>
+      <div className="pv-message-container" style={{ textAlign: 'center', padding: '40px' }}>
+        <div style={{ fontSize: '32px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>🐝</div>
+        <p className="pv-message" style={{ fontWeight: 600 }}>Loading Verification Data...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="pv-message-container">
-        <p className="pv-message error-text">{error}</p>
+      <div className="pv-message-container" style={{ textAlign: 'center', padding: '40px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px' }}>
+        <p className="pv-message error-text" style={{ color: '#ef4444', fontWeight: 600, fontSize: '18px', marginBottom: '16px' }}>{error}</p>
+        <button onClick={loadData} style={{ padding: '8px 16px', background: 'var(--text-primary)', color: 'var(--bg-color)', borderRadius: '6px', fontWeight: 600 }}>Retry</button>
       </div>
     );
   }
 
   if (data && !data.found) {
     return (
-      <div className="pv-message-container">
-        <h2 className="pv-message-title">{t.notFound}</h2>
+      <div className="pv-message-container" style={{ textAlign: 'center', padding: '40px' }}>
+        <h2 className="pv-message-title" style={{ fontSize: '20px', fontWeight: 700 }}>{t.notFound}</h2>
+        <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>Please check the QR code or Batch ID.</p>
       </div>
     );
   }
@@ -65,19 +69,16 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   const hasCollection = !!data.collection && data.collection.center !== 'No data available yet.' || !!data.collectionProcessing;
   const hasProcessing = !!data.processing && data.processing.processor !== 'No data available yet.' || !!data.collectionProcessing;
   const hasLabTest = !!data.labVerification && data.labVerification.labName !== 'No data available yet.';
-  const hasLabReport = hasLabTest && data.labVerification && data.labVerification.parameters && data.labVerification.parameters.length > 0;
   const hasPackaging = !!data.packaging && data.packaging.facility !== 'No data available yet.';
   const hasBlockchain = !!data.blockchainVerification && data.blockchainVerification.onChainConfigured;
 
   const workflowNodes = [
-    { id: 'harvester', title: t.nodes.harvester, active: hasHarvester },
-    { id: 'hive', title: t.nodes.hive, active: hasHive },
-    { id: 'collection', title: 'COLLECTION', active: hasCollection },
-    { id: 'processing', title: 'PROCESSING', active: hasProcessing },
-    { id: 'laboratory', title: t.nodes.laboratory, active: hasLabTest },
-    { id: 'lab_report', title: t.nodes.lab_report, active: hasLabReport },
-    { id: 'packaging', title: t.nodes.packaging, active: hasPackaging },
-    { id: 'blockchain', title: 'BLOCKCHAIN INTEGRITY', active: hasBlockchain }
+    { id: 'harvester', title: '🐝 HARVESTER', active: hasHarvester },
+    { id: 'collection', title: '📦 COLLECTION', active: hasCollection },
+    { id: 'processing', title: '⚙️ PROCESSING', active: hasProcessing },
+    { id: 'laboratory', title: '🧪 LAB TEST', active: hasLabTest },
+    { id: 'packaging', title: '📦 PACKAGING', active: hasPackaging },
+    { id: 'blockchain', title: '🔗 BLOCKCHAIN / INTEGRITY', active: hasBlockchain }
   ];
 
   const renderModalContent = () => {
@@ -86,35 +87,20 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
         return (
           <div className="pv-kv-list">
             <div className="pv-kv-row"><span className="pv-kv-label">Harvester Name</span><span className="pv-kv-value">{data.harvester.name}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Harvester ID</span><span className="pv-kv-value">{data.harvester.beekeeperId}</span></div>
-            {data.harvester.apiaryLocation !== 'No data available yet.' && (
-              <div className="pv-kv-row"><span className="pv-kv-label">Location</span><span className="pv-kv-value">{data.harvester.apiaryLocation}</span></div>
-            )}
-            {data.harvester.beeBreed !== 'Unknown' && (
-              <div className="pv-kv-row"><span className="pv-kv-label">Bee Breed</span><span className="pv-kv-value">{data.harvester.beeBreed}</span></div>
-            )}
-          </div>
-        );
-      case 'hive':
-        return (
-          <div className="pv-kv-list">
             <div className="pv-kv-row"><span className="pv-kv-label">Hive ID</span><span className="pv-kv-value">{data.harvester.hiveCode}</span></div>
-            {data.iotTelemetry && data.iotTelemetry.temperature !== 'No IoT telemetry available yet.' && (
-              <>
-                <div className="pv-kv-row"><span className="pv-kv-label">Temperature</span><span className="pv-kv-value">{data.iotTelemetry.temperature}</span></div>
-                <div className="pv-kv-row"><span className="pv-kv-label">Humidity</span><span className="pv-kv-value">{data.iotTelemetry.humidity}</span></div>
-                <div className="pv-kv-row"><span className="pv-kv-label">Weight</span><span className="pv-kv-value">{data.iotTelemetry.weight}</span></div>
-                <div className="pv-kv-row"><span className="pv-kv-label">Recorded At</span><span className="pv-kv-value">{new Date(data.iotTelemetry.recordedAt).toLocaleString()}</span></div>
-              </>
-            )}
+            <div className="pv-kv-row"><span className="pv-kv-label">Location</span><span className="pv-kv-value">{data.harvester.apiaryLocation}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Bee Breed</span><span className="pv-kv-value">{data.harvester.beeBreed}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Queen Status</span><span className="pv-kv-value">{data.harvester.queenStatus}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Batch ID</span><span className="pv-kv-value">{data.batchId}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Status</span><span className="pv-kv-value">Harvest Completed</span></div>
           </div>
         );
       case 'collection':
         return (
           <div className="pv-kv-list">
-            <div className="pv-kv-row"><span className="pv-kv-label">Collection Center</span><span className="pv-kv-value">{data.collection?.center || data.collectionProcessing!.processor}</span></div>
-            {data.collection?.collector && <div className="pv-kv-row"><span className="pv-kv-label">Collector</span><span className="pv-kv-value">{data.collection.collector}</span></div>}
-            <div className="pv-kv-row"><span className="pv-kv-label">Received Date</span><span className="pv-kv-value">{data.collection?.receivedDate ? new Date(data.collection.receivedDate).toLocaleDateString() : 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Collection Center</span><span className="pv-kv-value">{data.collection?.center || data.collectionProcessing?.processor || 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Collector</span><span className="pv-kv-value">{data.collection?.collector || 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Received Date</span><span className="pv-kv-value">{data.collection?.receivedDate ? new Date(data.collection.receivedDate).toLocaleString() : 'N/A'}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Quantity Received</span><span className="pv-kv-value">{data.collection?.quantityKg || data.collectionProcessing?.quantityReceivedKg} kg</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Status</span><span className="pv-kv-value">{data.collection?.status || 'Received'}</span></div>
           </div>
@@ -122,66 +108,68 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
       case 'processing':
         return (
           <div className="pv-kv-list">
-            <div className="pv-kv-row"><span className="pv-kv-label">Processor</span><span className="pv-kv-value">{data.processing?.processor || data.collectionProcessing!.processor}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Processing Date</span><span className="pv-kv-value">{data.processing?.processingDate || data.collectionProcessing?.processingDate ? new Date((data.processing?.processingDate || data.collectionProcessing?.processingDate)!).toLocaleDateString() : 'N/A'}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Method</span><span className="pv-kv-value">{data.processing?.method || data.collectionProcessing!.method}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Input Quantity</span><span className="pv-kv-value">{data.processing?.inputQuantityKg || data.collectionProcessing?.inputQuantityKg} kg</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Output Quantity</span><span className="pv-kv-value">{data.processing?.outputQuantityKg || data.collectionProcessing?.outputQuantityKg} kg</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Status</span><span className="pv-kv-value">{data.processing?.status || data.collectionProcessing?.status || 'Processed'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Processor</span><span className="pv-kv-value">{data.processing?.processor || data.collectionProcessing?.processor || 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Processing Date</span><span className="pv-kv-value">{(data.processing?.processingDate || data.collectionProcessing?.processingDate) ? new Date((data.processing?.processingDate || data.collectionProcessing?.processingDate)!).toLocaleString() : 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Method</span><span className="pv-kv-value">{data.processing?.method || data.collectionProcessing?.method || 'N/A'}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Input Quantity</span><span className="pv-kv-value">{data.processing?.inputQuantityKg || data.collectionProcessing?.inputQuantityKg || 'N/A'} kg</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Output Quantity</span><span className="pv-kv-value">{data.processing?.outputQuantityKg || data.collectionProcessing?.outputQuantityKg || 'N/A'} kg</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Status</span><span className="pv-kv-value">{data.processing?.status || 'Processed'}</span></div>
           </div>
         );
       case 'laboratory':
         return (
           <div className="pv-kv-list">
-            <div className="pv-kv-row"><span className="pv-kv-label">Laboratory Name</span><span className="pv-kv-value">{data.labVerification!.labName}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Report Number</span><span className="pv-kv-value">{data.labVerification!.reportId}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Test Result</span><span className="pv-kv-value" style={{fontWeight: 700}}>{data.labVerification!.status}</span></div>
-          </div>
-        );
-      case 'lab_report':
-        return (
-          <div className="pv-kv-list">
+            {isDemo && <div style={{ background: '#fef3c7', color: '#92400e', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginBottom: '16px', textAlign: 'center' }}>DEMO RESULT — FOR PROTOTYPE ONLY</div>}
             <div className="pv-kv-row"><span className="pv-kv-label">Laboratory</span><span className="pv-kv-value">{data.labVerification!.labName}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Report Number</span><span className="pv-kv-value">{data.labVerification!.reportId}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Batch ID</span><span className="pv-kv-value">{data.batchId}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Quality Score</span><span className="pv-kv-value">{data.labVerification!.qualityScore}/100</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Overall Status</span><span className="pv-kv-value" style={{fontWeight: 700}}>{data.labVerification!.status}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Overall Result</span><span className="pv-kv-value" style={{fontWeight: 800, color: '#10b981'}}>{isDemo ? 'DEMO — PASSED' : data.labVerification!.status}</span></div>
             
-            <h4 style={{ margin: '16px 0 8px 0', fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Detailed Parameters</h4>
-            {data.labVerification!.parameters.map((param, i) => (
-              <div className="pv-kv-row" key={i} style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '12px 0', gap: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                  <span className="pv-kv-label" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{param.name}</span>
-                  <span className="pv-kv-value" style={{ 
-                    fontWeight: 700, 
-                    fontSize: '13px',
-                    color: param.status === 'Pass' ? '#10b981' : param.status === 'Fail' ? '#ef4444' : 'var(--text-secondary)'
-                  }}>{param.status}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  <span>Result: <strong>{param.value}</strong></span>
-                  <span>Standard: {param.standard}</span>
-                </div>
+            <h4 style={{ margin: '24px 0 12px 0', fontSize: '14px', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Test Results Table</h4>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border-color)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 60px', background: 'var(--surface-color)', padding: '10px 12px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                <div>Test</div>
+                <div>Result</div>
+                <div style={{textAlign: 'right'}}>Status</div>
               </div>
-            ))}
+              {data.labVerification!.parameters.map((param, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 60px', background: 'var(--bg-color)', padding: '12px', fontSize: '13px', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{param.name}</div>
+                  <div style={{ color: 'var(--text-secondary)' }}>{param.value}</div>
+                  <div style={{ textAlign: 'right', fontWeight: 700, color: param.status === 'Pass' ? '#10b981' : '#ef4444' }}>{param.status}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                <button style={{ background: 'var(--text-primary)', color: 'var(--bg-color)', padding: '10px 20px', borderRadius: '6px', fontWeight: 600, fontSize: '14px', cursor: 'pointer', border: 'none' }}>View Full Lab Report →</button>
+            </div>
           </div>
         );
       case 'packaging':
         return (
           <div className="pv-kv-list">
             <div className="pv-kv-row"><span className="pv-kv-label">Packaging Facility</span><span className="pv-kv-value">{data.packaging!.facility}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Batch ID</span><span className="pv-kv-value">{data.batchId}</span></div>
-            <div className="pv-kv-row"><span className="pv-kv-label">Packaging Date</span><span className="pv-kv-value">{new Date(data.packaging!.packagingDate).toLocaleDateString()}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Packaging Date</span><span className="pv-kv-value">{new Date(data.packaging!.packagingDate).toLocaleString()}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Final Batch ID</span><span className="pv-kv-value">{data.batchId}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">Net Quantity</span><span className="pv-kv-value">{data.packaging!.packageSize} x {data.packaging!.numberOfPackages}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Seal Status</span><span className="pv-kv-value">{data.packaging!.sealStatus}</span></div>
+            <div className="pv-kv-row"><span className="pv-kv-label">QR Generated At</span><span className="pv-kv-value">{new Date().toLocaleString()}</span></div>
           </div>
         );
       case 'blockchain':
         return (
           <div className="pv-kv-list">
+            {isDemo && <div style={{ background: '#fef3c7', color: '#92400e', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginBottom: '16px', textAlign: 'center' }}>DEMO BLOCKCHAIN DATA</div>}
             <div className="pv-kv-row"><span className="pv-kv-label">Network</span><span className="pv-kv-value">{data.blockchainVerification!.network}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Contract</span><span className="pv-kv-value" style={{fontFamily: 'monospace', fontSize: '12px'}}>{data.blockchainVerification!.contractAddress}</span></div>
             <div className="pv-kv-row"><span className="pv-kv-label">Integrity Status</span><span className="pv-kv-value" style={{fontWeight: 700, color: '#10b981'}}>{data.blockchainVerification!.ledgerStatus}</span></div>
             {data.blockchainVerification!.latestTxHash && (
-               <div className="pv-kv-row"><span className="pv-kv-label">Latest Hash</span><span className="pv-kv-value" style={{fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all'}}>{data.blockchainVerification!.latestTxHash}</span></div>
+               <div className="pv-kv-row" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '4px'}}>
+                   <span className="pv-kv-label">Transaction Hash</span>
+                   <span className="pv-kv-value" style={{fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all', color: 'var(--text-secondary)'}}>{data.blockchainVerification!.latestTxHash}</span>
+               </div>
             )}
             <div className="pv-kv-row"><span className="pv-kv-label">Total Validated Events</span><span className="pv-kv-value">{data.blockchainVerification!.totalConfirmedEvents}</span></div>
           </div>
@@ -192,54 +180,108 @@ export const PublicVerification: React.FC<Props> = ({ batchId, language = 'EN' }
   };
 
   return (
-    <div className="pv-container">
-      <div className="pv-header">
-        <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>HoneyChain</h1>
-        <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 16px 0', textTransform: 'uppercase' }}>Honey Traceability & Verification</h2>
-        <div className="pv-status-badge" style={{ backgroundColor: data.isFullyVerified ? '#10b981' : '#f59e0b' }}>
-          {data.isFullyVerified ? 'VERIFIED' : 'PENDING'}
+    <div className="pv-container" style={{ maxWidth: '600px', margin: '0 auto', padding: '16px', fontFamily: 'Inter, sans-serif' }}>
+      {isDemo && (
+        <div style={{ background: '#000', color: '#facc15', padding: '12px', textAlign: 'center', fontWeight: 800, letterSpacing: '1px', fontSize: '14px', borderRadius: '8px', marginBottom: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+          DEMO MODE — PROTOTYPE DATA
         </div>
-        <p className="pv-trace-id" style={{ marginTop: '12px', fontWeight: 600 }}>{t.traceId}: {data.batchId || batchId}</p>
+      )}
+
+      <div className="pv-header" style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>HoneyChain</h1>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 24px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Honey Traceability & Verification</h2>
+        
+        <div style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', margin: '0' }}>Batch Summary</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Batch ID</span><strong style={{ fontFamily: 'monospace' }}>{data.batchId}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Product</span><strong>{data.product?.productName || 'Raw Forest Honey'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Total Quantity</span><strong>{data.product?.quantityKg || data.packaging?.packageSize}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Current Status</span><strong>{data.status}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Verification Status</span><strong style={{ color: data.isFullyVerified ? '#10b981' : '#f59e0b' }}>{data.isFullyVerified ? '✓ Verified' : 'Pending'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Trace ID</span><strong style={{ fontFamily: 'monospace', fontSize: '12px' }}>{data.traceabilityId}</strong></div>
+        </div>
       </div>
 
-      <div className="pv-workflow">
+      <div style={{ marginBottom: '16px', fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Traceability Timeline</div>
+      <div className="pv-workflow" style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
+        {/* Timeline connector line */}
+        <div style={{ position: 'absolute', left: '24px', top: '24px', bottom: '24px', width: '2px', background: 'var(--border-color)', zIndex: 0 }}></div>
+        
         {workflowNodes.map((node) => (
           node.active && (
             <button 
               key={node.id} 
-              className="pv-workflow-node"
               onClick={() => setActiveStage(node.id)}
+              style={{ 
+                position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '12px', 
+                padding: '16px 20px', cursor: 'pointer', textAlign: 'left', width: '100%',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.borderColor = '#facc15'}
+              onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
             >
-              {node.title}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{node.title}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600 }}>Tap to view details</span>
+                <span style={{ fontSize: '18px' }}>→</span>
+              </div>
             </button>
           )
         ))}
+        {data.isFullyVerified && (
+             <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: '#10b981', color: '#fff', borderRadius: '12px', fontWeight: 700 }}>
+                 <span style={{ fontSize: '20px' }}>✓</span> VERIFIED
+             </div>
+        )}
       </div>
 
-      <div className="pv-footer" style={{ marginTop: '24px', textAlign: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-        <h2 className="pv-section-title" style={{ fontSize: '18px', fontWeight: 800 }}>
-          {data.isFullyVerified ? t.traceability : 'INCOMPLETE TRACEABILITY'}
+      <div className="pv-footer" style={{ marginTop: '40px', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px' }}>
+        <h2 className="pv-section-title" style={{ fontSize: '16px', fontWeight: 800, marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+          Verification Summary
         </h2>
-        <p className="pv-trace-status" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-          {data.status}
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Batch</span><strong style={{fontFamily: 'monospace'}}>{data.batchId}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Status</span><strong style={{color: data.isFullyVerified ? '#10b981' : 'inherit'}}>{data.isFullyVerified ? '✓ Verified' : 'Pending'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Traceability</span><strong>{data.isFullyVerified ? 'Complete' : 'Incomplete'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Lab Report</span><strong>{hasLabTest ? 'Available' : 'Pending'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Packaging</span><strong>{hasPackaging ? 'Completed' : 'Pending'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}><span style={{ color: 'var(--text-secondary)' }}>Data Type</span><strong style={{color: isDemo ? '#facc15' : 'inherit'}}>{isDemo ? 'DEMO / PROTOTYPE' : 'PRODUCTION'}</strong></div>
+        </div>
       </div>
 
       {activeStage && (
-        <div className="modal-overlay" onClick={() => setActiveStage(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">
-                {workflowNodes.find(n => n.id === activeStage)?.title.substring(3)}
+        <div className="modal-overlay" onClick={() => setActiveStage(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-color)', width: '100%', maxWidth: '600px', maxHeight: '90vh', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.3s ease-out' }}>
+            <div className="modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-color)' }}>
+              <button onClick={() => setActiveStage(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '14px', cursor: 'pointer', padding: '8px 0' }}>
+                <span style={{ fontSize: '18px' }}>←</span> Back
+              </button>
+              <h2 className="modal-title" style={{ fontSize: '16px', fontWeight: 800, margin: 0, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+                {workflowNodes.find(n => n.id === activeStage)?.title.replace(/^[^\w\s]+/, '').trim()}
               </h2>
-              <button className="modal-close" onClick={() => setActiveStage(null)}>{t.close}</button>
+              <button onClick={() => setActiveStage(null)} aria-label="Close modal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', background: 'var(--border-color)', border: 'none', borderRadius: '50%', color: 'var(--text-primary)', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }}>
+                ✕
+              </button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto' }}>
               {renderModalContent()}
             </div>
           </div>
         </div>
       )}
+      <style>{`
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
