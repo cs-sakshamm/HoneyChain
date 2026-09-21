@@ -113,17 +113,10 @@ export const App: React.FC = () => {
     setCurrentBatchId(cleanId);
   };
 
-  const footerLinks: ModalKey[] = ['Home', 'About', 'Traceability', 'Technology', 'Laboratory', 'Contact'];
+  const footerLinks: ModalKey[] = ['About', 'Traceability', 'Technology', 'Laboratory', 'Contact'];
 
   const getModalContent = (key: ModalKey) => {
     switch(key) {
-      case 'Home':
-        return (
-          <>
-            <p>Welcome to the HoneyChain Public Verification Portal.</p>
-            <p>This platform allows consumers to independently verify the origin, handling, and purity of their honey products by scanning a QR code that is securely linked to immutable records.</p>
-          </>
-        );
       case 'About':
         return (
           <>
@@ -172,14 +165,8 @@ export const App: React.FC = () => {
   return (
     <div className="app-layout" onClick={() => setShowLangMenu(false)}>
       
-      {/* Top Header - Matches Select Role Page */}
-      <header className="app-header-centered">
-        
-        {/* Centered Logo */}
-        <div className="center-logo-wrapper">
-          <HoneyChainLogo size={32} showWordmark={true} />
-        </div>
-        
+      {/* Top Header - Actions Only */}
+      <header className="app-header-centered" style={{ justifyContent: 'flex-end' }}>
         {/* Right Actions */}
         <div className="header-right-actions">
           
@@ -220,6 +207,10 @@ export const App: React.FC = () => {
       </header>
 
       <main className="app-main">
+        {/* Centered Logo in the middle of the screen */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '32px' }}>
+          <HoneyChainLogo size={42} showWordmark={true} />
+        </div>
         {currentBatchId ? (
           <PublicVerification batchId={currentBatchId} language={language} />
         ) : (
